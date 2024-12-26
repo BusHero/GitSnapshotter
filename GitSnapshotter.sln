@@ -1,8 +1,11 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
+# 
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GitSnapshotter", "GitSnapshotter\GitSnapshotter.csproj", "{4C623319-8AF5-4F7B-92E8-9227B3DEAB64}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "_build", "build\_build.csproj", "{B64E18DA-2E00-40A1-B3EB-56F4383749C7}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GitSnapshotter.Console", "GitSnapshotter.Console\GitSnapshotter.Console.csproj", "{41EA0338-58AF-4CF5-9EFB-78D25ABFA819}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -16,5 +19,9 @@ Global
 		{4C623319-8AF5-4F7B-92E8-9227B3DEAB64}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4C623319-8AF5-4F7B-92E8-9227B3DEAB64}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4C623319-8AF5-4F7B-92E8-9227B3DEAB64}.Release|Any CPU.Build.0 = Release|Any CPU
+		{41EA0338-58AF-4CF5-9EFB-78D25ABFA819}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{41EA0338-58AF-4CF5-9EFB-78D25ABFA819}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{41EA0338-58AF-4CF5-9EFB-78D25ABFA819}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{41EA0338-58AF-4CF5-9EFB-78D25ABFA819}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
