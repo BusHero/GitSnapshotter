@@ -25,14 +25,14 @@ sealed class Build : NukeBuild
         .Executes(() =>
         {
             DotNetClean(_ => _
-                .SetProject(Solution.GitSnapshotter));
+                .SetProject(Solution.GitSnapshotter_Console));
         });
 
     Target Restore => _ => _
         .Executes(() =>
         {
             DotNetRestore(_ => _
-                .SetProjectFile(Solution.GitSnapshotter));
+                .SetProjectFile(Solution.GitSnapshotter_Console));
         });
 
     Target Compile => _ => _
@@ -43,6 +43,6 @@ sealed class Build : NukeBuild
                 .SetConfiguration(Configuration)
                 .EnableNoLogo()
                 .EnableNoRestore()
-                .SetProjectFile(Solution.GitSnapshotter));
+                .SetProjectFile(Solution.GitSnapshotter_Console));
         });
 }
