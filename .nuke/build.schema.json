@@ -109,6 +109,13 @@
             "Release"
           ]
         },
+        "GithubOutput": {
+          "type": "string",
+          "description": "Github Output"
+        },
+        "PublishDirectory": {
+          "type": "string"
+        },
         "Solution": {
           "type": "string",
           "description": "Path to a solution file that is automatically loaded. Default is Source/GitSnapshotter.sln"

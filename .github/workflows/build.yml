@@ -19,5 +19,12 @@ jobs:
             .nuke/temp
             ~/.nuget/packages
           key: ${{ runner.os }}-${{ hashFiles('**/global.json', '**/*.csproj', '**/Directory.Packages.props') }}
+      
       - name: 'Run: Compile'
-        run: ./build.cmd Compile
+        id: nuke
+        run: ./build.cmd Publish -publish-directory publish -github-output "$GITHUB_OUTPUT"
+      
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GitSnapshotter.Console_${{ steps.nuke.outputs.version }}
+          path: publish
