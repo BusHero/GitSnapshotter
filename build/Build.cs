@@ -4,9 +4,11 @@ using System.Threading.Tasks;
 
 using Nuke.Common;
 using Nuke.Common.CI.GitHubActions;
+using Nuke.Common.Git;
 using Nuke.Common.IO;
 using Nuke.Common.ProjectModel;
 using Nuke.Common.Tools.DotNet;
+using Nuke.Common.Tools.GitHub;
 
 using static Nuke.Common.Tools.DotNet.DotNetTasks;
 
@@ -18,6 +20,8 @@ using static Nuke.Common.Tools.DotNet.DotNetTasks;
     InvokedTargets = [nameof(Compile)])]
 sealed class Build : NukeBuild
 {
+    private const string MainBranch = "trunk";
+
     public static int Main() => Execute<Build>(x => x.Compile);
 
     [Parameter("Configuration to build - Default is 'Debug' (local) or 'Release' (server)")]
@@ -29,6 +33,8 @@ sealed class Build : NukeBuild
     [Parameter("Github Output")] private readonly string GithubOutput = null!;
 
     [Parameter] public AbsolutePath PublishDirectory { get; } = null!;
+
+    [GitRepository] readonly GitRepository Repository = null!;
 
     Target Clean => _ => _
         .Before(Restore)
@@ -69,8 +75,9 @@ sealed class Build : NukeBuild
                 .SetOutput(PublishDirectory)
                 .SetProject(Solution.GitSnapshotter_Console)
             );
-            
-            await OutputToGithub("version", DateTime.Now.ToString("yyyyMMddHHmmss"));
+            var version =
+                $"{DateTime.Now:yyyyMMddHHmmss}+{(Repository.Branch == await Repository.GetDefaultBranch() ? "trunk" : "merge")}";
+            await OutputToGithub("version", version);
         });
 
     async Task OutputToGithub(string name, object content)
