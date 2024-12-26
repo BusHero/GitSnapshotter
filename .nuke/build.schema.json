@@ -109,6 +109,10 @@
             "Release"
           ]
         },
+        "GithubOutput": {
+          "type": "string",
+          "description": "Github Output"
+        },
         "PublishDirectory": {
           "type": "string"
         },
