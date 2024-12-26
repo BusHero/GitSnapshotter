@@ -1,5 +1,8 @@
 using Nuke.Common;
 using Nuke.Common.CI.GitHubActions;
+using Nuke.Common.ProjectModel;
+using Nuke.Common.Tools.DotNet;
+using static Nuke.Common.Tools.DotNet.DotNetTasks;
 
 [GitHubActions(
     "build",
@@ -7,32 +10,39 @@ using Nuke.Common.CI.GitHubActions;
     On = [GitHubActionsTrigger.Push],
     AutoGenerate = false,
     InvokedTargets = [nameof(Compile)])]
-class Build : NukeBuild
+sealed class Build : NukeBuild
 {
-    /// Support plugins are available for:
-    ///   - JetBrains ReSharper        https://nuke.build/resharper
-    ///   - JetBrains Rider            https://nuke.build/rider
-    ///   - Microsoft VisualStudio     https://nuke.build/visualstudio
-    ///   - Microsoft VSCode           https://nuke.build/vscode
     public static int Main() => Execute<Build>(x => x.Compile);
 
     [Parameter("Configuration to build - Default is 'Debug' (local) or 'Release' (server)")]
     readonly Configuration Configuration = IsLocalBuild ? Configuration.Debug : Configuration.Release;
+    
+    [Solution(GenerateProjects = true)] 
+    readonly Solution Solution;
 
     Target Clean => _ => _
         .Before(Restore)
         .Executes(() =>
         {
+            DotNetClean(_ => _
+                .SetProject(Solution.GitSnapshotter));
         });
 
     Target Restore => _ => _
         .Executes(() =>
         {
+            DotNetRestore(_ => _
+                .SetProjectFile(Solution.GitSnapshotter));
         });
 
     Target Compile => _ => _
         .DependsOn(Restore)
         .Executes(() =>
         {
+            DotNetBuild(_ => _
+                .SetConfiguration(Configuration)
+                .EnableNoLogo()
+                .EnableNoRestore()
+                .SetProjectFile(Solution.GitSnapshotter));
         });
 }
