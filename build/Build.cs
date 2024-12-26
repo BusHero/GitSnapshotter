@@ -45,4 +45,18 @@ sealed class Build : NukeBuild
                 .EnableNoRestore()
                 .SetProjectFile(Solution.GitSnapshotter_Console));
         });
+
+    Target Publish => _ => _
+        .DependsOn(Compile)
+        .Executes(() =>
+        {
+            DotNetPublish(_ => _
+                .EnableNoLogo()
+                .EnableNoBuild()
+                .EnableNoRestore()
+                .SetConfiguration(Configuration)
+                .SetOutput(RootDirectory / "publish" / "GitSnapshotter.Console")
+                .SetProject(Solution.GitSnapshotter_Console)
+            );
+        });
 }
