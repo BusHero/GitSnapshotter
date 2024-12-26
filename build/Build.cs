@@ -1,5 +1,6 @@
 using Nuke.Common;
 using Nuke.Common.CI.GitHubActions;
+using Nuke.Common.IO;
 using Nuke.Common.ProjectModel;
 using Nuke.Common.Tools.DotNet;
 using static Nuke.Common.Tools.DotNet.DotNetTasks;
@@ -46,7 +47,11 @@ sealed class Build : NukeBuild
                 .SetProjectFile(Solution.GitSnapshotter_Console));
         });
 
+    [Parameter] 
+    public AbsolutePath PublishDirectory { get; }
+
     Target Publish => _ => _
+        .Requires(() => PublishDirectory)
         .DependsOn(Compile)
         .Executes(() =>
         {
@@ -55,7 +60,7 @@ sealed class Build : NukeBuild
                 .EnableNoBuild()
                 .EnableNoRestore()
                 .SetConfiguration(Configuration)
-                .SetOutput(RootDirectory / "publish" / "GitSnapshotter.Console")
+                .SetOutput(PublishDirectory)
                 .SetProject(Solution.GitSnapshotter_Console)
             );
         });
