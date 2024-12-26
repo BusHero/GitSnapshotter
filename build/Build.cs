@@ -17,7 +17,7 @@ sealed class Build : NukeBuild
     [Parameter("Configuration to build - Default is 'Debug' (local) or 'Release' (server)")]
     readonly Configuration Configuration = IsLocalBuild ? Configuration.Debug : Configuration.Release;
     
-    [Solution(GenerateProjects = true)] 
+    [Solution(relativePath: "Source/GitSnapshotter.sln", GenerateProjects = true)] 
     readonly Solution Solution;
 
     Target Clean => _ => _
