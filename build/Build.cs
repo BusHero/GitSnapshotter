@@ -2,6 +2,8 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 
+using JetBrains.Annotations;
+
 using Nuke.Common;
 using Nuke.Common.CI.GitHubActions;
 using Nuke.Common.Git;
@@ -20,8 +22,6 @@ using static Nuke.Common.Tools.DotNet.DotNetTasks;
     InvokedTargets = [nameof(Compile)])]
 sealed class Build : NukeBuild
 {
-    private const string MainBranch = "trunk";
-
     public static int Main() => Execute<Build>(x => x.Compile);
 
     [Parameter("Configuration to build - Default is 'Debug' (local) or 'Release' (server)")]
@@ -36,6 +36,7 @@ sealed class Build : NukeBuild
 
     [GitRepository] readonly GitRepository Repository = null!;
 
+    [UsedImplicitly]
     Target Clean => _ => _
         .Before(Restore)
         .Executes(() =>
@@ -62,6 +63,7 @@ sealed class Build : NukeBuild
                 .SetProjectFile(Solution.GitSnapshotter_Console));
         });
 
+    [UsedImplicitly]
     Target Publish => _ => _
         .Requires(() => PublishDirectory)
         .DependsOn(Compile)
