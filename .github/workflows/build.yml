@@ -22,7 +22,7 @@ jobs:
       
       - name: 'Run: Nuke'
         id: nuke
-        run: ./build.cmd Publish, RunUnitTests -publish-directory publish -configuration Release -github-output "$GITHUB_OUTPUT"
+        run: ./build.cmd Publish RunUnitTests -publish-directory publish -configuration Release -github-output "$GITHUB_OUTPUT"
       
       - uses: actions/upload-artifact@v4
         with:
