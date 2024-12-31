@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Threading.Tasks;
 
@@ -20,39 +21,41 @@ using static Nuke.Common.Tools.DotNet.DotNetTasks;
     On = [GitHubActionsTrigger.Push],
     AutoGenerate = false,
     InvokedTargets = [nameof(Compile)])]
+[SuppressMessage("ReSharper", "MemberCanBePrivate.Global")]
 sealed class Build : NukeBuild
 {
     public static int Main() => Execute<Build>(x => x.Compile);
 
     [Parameter("Configuration to build - Default is 'Debug' (local) or 'Release' (server)")]
-    readonly Configuration Configuration = IsLocalBuild ? Configuration.Debug : Configuration.Release;
+    private readonly Configuration Configuration = IsLocalBuild ? Configuration.Debug : Configuration.Release;
 
     [Solution(relativePath: "Source/GitSnapshotter.sln", GenerateProjects = true)]
-    readonly Solution Solution = null!;
+    private readonly Solution Solution = null!;
 
     [Parameter("Github Output")] private readonly string GithubOutput = null!;
 
     [Parameter] public AbsolutePath PublishDirectory { get; } = null!;
 
-    [GitRepository] readonly GitRepository Repository = null!;
+    [GitRepository] public readonly GitRepository Repository = null!;
 
     [UsedImplicitly]
-    Target Clean => _ => _
+    public Target Clean => _ => _
         .Before(Restore)
         .Executes(() =>
         {
             DotNetClean(_ => _
-                .SetProject(Solution.GitSnapshotter_Console));
+                .SetConfiguration(Configuration)
+                .SetProject(Solution));
         });
 
-    Target Restore => _ => _
+    public Target Restore => _ => _
         .Executes(() =>
         {
             DotNetRestore(_ => _
-                .SetProjectFile(Solution.GitSnapshotter_Console));
+                .SetProjectFile(Solution));
         });
 
-    Target Compile => _ => _
+    public Target Compile => _ => _
         .DependsOn(Restore)
         .Executes(() =>
         {
@@ -60,11 +63,11 @@ sealed class Build : NukeBuild
                 .SetConfiguration(Configuration)
                 .EnableNoLogo()
                 .EnableNoRestore()
-                .SetProjectFile(Solution.GitSnapshotter_Console));
+                .SetProjectFile(Solution));
         });
 
     [UsedImplicitly]
-    Target Publish => _ => _
+    public Target Publish => _ => _
         .Requires(() => PublishDirectory)
         .DependsOn(Compile)
         .Executes(async () =>
@@ -77,13 +80,30 @@ sealed class Build : NukeBuild
                 .SetOutput(PublishDirectory)
                 .SetProject(Solution.GitSnapshotter_Console)
             );
+
             var version =
                 $"{DateTime.Now:yyyyMMddHHmmss}+{(Repository.Branch == await Repository.GetDefaultBranch() ? "trunk" : "merge")}";
+
             await OutputToGithub("version", version);
         });
 
-    async Task OutputToGithub(string name, object content)
+    [UsedImplicitly]
+    public Target RunUnitTests => _ => _
+        .DependsOn(Compile)
+        .Executes(() =>
+        {
+            DotNetTest(_ => _
+                .SetProjectFile(Solution)
+                .EnableNoBuild()
+                .EnableNoRestore()
+                .SetConfiguration(Configuration)
+                .EnableNoLogo());
+        });
+
+    private async Task OutputToGithub(string name, object content)
     {
-        await File.AppendAllTextAsync(GithubOutput, $"{name}={content}\n");
+        await File.AppendAllTextAsync(
+            GithubOutput,
+            $"{name}={content}\n");
     }
 }
