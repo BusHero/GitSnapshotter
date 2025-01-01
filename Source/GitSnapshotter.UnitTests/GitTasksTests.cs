@@ -7,9 +7,11 @@ public class GitTasksTests
     [Fact]
     public async Task NewGitRepositoryIsGitRepository()
     {
-        var gitRepository = await GitTasks.CreateGitRepository();
-
-        var result = await GitTasks.IsGitRepository(gitRepository);
+        var directory = GetTempDirectoryName();
+        
+        await GitTasks.CreateGitRepository(directory);
+        
+        var result = await GitTasks.IsGitRepository(directory);
 
         result.Should().BeTrue();
     }
@@ -17,9 +19,9 @@ public class GitTasksTests
     [Fact]
     public async Task MissingFolderIsNoGitRepository()
     {
-        var gitRepository = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        var directory = GetTempDirectoryName();
 
-        var result = await GitTasks.IsGitRepository(gitRepository);
+        var result = await GitTasks.IsGitRepository(directory);
 
         result.Should().BeFalse();
     }
@@ -27,10 +29,11 @@ public class GitTasksTests
     [Fact]
     public async Task NewFolderIsNoGitRepository()
     {
-        var gitRepository = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-        Directory.CreateDirectory(gitRepository);
+        var directory = GetTempDirectoryName();
         
-        var result = await GitTasks.IsGitRepository(gitRepository);
+        Directory.CreateDirectory(directory);
+        
+        var result = await GitTasks.IsGitRepository(directory);
 
         result.Should().BeFalse();
     }
@@ -38,11 +41,13 @@ public class GitTasksTests
     [Fact]
     public async Task DeletedGitRepositoryIsNoGitRepository()
     {
-        var gitRepository = await GitTasks.CreateGitRepository();
+        var directory = GetTempDirectoryName();
         
-        Directory.Delete(gitRepository, true);
+        await GitTasks.CreateGitRepository(directory);
         
-        var result = await GitTasks.IsGitRepository(gitRepository);
+        Directory.Delete(directory, true);
+        
+        var result = await GitTasks.IsGitRepository(directory);
 
         result.Should().BeFalse();
     }
@@ -84,4 +89,11 @@ public class GitTasksTests
     //     
     //     var result = GitRepository.GetSnapshot();
     // }
+
+    private static string GetTempDirectoryName()
+    {
+        return Path.Combine(
+            Path.GetTempPath(),
+            Guid.NewGuid().ToString("N"));
+    }
 }

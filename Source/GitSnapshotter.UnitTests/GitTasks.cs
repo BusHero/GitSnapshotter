@@ -4,19 +4,15 @@ namespace GitSnapshotter.UnitTests;
 
 public static class GitTasks
 {
-    public static async Task<string> CreateGitRepository()
+    public static async Task<string> CreateGitRepository(string path)
     {
-        var directory = Path.Combine(
-            Path.GetTempPath(),
-            Guid.NewGuid().ToString("N"));
-
         await Cli.Wrap("git")
             .WithArguments(_ => _
                 .Add("init")
-                .Add(directory))
+                .Add(path))
             .ExecuteAsync();
 
-        return directory;
+        return path;
     }
 
     public static async Task<bool> IsGitRepository(string path)
