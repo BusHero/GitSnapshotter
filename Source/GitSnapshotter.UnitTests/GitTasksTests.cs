@@ -1,15 +1,22 @@
-﻿using FluentAssertions;
+﻿using CliWrap;
+
+using FluentAssertions;
+
+using Xunit.Abstractions;
 
 namespace GitSnapshotter.UnitTests;
 
-public class GitTasksTests
+public class GitTasksTests(ITestOutputHelper output)
 {
     [Fact]
     public async Task NewGitRepositoryIsGitRepository()
     {
         var directory = GetTempDirectoryName();
         
-        await GitTasks.CreateGitRepository(directory);
+        await GitTasks.CreateGitRepositoryCommand(directory)
+            .WithStandardOutputPipe(PipeTarget.ToDelegate(output.WriteLine))
+            .WithStandardErrorPipe(PipeTarget.ToDelegate(x => output.WriteLine($"Err: {x}")))
+            .ExecuteAsync();
         
         var result = await GitTasks.IsGitRepository(directory);
 
@@ -43,7 +50,10 @@ public class GitTasksTests
     {
         var directory = GetTempDirectoryName();
         
-        await GitTasks.CreateGitRepository(directory);
+        await GitTasks.CreateGitRepositoryCommand(directory)
+            .WithStandardOutputPipe(PipeTarget.ToDelegate(output.WriteLine))
+            .WithStandardErrorPipe(PipeTarget.ToDelegate(x => output.WriteLine($"Err: {x}")))
+            .ExecuteAsync();
         
         Directory.Delete(directory, true);
         

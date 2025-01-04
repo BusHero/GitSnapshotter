@@ -4,12 +4,16 @@ namespace GitSnapshotter.UnitTests;
 
 public static class GitTasks
 {
-    public static async Task CreateGitRepository(string path)
-    {
-        await Cli.Wrap("git")
+    public static Command CreateGitRepositoryCommand(string path)
+        => Cli.Wrap("git")
             .WithArguments(_ => _
                 .Add("init")
-                .Add(path))
+                .Add(path));
+
+
+    public static async Task CreateGitRepository(string path)
+    {
+        await CreateGitRepositoryCommand(path) 
             .ExecuteAsync();
     }
 
@@ -22,7 +26,7 @@ public static class GitTasks
                     .Add(["-C", path])
                     .Add("status"))
                 .ExecuteAsync();
-        
+
             return result.IsSuccess;
         }
         catch
