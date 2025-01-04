@@ -8,6 +8,7 @@ public static class GitTasks
         => Cli.Wrap("git")
             .WithArguments(_ => _
                 .Add("init")
+                .Add(["--initial-branch", "main"])
                 .Add(path));
 
 
