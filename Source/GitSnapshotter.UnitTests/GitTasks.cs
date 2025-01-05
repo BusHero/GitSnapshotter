@@ -26,6 +26,8 @@ public static class GitTasks
                 .WithArguments(_ => _
                     .Add(["-C", path])
                     .Add("status"))
+                .WithStandardErrorPipe(PipeTarget.ToDelegate(Console.WriteLine))
+                .WithStandardOutputPipe(PipeTarget.ToDelegate(Console.WriteLine))
                 .ExecuteAsync();
 
             return result.IsSuccess;
