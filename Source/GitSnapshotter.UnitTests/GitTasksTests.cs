@@ -52,6 +52,19 @@ public class GitTasksTests
         result.Should().BeFalse();
     }
 
+    [Fact]
+    public async Task CreateGitRepositoryIsIdempotent()
+    {
+        var directory = GetTempDirectoryName();
+        
+        await GitTasks.CreateGitRepository(directory);
+        await GitTasks.CreateGitRepository(directory);
+        
+        var result = await GitTasks.IsGitRepository(directory);
+
+        result.Should().BeTrue();
+    }
+
     // [Fact]
     // public async Task GetHead()
     // {
