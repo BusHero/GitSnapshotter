@@ -13,10 +13,7 @@ public class GitTasksTests(ITestOutputHelper output)
     {
         var directory = GetTempDirectoryName();
         
-        await GitTasks.CreateGitRepositoryCommand(directory)
-            .WithStandardOutputPipe(PipeTarget.ToDelegate(output.WriteLine))
-            .WithStandardErrorPipe(PipeTarget.ToDelegate(x => output.WriteLine($"Err: {x}")))
-            .ExecuteAsync();
+        await GitTasks.CreateGitRepository(directory);
         
         var result = await GitTasks.IsGitRepository(directory);
 
@@ -50,10 +47,7 @@ public class GitTasksTests(ITestOutputHelper output)
     {
         var directory = GetTempDirectoryName();
         
-        await GitTasks.CreateGitRepositoryCommand(directory)
-            .WithStandardOutputPipe(PipeTarget.ToDelegate(output.WriteLine))
-            .WithStandardErrorPipe(PipeTarget.ToDelegate(x => output.WriteLine($"Err: {x}")))
-            .ExecuteAsync();
+        await GitTasks.CreateGitRepository(directory);
         
         Directory.Delete(directory, true);
         
