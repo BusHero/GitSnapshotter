@@ -11,6 +11,8 @@ public static class GitTasks
                 .Add("init")
                 .Add(["--initial-branch", "main"])
                 .Add(path)) 
+            .WithStandardErrorPipe(PipeTarget.ToDelegate(Console.WriteLine))
+            .WithStandardOutputPipe(PipeTarget.ToDelegate(Console.WriteLine))
             .ExecuteAsync();
     }
 
