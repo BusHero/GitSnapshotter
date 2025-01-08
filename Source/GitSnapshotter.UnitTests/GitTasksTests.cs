@@ -1,12 +1,8 @@
-﻿using CliWrap;
-
-using FluentAssertions;
-
-using Xunit.Abstractions;
+﻿using FluentAssertions;
 
 namespace GitSnapshotter.UnitTests;
 
-public class GitTasksTests(ITestOutputHelper output)
+public class GitTasksTests
 {
     [Fact]
     public async Task NewGitRepositoryIsGitRepository()
