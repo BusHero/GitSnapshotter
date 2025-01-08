@@ -10,9 +10,8 @@ public static class GitTasks
             .WithArguments(_ => _
                 .Add("init")
                 .Add(["--initial-branch", "main"])
-                .Add(path)) 
-            .WithStandardErrorPipe(PipeTarget.ToDelegate(Console.WriteLine))
-            .WithStandardOutputPipe(PipeTarget.ToDelegate(Console.WriteLine))
+                .Add(path))
+            .WithValidation(CommandResultValidation.None)
             .ExecuteAsync();
     }
 
@@ -24,6 +23,7 @@ public static class GitTasks
                 .WithArguments(_ => _
                     .Add(["-C", path])
                     .Add("status"))
+                .WithValidation(CommandResultValidation.None)
                 .ExecuteAsync();
 
             return result.IsSuccess;
