@@ -21,6 +21,23 @@ public class StuffTests
         }
     }
 
+    [Fact]
+    public void CommitFile()
+    {
+        var path = GetTempPath();
+
+        Repository.Init(path);
+        
+        File.WriteAllLines(Path.Combine(path, "test.txt"), ["test"]);
+        using var repo = new Repository(path);
+        
+        repo.Index.Add("test.txt");
+        repo.Index.Write();
+        
+        var signature = repo.Config.BuildSignature(DateTimeOffset.Now);
+        repo.Commit("test", signature, signature);
+    }
+
     private static string GetTempPath()
     {
         var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
