@@ -9,6 +9,18 @@ namespace GitSnapshotter.UnitTests;
 public class Lib2GitExploratoryTests
 {
     [Fact]
+    public void EmptyRepositoryContainsNoBranches()
+    {
+        var path = GetTempPath();
+
+        Repository.Init(path);
+        
+        using var repo = new Repository(path);
+        
+        repo.Branches.Should().BeEmpty();
+    }
+    
+    [Fact]
     public void RepositoryInitiation()
     {
         var path = GetTempPath();

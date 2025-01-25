@@ -10,9 +10,26 @@ public class CreateGitRepositoryTests
     [Fact]
     public void SnapshotOfInitialRepositoryContainsDefaultBranch()
     {
-        var snapshot = GitRepository.GetSnapshot();
+        var pathToRepository = CreateTemporaryGitRepository();
+        AddFileToRepository(pathToRepository);
+        CommitChanges(pathToRepository);
+        
+        var snapshot = GitRepository.GetSnapshot(pathToRepository);
 
         snapshot.Branches.Should().Contain("master");
+    }
+    
+    [Theory, AutoData]
+    public void SnapshotContainsAllCreatedBranches(string branchName)
+    {
+        var pathToRepository = CreateTemporaryGitRepository();
+        AddFileToRepository(pathToRepository);
+        CommitChanges(pathToRepository);
+        AddBranch(pathToRepository, branchName);
+        
+        var snapshot = GitRepository.GetSnapshot(pathToRepository);
+        
+        snapshot.Branches.Should().Contain(branchName);
     }
 
     [Fact]
@@ -42,7 +59,7 @@ public class CreateGitRepositoryTests
     }
     
     [Fact]
-    public void CommitCommits()
+    public void CommitCommitsTest()
     {
         var pathToRepo = CreateTemporaryGitRepository();
         
@@ -56,7 +73,7 @@ public class CreateGitRepositoryTests
     }
     
     [Theory, AutoData]
-    public void AddBranchAddsABranch(string branch)
+    public void AddBranchAddsABranchTest(string branch)
     {
         var pathToRepo = CreateTemporaryGitRepository();
         
