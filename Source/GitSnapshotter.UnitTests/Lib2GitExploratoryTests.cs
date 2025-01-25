@@ -5,6 +5,7 @@ using LibGit2Sharp;
 
 namespace GitSnapshotter.UnitTests;
 
+[Trait("Category", "Discovery")]
 public class Lib2GitExploratoryTests
 {
     [Fact]
