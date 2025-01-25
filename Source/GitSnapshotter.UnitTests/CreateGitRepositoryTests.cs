@@ -1,74 +1,68 @@
 ﻿using FluentAssertions;
+using FluentAssertions.Execution;
+
+using LibGit2Sharp;
 
 namespace GitSnapshotter.UnitTests;
 
 public class CreateGitRepositoryTests
 {
     [Fact]
-    public async Task NewGitRepositoryIsGitRepository()
+    public void SnapshotOfInitialRepositoryContainsDefaultBranch()
     {
-        var directory = await CreateTemporaryGitRepositoryAsync();
-        
-        var result = await GitTasks.IsGitRepositoryAsync(directory);
+        var snapshot = GitRepository.GetSnapshot();
 
-        result.Should().BeTrue();
+        snapshot.Branches.Should().Contain("master");
     }
 
     [Fact]
-    public async Task MissingFolderIsNoGitRepository()
+    public void CreateTemporaryGitRepositoryReturnsTemporaryGitRepository()
     {
-        var directory = GetTempDirectoryName();
+        var pathToRepo = CreateTemporaryGitRepository();
 
-        var result = await GitTasks.IsGitRepositoryAsync(directory);
-
-        result.Should().BeFalse();
-    }
-
-    [Fact]
-    public async Task NewFolderIsNoGitRepository()
-    {
-        var directory = GetTempDirectoryName();
-        
-        Directory.CreateDirectory(directory);
-        
-        var result = await GitTasks.IsGitRepositoryAsync(directory);
-
-        result.Should().BeFalse();
+        using (new AssertionScope())
+        {
+            Repository.IsValid(pathToRepo).Should().BeTrue();
+            pathToRepo.Should().StartWith(Path.GetTempPath());
+            pathToRepo.Should().NotEndWith(".git");
+        }
     }
     
     [Fact]
-    public async Task DeletedGitRepositoryIsNoGitRepository()
+    public void AddFileToRepositoryAddsFileToRepository()
     {
-        var directory = await CreateTemporaryGitRepositoryAsync();
+        var pathToRepo = CreateTemporaryGitRepository();
         
-        Directory.Delete(directory, true);
+        var filename = AddFileToRepository(pathToRepo);
         
-        var result = await GitTasks.IsGitRepositoryAsync(directory);
+        File.Exists(Path.Combine(pathToRepo, filename)).Should().BeTrue();
 
-        result.Should().BeFalse();
+        using var repo = new Repository(pathToRepo);
+        repo.Index.Index().Select(x => x.Item.Path).Should().Contain(filename);
     }
 
-    [Fact]
-    public async Task CreateGitRepositoryIsIdempotent()
+    private static string AddFileToRepository(string pathToRepo)
     {
-        var directory = await CreateTemporaryGitRepositoryAsync();
-        
-        await GitTasks.CreateGitRepositoryAsync(directory);
-        
-        var result = await GitTasks.IsGitRepositoryAsync(directory);
+        var filename = Guid.NewGuid().ToString("N");
 
-        result.Should().BeTrue();
+        File.WriteAllText(Path.Combine(pathToRepo, filename), filename);
+        
+        var repository = new Repository(pathToRepo);
+        repository.Index.Add(filename);
+        repository.Index.Write();
+        
+        return filename;
     }
 
-    private static async Task<string> CreateTemporaryGitRepositoryAsync()
+    private static string CreateTemporaryGitRepository()
     {
-        var directory = GetTempDirectoryName();
+        var path = GetTempDirectoryName();
         
-        await GitTasks.CreateGitRepositoryAsync(directory);
+        Repository.Init(path);
         
-        return directory;
+        return path;
     }
-    
+
     private static string GetTempDirectoryName()
     {
         return Path.Combine(
