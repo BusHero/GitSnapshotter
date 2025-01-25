@@ -45,6 +45,60 @@ public class Lib2GitExploratoryTests
     }
 
     [Theory, AutoData]
+    public void CommitedFileIsStaged(
+        string filename,
+        string[] contents,
+        string commitMessage)
+    {
+        var path = GetTempPath();
+
+        Repository.Init(path);
+
+        File.WriteAllLines(Path.Combine(path, filename), contents);
+        using var repo = new Repository(path);
+
+        repo.Index.Add(filename);
+        repo.Index.Write();
+
+        var signature = repo.Config.BuildSignature(DateTimeOffset.Now);
+        var commit = repo.Commit(commitMessage, signature, signature);
+
+        repo.Index[filename].StageLevel.Should().Be(StageLevel.Staged);
+    }
+
+    
+    [Theory, AutoData]
+    public void FileNotAddedToIndexIsNotPresent(
+        string filename,
+        string[] contents)
+    {
+        var path = GetTempPath();
+
+        Repository.Init(path);
+
+        File.WriteAllLines(Path.Combine(path, filename), contents);
+        using var repo = new Repository(path);
+        
+        repo.Index.Select(x => x.Path).Should().NotContain(filename);
+    }
+    
+    [Theory, AutoData]
+    public void FileAddedToIndexButNotToFilesystemIsPresent(
+        string filename,
+        string[] contents)
+    {
+        var path = GetTempPath();
+
+        Repository.Init(path);
+
+        File.WriteAllLines(Path.Combine(path, filename), contents);
+        using var repo = new Repository(path);
+        repo.Index.Add(filename);
+        
+        repo.Index[filename].StageLevel.Should().Be(StageLevel.Staged);
+    }
+
+    [Theory, AutoData]
     public void Branch(
         string filename,
         string[] contents,
@@ -71,7 +125,7 @@ public class Lib2GitExploratoryTests
             branch.FriendlyName.Should().Be("master");
         }
     }
-    
+
     [Theory, AutoData]
     public void CreateNewBranch(
         string filename,
@@ -91,9 +145,9 @@ public class Lib2GitExploratoryTests
 
         var signature = repo.Config.BuildSignature(DateTimeOffset.Now);
         repo.Commit(commitMessage, signature, signature);
-        
+
         repo.CreateBranch(branchName);
-        
+
         repo.Branches.Select(x => x.FriendlyName).Should().Contain(branchName);
     }
 
