@@ -31,6 +31,40 @@ public class CreateGitRepositoryTests
         
         snapshot.Branches.Should().Contain(branchName);
     }
+    
+    [Theory, AutoData]
+    public void HeadContainsMaster(string branchName)
+    {
+        var pathToRepository = CreateTemporaryGitRepository();
+        AddFileToRepository(pathToRepository);
+        CommitChanges(pathToRepository);
+        AddBranch(pathToRepository, branchName);
+        
+        var snapshot = GitRepository.GetSnapshot(pathToRepository);
+        
+        snapshot.Head.Should().Be("master");
+    }
+    
+    [Theory, AutoData]
+    public void HeadContainsCheckoutBranch(string branchName)
+    {
+        var pathToRepository = CreateTemporaryGitRepository();
+        AddFileToRepository(pathToRepository);
+        CommitChanges(pathToRepository);
+        AddBranch(pathToRepository, branchName);
+        CheckoutBranch(pathToRepository, branchName);
+        
+        var snapshot = GitRepository.GetSnapshot(pathToRepository);
+        
+        snapshot.Head.Should().Be(branchName);
+    }
+
+    private void CheckoutBranch(string pathToRepository, string branchName)
+    {
+        using var repo = new Repository(pathToRepository);
+        
+        Commands.Checkout(repo, branchName);
+    }
 
     [Fact]
     public void CreateTemporaryGitRepositoryReturnsTemporaryGitRepository()

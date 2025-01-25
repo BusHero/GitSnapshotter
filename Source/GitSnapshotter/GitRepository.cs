@@ -9,10 +9,11 @@ public class GitRepository
         using var repo = new Repository(pathToRepository);
 
         var branches = repo.Branches.Select(x => x.FriendlyName).ToArray();
+        var head = repo.Head.FriendlyName;
         
         return new GitRepositorySnapshot
         {
-            Head = null!,
+            Head = head,
             Branches = branches,
         };
     }
