@@ -71,6 +71,31 @@ public class Lib2GitExploratoryTests
             branch.FriendlyName.Should().Be("master");
         }
     }
+    
+    [Theory, AutoData]
+    public void CreateNewBranch(
+        string filename,
+        string[] contents,
+        string commitMessage,
+        string branchName)
+    {
+        var path = GetTempPath();
+
+        Repository.Init(path);
+
+        File.WriteAllLines(Path.Combine(path, filename), contents);
+        using var repo = new Repository(path);
+
+        repo.Index.Add(filename);
+        repo.Index.Write();
+
+        var signature = repo.Config.BuildSignature(DateTimeOffset.Now);
+        repo.Commit(commitMessage, signature, signature);
+        
+        repo.CreateBranch(branchName);
+        
+        repo.Branches.Select(x => x.FriendlyName).Should().Contain(branchName);
+    }
 
     private static string GetTempPath()
     {
