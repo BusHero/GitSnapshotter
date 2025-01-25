@@ -30,6 +30,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\GitSnapshotter\GitSnapshotter.csproj" />
+      <ProjectReference Include="..\Constants\Constants.csproj" />
     </ItemGroup>
 
 </Project>

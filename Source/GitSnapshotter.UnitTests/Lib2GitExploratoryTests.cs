@@ -1,11 +1,13 @@
-﻿using FluentAssertions;
+﻿using Constants;
+
+using FluentAssertions;
 using FluentAssertions.Execution;
 
 using LibGit2Sharp;
 
 namespace GitSnapshotter.UnitTests;
 
-[Trait("Category", "Discovery")]
+[Trait(TestConstants.Traits.Names.CATEGORY, TestConstants.Traits.Values.DISCOVERY)]
 public class Lib2GitExploratoryTests
 {
     [Fact]
