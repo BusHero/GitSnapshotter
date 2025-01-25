@@ -20,6 +20,11 @@ jobs:
             ~/.nuget/packages
           key: ${{ runner.os }}-${{ hashFiles('**/global.json', '**/*.csproj', '**/Directory.Packages.props') }}
       
+      - name: 'Configure git credentials'
+        run: |
+          git config --global user.email github-actions@github.com
+          git config --global user.name github-actions
+      
       - name: 'Run: Nuke'
         id: nuke
         run: ./build.cmd Publish RunUnitTests -publish-directory publish -configuration Release -github-output "$GITHUB_OUTPUT"

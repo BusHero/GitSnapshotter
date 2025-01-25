@@ -13,6 +13,8 @@ using Nuke.Common.ProjectModel;
 using Nuke.Common.Tools.DotNet;
 using Nuke.Common.Tools.GitHub;
 
+using static Constants.TestConstants;
+
 using static Nuke.Common.Tools.DotNet.DotNetTasks;
 
 [GitHubActions(
@@ -70,6 +72,7 @@ sealed class Build : NukeBuild
     public Target Publish => _ => _
         .Requires(() => PublishDirectory)
         .DependsOn(Compile)
+        .Triggers(RunUnitTests)
         .Executes(async () =>
         {
             DotNetPublish(_ => _
@@ -96,6 +99,7 @@ sealed class Build : NukeBuild
                 .SetProjectFile(Solution)
                 .EnableNoBuild()
                 .EnableNoRestore()
+                .SetFilter($"{Traits.Names.CATEGORY}~{Traits.Values.DISCOVERY}")
                 .SetConfiguration(Configuration)
                 .EnableNoLogo());
         });
