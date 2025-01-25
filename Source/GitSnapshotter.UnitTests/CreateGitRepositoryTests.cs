@@ -40,6 +40,49 @@ public class CreateGitRepositoryTests
         using var repo = new Repository(pathToRepo);
         repo.Index.Index().Select(x => x.Item.Path).Should().Contain(filename);
     }
+    
+    [Fact]
+    public void CommitCommits()
+    {
+        var pathToRepo = CreateTemporaryGitRepository();
+        
+        var filename = AddFileToRepository(pathToRepo);
+
+        CommitChanges(pathToRepo);
+        
+        using var repo = new Repository(pathToRepo);
+        
+        repo.Commits.Count().Should().Be(1);
+    }
+    
+    [Theory, AutoData]
+    public void AddBranchAddsABranch(string branch)
+    {
+        var pathToRepo = CreateTemporaryGitRepository();
+        
+        var filename = AddFileToRepository(pathToRepo);
+
+        CommitChanges(pathToRepo);
+        AddBranch(pathToRepo, branch);
+        
+        using var repo = new Repository(pathToRepo);
+        repo.Branches.Select(x => x.FriendlyName).Should().Contain(branch);
+    }
+
+    private void AddBranch(string pathToRepo, string branch)
+    {
+        using var repo = new Repository(pathToRepo);
+        repo.CreateBranch(branch);
+    }
+
+    private void CommitChanges(string pathToRepo)
+    {
+        using var repo = new Repository(pathToRepo);
+        var signature = repo.Config.BuildSignature(DateTimeOffset.Now);
+        var commitMessage = $"Committing {pathToRepo}";
+        
+        var commit = repo.Commit(commitMessage, signature, signature);
+    }
 
     private static string AddFileToRepository(string pathToRepo)
     {
