@@ -163,6 +163,33 @@ public class Lib2GitExploratoryTests
         repo.Branches.Select(x => x.FriendlyName).Should().Contain(branchName);
     }
 
+    [Theory, AutoData]
+    public void SwitchBranches(
+        string filename,
+        string[] contents,
+        string commitMessage,
+        string branchName)
+    {
+        var path = GetTempPath();
+
+        Repository.Init(path);
+
+        File.WriteAllLines(Path.Combine(path, filename), contents);
+        using var repo = new Repository(path);
+
+        repo.Index.Add(filename);
+        repo.Index.Write();
+
+        var signature = repo.Config.BuildSignature(DateTimeOffset.Now);
+        repo.Commit(commitMessage, signature, signature);
+
+        var branch = repo.CreateBranch(branchName);
+
+        Commands.Checkout(repo, branch);
+        
+        repo.Head.FriendlyName.Should().Be(branchName);
+    }
+
     private static string GetTempPath()
     {
         var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
