@@ -13,19 +13,19 @@ public class Lib2GitExploratoryTests
     [Fact]
     public void EmptyRepositoryContainsNoBranches()
     {
-        var path = GetTempPath();
+        var path = GitTasks.GetTempPath();
 
         Repository.Init(path);
-        
+
         using var repo = new Repository(path);
-        
+
         repo.Branches.Should().BeEmpty();
     }
-    
+
     [Fact]
     public void RepositoryInitiation()
     {
-        var path = GetTempPath();
+        var path = GitTasks.GetTempPath();
 
         var repo = Repository.Init(path);
 
@@ -42,7 +42,7 @@ public class Lib2GitExploratoryTests
         string[] contents,
         string commitMessage)
     {
-        var path = GetTempPath();
+        var path = GitTasks.GetTempPath();
 
         Repository.Init(path);
 
@@ -64,7 +64,7 @@ public class Lib2GitExploratoryTests
         string[] contents,
         string commitMessage)
     {
-        var path = GetTempPath();
+        var path = GitTasks.GetTempPath();
 
         Repository.Init(path);
 
@@ -75,40 +75,39 @@ public class Lib2GitExploratoryTests
         repo.Index.Write();
 
         var signature = repo.Config.BuildSignature(DateTimeOffset.Now);
-        var commit = repo.Commit(commitMessage, signature, signature);
+        repo.Commit(commitMessage, signature, signature);
 
         repo.Index[filename].StageLevel.Should().Be(StageLevel.Staged);
     }
 
-    
     [Theory, AutoData]
     public void FileNotAddedToIndexIsNotPresent(
         string filename,
         string[] contents)
     {
-        var path = GetTempPath();
+        var path = GitTasks.GetTempPath();
 
         Repository.Init(path);
 
         File.WriteAllLines(Path.Combine(path, filename), contents);
         using var repo = new Repository(path);
-        
+
         repo.Index.Select(x => x.Path).Should().NotContain(filename);
     }
-    
+
     [Theory, AutoData]
     public void FileAddedToIndexButNotToFilesystemIsPresent(
         string filename,
         string[] contents)
     {
-        var path = GetTempPath();
+        var path = GitTasks.GetTempPath();
 
         Repository.Init(path);
 
         File.WriteAllLines(Path.Combine(path, filename), contents);
         using var repo = new Repository(path);
         repo.Index.Add(filename);
-        
+
         repo.Index[filename].StageLevel.Should().Be(StageLevel.Staged);
     }
 
@@ -118,7 +117,7 @@ public class Lib2GitExploratoryTests
         string[] contents,
         string commitMessage)
     {
-        var path = GetTempPath();
+        var path = GitTasks.GetTempPath();
 
         Repository.Init(path);
 
@@ -147,7 +146,7 @@ public class Lib2GitExploratoryTests
         string commitMessage,
         string branchName)
     {
-        var path = GetTempPath();
+        var path = GitTasks.GetTempPath();
 
         Repository.Init(path);
 
@@ -172,7 +171,7 @@ public class Lib2GitExploratoryTests
         string commitMessage,
         string branchName)
     {
-        var path = GetTempPath();
+        var path = GitTasks.GetTempPath();
 
         Repository.Init(path);
 
@@ -188,13 +187,7 @@ public class Lib2GitExploratoryTests
         var branch = repo.CreateBranch(branchName);
 
         Commands.Checkout(repo, branch);
-        
-        repo.Head.FriendlyName.Should().Be(branchName);
-    }
 
-    private static string GetTempPath()
-    {
-        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
-        return path;
+        repo.Head.FriendlyName.Should().Be(branchName);
     }
 }
