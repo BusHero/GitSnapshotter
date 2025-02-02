@@ -70,4 +70,23 @@ public class SnapshotTests
 
         repo.IsValidCommit(commit).Should().BeTrue();
     }
+
+    [Theory, AutoData]
+    public void SnapshotContainsRemotes(string remoteName)
+    {
+        using var original = GitTasks.CreateTemporaryGitRepository();
+        original.AddFileToRepository();
+        original.CommitChanges();
+
+        using var remote = GitTasks.CreateTemporaryGitRepository();
+        remote.AddFileToRepository();
+        remote.CommitChanges();
+
+        var remoteUrl = remote.Info.Path;
+        GitTasks.AddRemote(original, remoteName, remoteUrl);
+
+        var snapshot = GitRepository.GetSnapshot(original.Info.WorkingDirectory);
+
+        snapshot.Remotes[remoteName].Should().Be(remoteUrl);
+    }
 }
