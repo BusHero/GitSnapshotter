@@ -53,7 +53,7 @@ internal static class GitTasks
         return repository.Lookup<Commit>(sha) != null;
     }
 
-    public static void AddRemote(Repository repository, string remote, string url)
+    public static void AddRemote(this Repository repository, string remote, string url)
     {
         repository.Network.Remotes.Add(remote, url);
     }
