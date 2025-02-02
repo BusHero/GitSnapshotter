@@ -8,9 +8,10 @@ public class GitRepository
     {
         using var repo = new Repository(pathToRepository);
 
-        var branches = repo.Branches.Select(x => x.FriendlyName).ToArray();
         var head = repo.Head.FriendlyName;
-        
+        var branches = repo.Branches
+            .ToDictionary(x => x.FriendlyName, x => x.Tip.Sha);
+
         return new GitRepositorySnapshot
         {
             Head = head,

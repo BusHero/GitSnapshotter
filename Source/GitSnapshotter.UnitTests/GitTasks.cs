@@ -4,54 +4,52 @@ namespace GitSnapshotter.UnitTests;
 
 internal static class GitTasks
 {
-    public static string CreateTemporaryGitRepository()
+    public static Repository CreateTemporaryGitRepository()
     {
-        var path = GetTempDirectoryName();
+        var path = GetTempPath();
 
         Repository.Init(path);
 
-        return path;
+        return new Repository(path);
     }
 
-    private static string GetTempDirectoryName()
+    public static string GetTempPath()
     {
         return Path.Combine(
             Path.GetTempPath(),
             Guid.NewGuid().ToString("N"));
     }
 
-    public static string AddFileToRepository(string pathToRepo)
+    public static string AddFileToRepository(this Repository repository)
     {
         var filename = Guid.NewGuid().ToString("N");
+        
+        File.WriteAllText(Path.Combine(repository.Info.WorkingDirectory, filename), filename);
 
-        File.WriteAllText(Path.Combine(pathToRepo, filename), filename);
-
-        var repository = new Repository(pathToRepo);
         repository.Index.Add(filename);
         repository.Index.Write();
 
         return filename;
     }
 
-    public static void AddBranch(string pathToRepo, string branch)
+    public static void AddBranch(this Repository repo, string branch)
     {
-        using var repo = new Repository(pathToRepo);
         repo.CreateBranch(branch);
     }
 
-    public static void CommitChanges(string pathToRepo)
+    public static void CommitChanges(this Repository repo)
     {
-        using var repo = new Repository(pathToRepo);
         var signature = repo.Config.BuildSignature(DateTimeOffset.Now);
-        var commitMessage = $"Committing {pathToRepo}";
-
-        repo.Commit(commitMessage, signature, signature);
+        repo.Commit($"Committing new changes", signature, signature);
     }
 
-    public static void CheckoutBranch(string pathToRepository, string branchName)
+    public static void CheckoutBranch(this Repository repo, string branchName)
     {
-        using var repo = new Repository(pathToRepository);
-
         Commands.Checkout(repo, branchName);
+    }
+
+    public static bool IsValidCommit(this Repository repository, string sha)
+    {
+        return repository.Lookup<Commit>(sha) != null;
     }
 }
