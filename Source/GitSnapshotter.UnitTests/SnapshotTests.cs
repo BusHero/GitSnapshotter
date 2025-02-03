@@ -201,4 +201,44 @@ public class SnapshotTests
             snapshot.Branches["master"].RemoteName.Should().Be(remoteName);
         }
     }
+
+    [Theory, AutoData]
+    public void SnapshotContainsTags(string tagName)
+    {
+        using var repository = GitTasks.CreateTemporaryGitRepository();
+        repository.AddFileToRepository();
+        repository.CommitChanges();
+        repository.Tags.Add(tagName, repository.Head.Tip);
+
+        var snapshot = GitRepository.GetSnapshot(repository.Info.WorkingDirectory);
+
+        repository.IsValidCommit(snapshot.Tags[tagName].Target).Should().BeTrue();
+    }
+
+    [Theory, AutoData]
+    public void AnnotatedTagContainsMessage(string tagName, string tagMessage)
+    {
+        using var repository = GitTasks.CreateTemporaryGitRepository();
+        repository.AddFileToRepository();
+        repository.CommitChanges();
+        var signature = repository.Config.BuildSignature(DateTimeOffset.Now);
+        repository.Tags.Add(tagName, repository.Head.Tip, signature, tagMessage);
+
+        var snapshot = GitRepository.GetSnapshot(repository.Info.WorkingDirectory);
+
+        snapshot.Tags[tagName].Message!.TrimEnd().Should().Be(tagMessage);
+    }
+
+    [Theory, AutoData]
+    public void NonAnnotatedTagContainsNullForMessage(string tagName)
+    {
+        using var repository = GitTasks.CreateTemporaryGitRepository();
+        repository.AddFileToRepository();
+        repository.CommitChanges();
+        repository.Tags.Add(tagName, repository.Head.Tip);
+
+        var snapshot = GitRepository.GetSnapshot(repository.Info.WorkingDirectory);
+
+        snapshot.Tags[tagName].Message.Should().BeNull();
+    }
 }
