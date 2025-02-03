@@ -23,7 +23,7 @@ internal static class GitTasks
     public static string AddFileToRepository(this Repository repository)
     {
         var filename = Guid.NewGuid().ToString("N");
-        
+
         File.WriteAllText(Path.Combine(repository.Info.WorkingDirectory, filename), filename);
 
         repository.Index.Add(filename);
@@ -56,5 +56,9 @@ internal static class GitTasks
     public static void AddRemote(this Repository repository, string remote, string url)
     {
         repository.Network.Remotes.Add(remote, url);
+    }
+
+    public static void AddTag(this Repository repository, string tag)
+    {
     }
 }

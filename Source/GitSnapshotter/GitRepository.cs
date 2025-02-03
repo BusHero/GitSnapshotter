@@ -40,11 +40,22 @@ public class GitRepository
                     };
                 });
 
+        var tags = repo
+            .Tags
+            .ToDictionary(
+                tag => tag.FriendlyName,
+                tag => new Tag
+                {
+                    Target = tag.Target.Sha,
+                    Message = tag.Annotation?.Message,
+                });
+
         return new GitRepositorySnapshot
         {
             Head = head,
             Branches = branches,
             Remotes = remotes,
+            Tags = tags,
         };
     }
 }
