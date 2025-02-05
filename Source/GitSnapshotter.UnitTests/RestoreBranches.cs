@@ -4,7 +4,7 @@ using LibGit2Sharp;
 
 namespace GitSnapshotter.UnitTests;
 
-public class RestoreBranches
+public sealed class RestoreBranches
 {
     [Theory, AutoData]
     public void RestoreBranch(string branchName)

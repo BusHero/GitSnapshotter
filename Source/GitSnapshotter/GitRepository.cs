@@ -64,14 +64,22 @@ public class GitRepository
     {
         using var repository = new Repository(pathToRepository);
         var originalBranches = repository.Branches.Select(x => x.FriendlyName).ToArray();
+        var snapshotBranches = snapshot.Branches.Select(x => x.Name).ToArray();
 
-        var removedBranches = snapshot
+        var branchesToAdd = snapshot
             .Branches
-            .Where(x => !originalBranches.Contains(x.Name));
+            .ExceptBy(originalBranches, x => x.Name);
 
-        foreach (var branch in removedBranches)
+        foreach (var branch in branchesToAdd)
         {
             repository.CreateBranch(branch.Name, branch.Tip);
+        }
+
+        var branchesToDelete = originalBranches.Except(snapshotBranches);
+
+        foreach (var branchToDelete in branchesToDelete)
+        {
+            repository.Branches.Remove(branchToDelete);
         }
     }
 }
