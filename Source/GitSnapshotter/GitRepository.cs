@@ -57,4 +57,21 @@ public class GitRepository
             Tags = tags,
         };
     }
+
+    public static void Restore(
+        string pathToRepository,
+        GitRepositorySnapshot snapshot)
+    {
+        using var repository = new Repository(pathToRepository);
+        var originalBranches = repository.Branches.Select(x => x.FriendlyName).ToArray();
+
+        var removedBranches = snapshot
+            .Branches
+            .Where(x => !originalBranches.Contains(x.Name));
+
+        foreach (var branch in removedBranches)
+        {
+            repository.CreateBranch(branch.Name, branch.Tip);
+        }
+    }
 }
