@@ -5,7 +5,7 @@ using LibGit2Sharp;
 
 namespace GitSnapshotter.UnitTests;
 
-public class SnapshotTests
+public class GetSnapshotTests
 {
     [Fact]
     public void SnapshotOfInitialRepositoryContainsDefaultBranch()
