@@ -57,4 +57,68 @@ public class GitRepository
             Tags = tags,
         };
     }
+
+    public static void Restore(
+        string pathToRepository,
+        GitRepositorySnapshot snapshot)
+    {
+        using var repository = new Repository(pathToRepository);
+        var originalBranches = repository
+            .Branches
+            .Select(x => x.FriendlyName)
+            .ToArray();
+        var snapshotBranches = snapshot
+            .Branches
+            .Select(x => x.Name)
+            .ToArray();
+
+        RestoreBranches(snapshot.Branches, originalBranches, repository);
+        RemoveBranches(originalBranches, snapshotBranches, repository);
+        RestoreTips(snapshot.Branches, repository);
+    }
+
+    private static void RestoreBranches(
+        IEnumerable<Branch> branches,
+        IEnumerable<string> originalBranches,
+        Repository repository)
+    {
+        foreach (var (name, tip) in branches.ExceptBy(originalBranches, x => x.Name))
+        {
+            repository.CreateBranch(name, tip);
+        }
+    }
+
+    private static void RestoreTips(IEnumerable<Branch> branches, Repository repository)
+    {
+        foreach (var (name, tip) in branches)
+        {
+            repository.Refs.UpdateTarget(repository.Branches[name].Reference, tip);
+        }
+    }
+
+    private static void RemoveBranches(
+        IEnumerable<string> originalBranches,
+        IEnumerable<string> snapshotBranches,
+        Repository repository)
+    {
+        foreach (var branchToDelete in originalBranches.Except(snapshotBranches))
+        {
+            repository.Branches.Remove(branchToDelete);
+        }
+    }
+
+    private static void CreateBranches(
+        GitRepositorySnapshot snapshot,
+        string[] originalBranches,
+        Repository repository)
+    {
+        var branchesToAdd = snapshot
+            .Branches
+            .ExceptBy(originalBranches, x => x.Name);
+
+        foreach (var (name, tip) in branchesToAdd)
+        {
+            repository.CreateBranch(name, tip);
+        }
+    }
 }
