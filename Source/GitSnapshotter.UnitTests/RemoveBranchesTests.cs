@@ -2,7 +2,7 @@
 
 namespace GitSnapshotter.UnitTests;
 
-public sealed class RemoveBranches
+public sealed class RemoveBranchesTests
 {
     [Theory, AutoData]
     public void RemoveNewlyAddedBranch(string branchName)
