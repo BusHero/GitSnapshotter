@@ -11,7 +11,7 @@ public sealed record GitRepositorySnapshot
     public required Tag[] Tags { get; init; }
 }
 
-public record Branch
+public sealed record Branch
 {
     public required string Name { get; init; }
     

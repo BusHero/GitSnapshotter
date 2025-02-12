@@ -2,7 +2,7 @@
 
 namespace GitSnapshotter;
 
-public class GitRepository
+public sealed class GitRepository
 {
     public static GitRepositorySnapshot GetSnapshot(string pathToRepository)
     {

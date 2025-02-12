@@ -5,7 +5,7 @@ using LibGit2Sharp;
 
 namespace GitSnapshotter.UnitTests;
 
-public class GitTasksTests
+public sealed class GitTasksTests
 {
     [Theory, AutoData]
     public void AddBranchAddsABranchTest(string branch)
