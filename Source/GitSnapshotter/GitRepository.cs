@@ -75,6 +75,7 @@ public sealed class GitRepository
         RestoreBranches(snapshot.Branches, originalBranches, repository);
         RemoveBranches(originalBranches, snapshotBranches, repository);
         RestoreTips(snapshot.Branches, repository);
+        Commands.Checkout(repository, snapshot.Head);
     }
 
     private static void RestoreBranches(
