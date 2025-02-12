@@ -8,7 +8,7 @@ using LibGit2Sharp;
 namespace GitSnapshotter.UnitTests;
 
 [Trait(TestConstants.Traits.Names.CATEGORY, TestConstants.Traits.Values.DISCOVERY)]
-public class Lib2GitExploratoryTests
+public sealed class Lib2GitExploratoryTests
 {
     [Fact]
     public void EmptyRepositoryContainsNoBranches()
