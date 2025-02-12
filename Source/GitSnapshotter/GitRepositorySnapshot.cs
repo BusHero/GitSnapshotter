@@ -13,13 +13,19 @@ public sealed record GitRepositorySnapshot
 
 public record Branch
 {
+    public required string Name { get; init; }
+    
     public required string Tip { get; init; }
 
     public string? TrackedBranch { get; init; }
 
     public string? RemoteName { get; init; }
 
-    public required string Name { get; init; }
+    public void Deconstruct(out string name, out string tip)
+    {
+        name = Name;
+        tip = Tip;
+    }
 }
 
 public sealed record Remote

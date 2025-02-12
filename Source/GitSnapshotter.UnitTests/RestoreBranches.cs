@@ -1,4 +1,6 @@
-﻿using FluentAssertions;
+﻿using AutoFixture;
+
+using FluentAssertions;
 
 using LibGit2Sharp;
 
@@ -6,6 +8,8 @@ namespace GitSnapshotter.UnitTests;
 
 public sealed class RestoreBranches
 {
+    private readonly IFixture _fixture = new Fixture();
+    
     [Theory, AutoData]
     public void RestoreBranch(string branchName)
     {
@@ -92,5 +96,28 @@ public sealed class RestoreBranches
         var newSnapshot = GitRepository.GetSnapshot(repo.Info.WorkingDirectory);
 
         newSnapshot.Should().BeEquivalentTo(originalSnapshot);
+    }
+    
+    [Theory, AutoData]
+    public void RestoreTip(string branchName)
+    {
+        using var repo = GitTasks.CreateTemporaryGitRepository();
+        repo.AddFileToRepository();
+        repo.CommitChanges();
+        repo.AddBranch(branchName);
+        var originalSnapshot = GitRepository.GetSnapshot(repo.Info.WorkingDirectory);
+        repo.AddFileToRepository();
+        repo.CommitChanges();
+        repo.Refs.UpdateTarget(repo.Branches[branchName].Reference, repo.Head.Tip.Sha);
+
+        GitRepository.Restore(repo.Info.WorkingDirectory, originalSnapshot);
+        var newSnapshot = GitRepository.GetSnapshot(repo.Info.WorkingDirectory);
+        
+        newSnapshot.Should().BeEquivalentTo(originalSnapshot);
+    }
+
+    private string GetRandomBranchName()
+    {
+        return _fixture.Create<string>();
     }
 }
