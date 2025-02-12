@@ -63,6 +63,115 @@ public sealed class GitRepository
         GitRepositorySnapshot snapshot)
     {
         using var repository = new Repository(pathToRepository);
+
+        RestoreBranches(snapshot, repository);
+        RestoreTags(snapshot, repository);
+
+        Commands.Checkout(repository, snapshot.Head);
+    }
+
+    private static void RestoreTags(
+        GitRepositorySnapshot snapshot,
+        Repository repository)
+    {
+        var originalTags = repository
+            .Tags
+            .Select(x => x.FriendlyName)
+            .ToArray();
+        var snapshotTags = snapshot
+            .Tags
+            .Select(x => x.Name)
+            .ToArray();
+
+        var tags = snapshot.Tags;
+
+        AddRemovedTag(tags, originalTags, repository);
+        RemoveAddedTag(originalTags, snapshotTags, repository);
+        RestoreTagReferences(snapshot, repository);
+    }
+
+    private static void RestoreTagReferences(
+        GitRepositorySnapshot snapshot,
+        Repository repository)
+    {
+        var originalTags = repository
+            .Tags
+            .ToDictionary(x => x.FriendlyName, x => x.Target.Sha);
+
+        if (snapshot.Tags is [])
+        {
+            return;
+        }
+
+        if (originalTags.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var tag in snapshot.Tags)
+        {
+            if (!originalTags.TryGetValue(tag.Name, out var value))
+            {
+                break;
+            }
+
+            if (value == tag.Target)
+            {
+                break;
+            }
+
+            repository.Tags.Remove(snapshot.Tags[0].Name);
+
+            if (snapshot.Tags[0].Message != null)
+            {
+                repository.Tags.Add(
+                    snapshot.Tags[0].Name,
+                    snapshot.Tags[0].Target,
+                    repository.Config.BuildSignature(DateTimeOffset.Now),
+                    snapshot.Tags[0].Message);
+            }
+            else
+            {
+                repository.Tags.Add(snapshot.Tags[0].Name, snapshot.Tags[0].Target);
+            }
+        }
+    }
+
+    private static void RemoveAddedTag(
+        IEnumerable<string> originalTags,
+        IEnumerable<string> snapshotTags,
+        Repository repository)
+    {
+        foreach (var tag in originalTags.Except(snapshotTags))
+        {
+            repository.Tags.Remove(tag);
+        }
+    }
+
+    private static void AddRemovedTag(
+        IEnumerable<Tag> tags,
+        IEnumerable<string> originalTags,
+        Repository repository)
+    {
+        var signature = repository.Config.BuildSignature(DateTimeOffset.Now);
+
+        foreach (var (name, target, message) in tags.ExceptBy(originalTags, x => x.Name))
+        {
+            if (message is null)
+            {
+                repository.Tags.Add(name, target);
+            }
+            else
+            {
+                repository.Tags.Add(name, target, signature, message);
+            }
+        }
+    }
+
+    private static void RestoreBranches(
+        GitRepositorySnapshot snapshot,
+        Repository repository)
+    {
         var originalBranches = repository
             .Branches
             .Select(x => x.FriendlyName)
@@ -72,13 +181,33 @@ public sealed class GitRepository
             .Select(x => x.Name)
             .ToArray();
 
-        RestoreBranches(snapshot.Branches, originalBranches, repository);
-        RemoveBranches(originalBranches, snapshotBranches, repository);
+        AddRemovedBranches(snapshot.Branches, originalBranches, repository);
+        RemoveAddedBranches(originalBranches, snapshotBranches, repository);
         RestoreTips(snapshot.Branches, repository);
-        Commands.Checkout(repository, snapshot.Head);
     }
 
-    private static void RestoreBranches(
+    private static void RestoreTips(
+        IEnumerable<Branch> branches,
+        Repository repository)
+    {
+        foreach (var (name, tip) in branches)
+        {
+            repository.Refs.UpdateTarget(repository.Branches[name].Reference, tip);
+        }
+    }
+
+    private static void RemoveAddedBranches(
+        IEnumerable<string> originalBranches,
+        IEnumerable<string> snapshotBranches,
+        Repository repository)
+    {
+        foreach (var branchToDelete in originalBranches.Except(snapshotBranches))
+        {
+            repository.Branches.Remove(branchToDelete);
+        }
+    }
+
+    private static void AddRemovedBranches(
         IEnumerable<Branch> branches,
         IEnumerable<string> originalBranches,
         Repository repository)
@@ -89,24 +218,6 @@ public sealed class GitRepository
         }
     }
 
-    private static void RestoreTips(IEnumerable<Branch> branches, Repository repository)
-    {
-        foreach (var (name, tip) in branches)
-        {
-            repository.Refs.UpdateTarget(repository.Branches[name].Reference, tip);
-        }
-    }
-
-    private static void RemoveBranches(
-        IEnumerable<string> originalBranches,
-        IEnumerable<string> snapshotBranches,
-        Repository repository)
-    {
-        foreach (var branchToDelete in originalBranches.Except(snapshotBranches))
-        {
-            repository.Branches.Remove(branchToDelete);
-        }
-    }
 
     private static void CreateBranches(
         GitRepositorySnapshot snapshot,

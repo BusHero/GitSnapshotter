@@ -14,7 +14,7 @@ public sealed record GitRepositorySnapshot
 public sealed record Branch
 {
     public required string Name { get; init; }
-    
+
     public required string Tip { get; init; }
 
     public string? TrackedBranch { get; init; }
@@ -39,9 +39,22 @@ public sealed record Remote
 
 public sealed record Tag
 {
+    public required string Name { get; init; }
+
     public required string Target { get; init; }
 
     public string? Message { get; init; }
 
-    public required string Name { get; init; }
+    public void Deconstruct(out string name, out string target)
+    {
+        name = Name;
+        target = Target;
+    }
+
+    public void Deconstruct(out string name, out string target, out string? message)
+    {
+        name = Name;
+        target = Target;
+        message = Message;
+    }
 }
