@@ -26,7 +26,9 @@
       "enum": [
         "Clean",
         "Compile",
+        "Pack",
         "Publish",
+        "PublishPackage",
         "Restore",
         "RunUnitTests"
       ]
@@ -110,12 +112,18 @@
             "Release"
           ]
         },
+        "GithubApiKey": {
+          "type": "string",
+          "description": "Github key to publish",
+          "default": "Secrets must be entered via 'nuke :secrets [profile]'"
+        },
         "GithubOutput": {
           "type": "string",
           "description": "Github Output"
         },
         "PublishDirectory": {
-          "type": "string"
+          "type": "string",
+          "description": "Directory to publish stuff to"
         },
         "Solution": {
           "type": "string",
