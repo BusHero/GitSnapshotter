@@ -1,7 +1,6 @@
 using System;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
-using System.Runtime.ConstrainedExecution;
 using System.Threading.Tasks;
 
 using JetBrains.Annotations;
@@ -130,7 +129,7 @@ sealed class Build : NukeBuild
         .Executes(() =>
         {
             DotNetNuGetPush(_ => _
-                .SetSource("github")
+                .SetSource("https://nuget.pkg.github.com/BusHero/index.json")
                 .EnableSkipDuplicate()
                 .SetTargetPath(PublishDirectory / "*.nupkg")
                 .SetApiKey(GithubApiKey)
