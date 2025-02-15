@@ -26,7 +26,7 @@ using static Nuke.Common.Tools.DotNet.DotNetTasks;
 [SuppressMessage("ReSharper", "MemberCanBePrivate.Global")]
 sealed class Build : NukeBuild
 {
-    public static int Main() => Execute<Build>(x => x.Compile);
+    public static int Main() => Execute<Build>(x => x.Pack);
 
     [Parameter("Configuration to build - Default is 'Debug' (local) or 'Release' (server)")]
     private readonly Configuration Configuration = IsLocalBuild ? Configuration.Debug : Configuration.Release;
@@ -35,8 +35,9 @@ sealed class Build : NukeBuild
     private readonly Solution Solution = null!;
 
     [Parameter("Github Output")] private readonly string GithubOutput = null!;
+    [Secret, Parameter("Github key to publish")] public readonly string GithubApiKey = null!;
 
-    [Parameter] public AbsolutePath PublishDirectory { get; } = null!;
+    [Parameter("Directory to publish stuff to")] public readonly AbsolutePath PublishDirectory = null!;
 
     [GitRepository] public readonly GitRepository Repository = null!;
 
@@ -59,6 +60,7 @@ sealed class Build : NukeBuild
 
     public Target Compile => _ => _
         .DependsOn(Restore)
+        .Triggers(RunUnitTests)
         .Executes(() =>
         {
             DotNetBuild(_ => _
@@ -72,7 +74,6 @@ sealed class Build : NukeBuild
     public Target Publish => _ => _
         .Requires(() => PublishDirectory)
         .DependsOn(Compile)
-        .Triggers(RunUnitTests)
         .Executes(async () =>
         {
             DotNetPublish(_ => _
@@ -102,6 +103,37 @@ sealed class Build : NukeBuild
                 .SetFilter($"{Traits.Names.CATEGORY}~{Traits.Values.DISCOVERY}")
                 .SetConfiguration(Configuration)
                 .EnableNoLogo());
+        });
+
+    [UsedImplicitly]
+    public Target Pack => _ => _
+        .DependsOn(Compile)
+        .Requires(() => PublishDirectory)
+        .Executes(() =>
+        {
+            var branch = Repository.Branch?.Replace('/', '-');
+            DotNetPack(_ => _
+                .SetProject(Solution.GitSnapshotter)
+                .SetConfiguration(Configuration)
+                .EnableNoBuild()
+                .SetVersionSuffix($"{branch}-{DateTime.Now:yyyyMMddhhmmss}")
+                .SetOutputDirectory(PublishDirectory)
+                .EnableNoRestore());
+        });
+
+    [UsedImplicitly]
+    public Target PublishPackage => _ => _
+        .DependsOn(Pack, RunUnitTests)
+        .Requires(() => PublishDirectory)
+        .Requires(() => GithubApiKey)
+        .Executes(() =>
+        {
+            DotNetNuGetPush(_ => _
+                .SetSource("https://nuget.pkg.github.com/BusHero/index.json")
+                .EnableSkipDuplicate()
+                .SetTargetPath(PublishDirectory / "*.nupkg")
+                .SetApiKey(GithubApiKey)
+            );
         });
 
     private async Task OutputToGithub(string name, object content)
