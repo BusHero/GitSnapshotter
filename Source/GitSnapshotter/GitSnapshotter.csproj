@@ -12,7 +12,6 @@
         <VersionPrefix>0.0.5</VersionPrefix>
         <Authors>BusHero</Authors>
         <RepositoryUrl>https://github.com/BusHero/GitSnapshotter.git</RepositoryUrl>
-        <PackageReadmeFile>Readme.md</PackageReadmeFile>
     </PropertyGroup>
 
     <ItemGroup>
