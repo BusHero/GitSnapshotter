@@ -40,7 +40,7 @@ public sealed class GitTasksTests
 
         await Assert.That(File.Exists(Path.Combine(repo.Info.WorkingDirectory, filename))).IsTrue();
 
-        await Assert.That(repo.Index.Index().Select(x => x.Item.Path)).Contains(filename);
+        await Assert.That(repo.Index.Select(x => x.Path)).Contains(filename);
     }
 
     [Test]

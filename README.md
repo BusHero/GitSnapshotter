@@ -7,7 +7,8 @@ See [the package README](Source/GitSnapshotter/docs/README.md) for usage.
 
 ## Development
 
-Requires the .NET 10 SDK (see `global.json`).
+Requires the .NET 10 SDK (see `global.json`) and the .NET 8 runtime: the library targets .NET 8, and the tests run on
+both .NET 8 and .NET 10.
 
 ```sh
 ./build.sh                 # run the build pipeline: build, test, pack, publish the console app

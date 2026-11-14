@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net10.0</TargetFramework>
+        <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <IsPackable>false</IsPackable>
@@ -21,7 +21,14 @@
     <ItemGroup>
       <ProjectReference Include="..\GitSnapshotter\GitSnapshotter.csproj" />
       <ProjectReference Include="..\Constants\Constants.csproj" />
+    </ItemGroup>
+
+    <!-- The console app targets .NET 10 only, so its tests run on that framework only. -->
+    <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
       <ProjectReference Include="..\GitSnapshotter.Console\GitSnapshotter.Console.csproj" />
+    </ItemGroup>
+    <ItemGroup Condition="'$(TargetFramework)' != 'net10.0'">
+      <Compile Remove="CliTests.cs" />
     </ItemGroup>
 
 </Project>

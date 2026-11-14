@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text;
 
 using LibGit2Sharp;
@@ -253,7 +253,7 @@ internal static class WorkingTreeOperations
         content.CopyTo(buffer, header.Length);
 
 #pragma warning disable CA5350 // git object ids are SHA-1 by definition
-        return Convert.ToHexStringLower(SHA1.HashData(buffer));
+        return Convert.ToHexString(SHA1.HashData(buffer)).ToLowerInvariant();
 #pragma warning restore CA5350
     }
 
