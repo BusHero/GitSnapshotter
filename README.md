@@ -7,10 +7,21 @@ See [the package README](Source/GitSnapshotter/docs/README.md) for usage.
 
 ## Development
 
+Requires the .NET 10 SDK (see `global.json`).
+
 ```sh
 ./build.sh Compile         # compile and run the tests (NUKE)
 dotnet test Source/GitSnapshotter.sln
 ```
+
+Every push to `trunk` publishes a prerelease package, so enable the pre-push hook once per clone. It runs the
+test suite on the commit being pushed to `trunk` and stops the push if anything fails:
+
+```sh
+git config core.hooksPath .githooks
+```
+
+`git push --no-verify` skips it.
 
 | Project | Purpose |
 |---|---|
