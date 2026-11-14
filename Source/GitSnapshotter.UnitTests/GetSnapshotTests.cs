@@ -1,14 +1,11 @@
-﻿using FluentAssertions;
-using FluentAssertions.Execution;
-
-using LibGit2Sharp;
+﻿using LibGit2Sharp;
 
 namespace GitSnapshotter.UnitTests;
 
 public sealed class GetSnapshotTests
 {
     [Test]
-    public void SnapshotOfInitialRepositoryContainsDefaultBranch()
+    public async Task SnapshotOfInitialRepositoryContainsDefaultBranch()
     {
         using var repository = GitTasks.CreateTemporaryGitRepository();
         repository.AddFileToRepository();
@@ -17,24 +14,11 @@ public sealed class GetSnapshotTests
 
         var snapshot = GitRepository.GetSnapshot(repository.Info.WorkingDirectory);
 
-        snapshot.Branches.FirstOrDefault(x => x.Name == "master").Should().NotBeNull();
+        await Assert.That(snapshot.Branches.FirstOrDefault(x => x.Name == "master")).IsNotNull();
     }
 
     [Test, AutoData]
-    public void SnapshotContainsAllCreatedBranches(string branchName)
-    {
-        using var repository = GitTasks.CreateTemporaryGitRepository();
-        repository.AddFileToRepository();
-        repository.CommitChanges();
-        repository.AddBranch(branchName);
-
-        var snapshot = GitRepository.GetSnapshot(repository.Info.WorkingDirectory);
-
-        snapshot.Branches.FirstOrDefault(x => x.Name == branchName).Should().NotBeNull();
-    }
-
-    [Test, AutoData]
-    public void HeadContainsMaster(string branchName)
+    public async Task SnapshotContainsAllCreatedBranches(string branchName)
     {
         using var repository = GitTasks.CreateTemporaryGitRepository();
         repository.AddFileToRepository();
@@ -43,11 +27,24 @@ public sealed class GetSnapshotTests
 
         var snapshot = GitRepository.GetSnapshot(repository.Info.WorkingDirectory);
 
-        snapshot.Head.Should().Be("master");
+        await Assert.That(snapshot.Branches.FirstOrDefault(x => x.Name == branchName)).IsNotNull();
     }
 
     [Test, AutoData]
-    public void HeadContainsCheckoutBranch(string branchName)
+    public async Task HeadContainsMaster(string branchName)
+    {
+        using var repository = GitTasks.CreateTemporaryGitRepository();
+        repository.AddFileToRepository();
+        repository.CommitChanges();
+        repository.AddBranch(branchName);
+
+        var snapshot = GitRepository.GetSnapshot(repository.Info.WorkingDirectory);
+
+        await Assert.That(snapshot.Head).IsEqualTo("master");
+    }
+
+    [Test, AutoData]
+    public async Task HeadContainsCheckoutBranch(string branchName)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.AddFileToRepository();
@@ -57,11 +54,11 @@ public sealed class GetSnapshotTests
 
         var snapshot = GitRepository.GetSnapshot(repo.Info.WorkingDirectory);
 
-        snapshot.Head.Should().Be(branchName);
+        await Assert.That(snapshot.Head).IsEqualTo(branchName);
     }
 
     [Test]
-    public void BranchesContainsCommits()
+    public async Task BranchesContainsCommits()
     {
         using var repository = GitTasks.CreateTemporaryGitRepository();
         repository.AddFileToRepository();
@@ -71,11 +68,11 @@ public sealed class GetSnapshotTests
 
         var commit = snapshot.Branches.First(x => x.Name == "master").Tip;
 
-        repository.IsValidCommit(commit).Should().BeTrue();
+        await Assert.That(repository.IsValidCommit(commit)).IsTrue();
     }
 
     [Test, AutoData]
-    public void SnapshotContainsRemotes(string remoteName)
+    public async Task SnapshotContainsRemotes(string remoteName)
     {
         using var original = GitTasks.CreateTemporaryGitRepository();
         original.AddFileToRepository();
@@ -90,38 +87,11 @@ public sealed class GetSnapshotTests
 
         var snapshot = GitRepository.GetSnapshot(original.Info.WorkingDirectory);
 
-        snapshot.Remotes.First(x => x.Name == remoteName).Url.Should().Be(remoteUrl);
+        await Assert.That(snapshot.Remotes.First(x => x.Name == remoteName).Url).IsEqualTo(remoteUrl);
     }
 
     [Test, AutoData]
-    public void SnapshotContainsRemoteBranches(string remoteName)
-    {
-        using var original = GitTasks.CreateTemporaryGitRepository();
-        original.AddFileToRepository();
-        original.CommitChanges();
-
-        using var remote = GitTasks.CreateTemporaryGitRepository();
-        remote.AddFileToRepository();
-        remote.CommitChanges();
-
-        var remoteUrl = remote.Info.Path;
-        original.AddRemote(remoteName, remoteUrl);
-        Commands.Fetch(original, remoteName, [], new FetchOptions(), null);
-
-        var snapshot = GitRepository.GetSnapshot(original.Info.WorkingDirectory);
-
-        snapshot.Remotes.First(x => x.Name == remoteName)
-            .Branches
-            .Should()
-            .ContainSingle()
-            .Which
-            .Key
-            .Should()
-            .Be($"{remoteName}/master");
-    }
-
-    [Test, AutoData]
-    public void SnapshotDoesNotContainRemoteBranches(string remoteName)
+    public async Task SnapshotContainsRemoteBranches(string remoteName)
     {
         using var original = GitTasks.CreateTemporaryGitRepository();
         original.AddFileToRepository();
@@ -137,16 +107,33 @@ public sealed class GetSnapshotTests
 
         var snapshot = GitRepository.GetSnapshot(original.Info.WorkingDirectory);
 
-        snapshot.Branches.Should()
-            .ContainSingle()
-            .Which
-            .Name
-            .Should()
-            .Be("master");
+        var branches = snapshot.Remotes.First(x => x.Name == remoteName).Branches;
+        await Assert.That(branches.Keys).IsEquivalentTo([$"{remoteName}/master"], CollectionOrdering.Matching);
     }
 
     [Test, AutoData]
-    public void RemoteTipIsValidSha(string remoteName)
+    public async Task SnapshotDoesNotContainRemoteBranches(string remoteName)
+    {
+        using var original = GitTasks.CreateTemporaryGitRepository();
+        original.AddFileToRepository();
+        original.CommitChanges();
+
+        using var remote = GitTasks.CreateTemporaryGitRepository();
+        remote.AddFileToRepository();
+        remote.CommitChanges();
+
+        var remoteUrl = remote.Info.Path;
+        original.AddRemote(remoteName, remoteUrl);
+        Commands.Fetch(original, remoteName, [], new FetchOptions(), null);
+
+        var snapshot = GitRepository.GetSnapshot(original.Info.WorkingDirectory);
+
+        var item2 = await Assert.That(snapshot.Branches).HasSingleItem();
+        await Assert.That(item2.Name).IsEqualTo("master");
+    }
+
+    [Test, AutoData]
+    public async Task RemoteTipIsValidSha(string remoteName)
     {
         using var original = GitTasks.CreateTemporaryGitRepository();
         original.AddFileToRepository();
@@ -165,15 +152,15 @@ public sealed class GetSnapshotTests
         var commit = snapshot.Remotes.First(x => x.Name == remoteName)
             .Branches[$"{remoteName}/master"];
 
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            original.IsValidCommit(commit).Should().BeTrue();
-            remote.IsValidCommit(commit).Should().BeTrue();
+            await Assert.That(original.IsValidCommit(commit)).IsTrue();
+            await Assert.That(remote.IsValidCommit(commit)).IsTrue();
         }
     }
 
     [Test, AutoData]
-    public void BranchShowsFollowedBranch(string remoteName, string branchName)
+    public async Task BranchShowsFollowedBranch(string remoteName, string branchName)
     {
         using var original = GitTasks.CreateTemporaryGitRepository();
         original.AddFileToRepository();
@@ -194,17 +181,17 @@ public sealed class GetSnapshotTests
 
         var snapshot = GitRepository.GetSnapshot(original.Info.WorkingDirectory);
 
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
             var branch = snapshot.Branches.First(x => x.Name == "master");
 
-            branch.TrackedBranch.Should().Be($"{remoteName}/{branchName}");
-            branch.RemoteName.Should().Be(remoteName);
+            await Assert.That(branch.TrackedBranch).IsEqualTo($"{remoteName}/{branchName}");
+            await Assert.That(branch.RemoteName).IsEqualTo(remoteName);
         }
     }
 
     [Test, AutoData]
-    public void SnapshotContainsTags(string tagName)
+    public async Task SnapshotContainsTags(string tagName)
     {
         using var repository = GitTasks.CreateTemporaryGitRepository();
         repository.AddFileToRepository();
@@ -214,11 +201,11 @@ public sealed class GetSnapshotTests
         var snapshot = GitRepository.GetSnapshot(repository.Info.WorkingDirectory);
 
         var tag = snapshot.Tags.First(x => x.Name == tagName);
-        repository.IsValidCommit(tag.Target).Should().BeTrue();
+        await Assert.That(repository.IsValidCommit(tag.Target)).IsTrue();
     }
 
     [Test, AutoData]
-    public void AnnotatedTagContainsMessage(string tagName, string tagMessage)
+    public async Task AnnotatedTagContainsMessage(string tagName, string tagMessage)
     {
         using var repository = GitTasks.CreateTemporaryGitRepository();
         repository.AddFileToRepository();
@@ -228,11 +215,11 @@ public sealed class GetSnapshotTests
 
         var snapshot = GitRepository.GetSnapshot(repository.Info.WorkingDirectory);
 
-        snapshot.Tags.First(x => x.Name == tagName).Message!.TrimEnd().Should().Be(tagMessage);
+        await Assert.That(snapshot.Tags.First(x => x.Name == tagName).Message!.TrimEnd()).IsEqualTo(tagMessage);
     }
 
     [Test, AutoData]
-    public void NonAnnotatedTagContainsNullForMessage(string tagName)
+    public async Task NonAnnotatedTagContainsNullForMessage(string tagName)
     {
         using var repository = GitTasks.CreateTemporaryGitRepository();
         repository.AddFileToRepository();
@@ -241,6 +228,6 @@ public sealed class GetSnapshotTests
 
         var snapshot = GitRepository.GetSnapshot(repository.Info.WorkingDirectory);
 
-        snapshot.Tags.First(x => x.Name == tagName).Message.Should().BeNull();
+        await Assert.That(snapshot.Tags.First(x => x.Name == tagName).Message).IsNull();
     }
 }

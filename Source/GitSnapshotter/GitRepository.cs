@@ -193,6 +193,7 @@ public static class GitRepository
 
         var branches = references
             .OfType<DirectReference>()
+            .OrderBy(r => r.CanonicalName, StringComparer.Ordinal)
             .ToDictionary(r => r.CanonicalName[RemotesPrefix.Length..], r => r.TargetIdentifier);
 
         var head = references
@@ -215,6 +216,7 @@ public static class GitRepository
         repository.Refs
             .OfType<DirectReference>()
             .Where(r => IsOtherReference(r.CanonicalName))
+            .OrderBy(r => r.CanonicalName, StringComparer.Ordinal)
             .ToDictionary(r => r.CanonicalName, r => r.TargetIdentifier);
 
     private static bool IsOtherReference(string canonicalName) =>

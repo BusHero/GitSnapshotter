@@ -1,11 +1,9 @@
-﻿using FluentAssertions;
-
-namespace GitSnapshotter.UnitTests;
+﻿namespace GitSnapshotter.UnitTests;
 
 public sealed class RemoveBranchesTests
 {
     [Test, AutoData]
-    public void RemoveNewlyAddedBranch(string branchName)
+    public async Task RemoveNewlyAddedBranch(string branchName)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.AddFileToRepository();
@@ -17,11 +15,11 @@ public sealed class RemoveBranchesTests
         GitRepository.Restore(repo.Info.WorkingDirectory, originalSnapshot);
         var newSnapshot = GitRepository.GetSnapshot(repo.Info.WorkingDirectory);
 
-        newSnapshot.Should().BeEquivalentTo(originalSnapshot);
+        await Assert.That(newSnapshot).IsEquivalentTo(originalSnapshot);
     }
     
     [Test, AutoData]
-    public void RemoveSeveralBranches(string branchName1, string branchName2)
+    public async Task RemoveSeveralBranches(string branchName1, string branchName2)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.AddFileToRepository();
@@ -34,6 +32,6 @@ public sealed class RemoveBranchesTests
         GitRepository.Restore(repo.Info.WorkingDirectory, originalSnapshot);
         var newSnapshot = GitRepository.GetSnapshot(repo.Info.WorkingDirectory);
 
-        newSnapshot.Should().BeEquivalentTo(originalSnapshot);
+        await Assert.That(newSnapshot).IsEquivalentTo(originalSnapshot);
     }
 }

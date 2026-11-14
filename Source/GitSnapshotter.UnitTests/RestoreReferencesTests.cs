@@ -1,14 +1,11 @@
-﻿using FluentAssertions;
-using FluentAssertions.Execution;
-
-using LibGit2Sharp;
+﻿using LibGit2Sharp;
 
 namespace GitSnapshotter.UnitTests;
 
 public sealed class RestoreReferencesTests
 {
     [Test]
-    public void SnapshotContainsOtherReferences()
+    public async Task SnapshotContainsOtherReferences()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         var commit = repo.CommitFile("a.txt", "1");
@@ -16,22 +13,23 @@ public sealed class RestoreReferencesTests
 
         var snapshot = repo.Snapshot();
 
-        snapshot.References.Should().Equal(new Dictionary<string, string> { ["refs/custom/marker"] = commit.Sha });
+        await Assert.That(snapshot.References)
+            .IsEquivalentTo(new Dictionary<string, string> { ["refs/custom/marker"] = commit.Sha });
     }
 
     [Test]
-    public void SnapshotDoesNotRepeatBranchesTagsOrRemotesInReferences()
+    public async Task SnapshotDoesNotRepeatBranchesTagsOrRemotesInReferences()
     {
         var (clone, origin) = GitTasks.CreateClonedRepository();
         using var _ = clone;
         using var __ = origin;
         clone.AddTag("v1");
 
-        clone.Snapshot().References.Should().BeEmpty();
+        await Assert.That(clone.Snapshot().References).IsEmpty();
     }
 
     [Test]
-    public void RemovedReferenceIsRestored()
+    public async Task RemovedReferenceIsRestored()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         var commit = repo.CommitFile("a.txt", "1");
@@ -41,11 +39,11 @@ public sealed class RestoreReferencesTests
         repo.Refs.Remove("refs/custom/marker");
         repo.RestoreFrom(snapshot);
 
-        repo.Reopen().Refs["refs/custom/marker"].TargetIdentifier.Should().Be(commit.Sha);
+        await Assert.That(repo.Reopen().Refs["refs/custom/marker"].TargetIdentifier).IsEqualTo(commit.Sha);
     }
 
     [Test]
-    public void AddedReferenceIsRemoved()
+    public async Task AddedReferenceIsRemoved()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         var commit = repo.CommitFile("a.txt", "1");
@@ -54,11 +52,11 @@ public sealed class RestoreReferencesTests
         repo.Refs.Add("refs/custom/marker", commit.Id);
         repo.RestoreFrom(snapshot);
 
-        repo.Reopen().Refs["refs/custom/marker"].Should().BeNull();
+        await Assert.That(repo.Reopen().Refs["refs/custom/marker"]).IsNull();
     }
 
     [Test]
-    public void StashIsRestored()
+    public async Task StashIsRestored()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
@@ -71,15 +69,15 @@ public sealed class RestoreReferencesTests
         repo.RestoreFrom(snapshot);
 
         using var fresh = repo.Reopen();
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            fresh.Refs["refs/stash"].TargetIdentifier.Should().Be(stash.WorkTree.Sha);
-            fresh.Snapshot().Should().BeEquivalentTo(snapshot);
+            await Assert.That(fresh.Refs["refs/stash"].TargetIdentifier).IsEqualTo(stash.WorkTree.Sha);
+            await Assert.That(fresh.Snapshot()).IsEquivalentTo(snapshot);
         }
     }
 
     [Test]
-    public void NotesAreRestored()
+    public async Task NotesAreRestored()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         var commit = repo.CommitFile("a.txt", "1");
@@ -91,6 +89,6 @@ public sealed class RestoreReferencesTests
         repo.RestoreFrom(snapshot);
 
         using var fresh = repo.Reopen();
-        fresh.Notes[commit.Id].Single().Message.Should().Be("a note");
+        await Assert.That(fresh.Notes[commit.Id].Single().Message).IsEqualTo("a note");
     }
 }

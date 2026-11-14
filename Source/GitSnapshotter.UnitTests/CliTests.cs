@@ -1,7 +1,4 @@
-﻿using FluentAssertions;
-using FluentAssertions.Execution;
-
-using GitSnapshotter.Console;
+﻿using GitSnapshotter.Console;
 
 namespace GitSnapshotter.UnitTests;
 
@@ -13,81 +10,81 @@ public sealed class CliTests
     private int Run(params string[] args) => Cli.Run(args, _output, _error);
 
     [Test]
-    public void NoArgumentsPrintsUsage()
+    public async Task NoArgumentsPrintsUsage()
     {
         var exitCode = Run();
 
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            exitCode.Should().Be(Cli.UsageError);
-            _error.ToString().Should().Contain("Usage:");
+            await Assert.That(exitCode).IsEqualTo(Cli.UsageError);
+            await Assert.That(_error.ToString()).Contains("Usage:");
         }
     }
 
     [Test]
-    public void HelpPrintsUsage()
+    public async Task HelpPrintsUsage()
     {
         var exitCode = Run("help");
 
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            exitCode.Should().Be(Cli.Success);
-            _output.ToString().Should().Contain("Usage:");
+            await Assert.That(exitCode).IsEqualTo(Cli.Success);
+            await Assert.That(_output.ToString()).Contains("Usage:");
         }
     }
 
     [Test]
-    public void UnknownCommandIsAUsageError()
+    public async Task UnknownCommandIsAUsageError()
     {
-        Run("frobnicate", "x").Should().Be(Cli.UsageError);
+        await Assert.That(Run("frobnicate", "x")).IsEqualTo(Cli.UsageError);
     }
 
     [Test]
-    public void UnknownOptionIsAUsageError()
+    public async Task UnknownOptionIsAUsageError()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
 
         var exitCode = Run("snapshot", repo.Info.WorkingDirectory, "--bogus");
 
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            exitCode.Should().Be(Cli.UsageError);
-            _error.ToString().Should().Contain("--bogus");
+            await Assert.That(exitCode).IsEqualTo(Cli.UsageError);
+            await Assert.That(_error.ToString()).Contains("--bogus");
         }
     }
 
     [Test]
-    public void SnapshotPrintsJson()
+    public async Task SnapshotPrintsJson()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
 
         var exitCode = Run("snapshot", repo.Info.WorkingDirectory);
 
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            exitCode.Should().Be(Cli.Success);
-            GitRepositorySnapshot.FromJson(_output.ToString()).Should().BeEquivalentTo(repo.Snapshot());
+            await Assert.That(exitCode).IsEqualTo(Cli.Success);
+            await Assert.That(GitRepositorySnapshot.FromJson(_output.ToString())).IsEquivalentTo(repo.Snapshot());
         }
     }
 
     [Test]
-    public void RepositoryPathAloneStillPrintsSnapshot()
+    public async Task RepositoryPathAloneStillPrintsSnapshot()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
 
         var exitCode = Run(repo.Info.WorkingDirectory);
 
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            exitCode.Should().Be(Cli.Success);
-            GitRepositorySnapshot.FromJson(_output.ToString()).Should().BeEquivalentTo(repo.Snapshot());
+            await Assert.That(exitCode).IsEqualTo(Cli.Success);
+            await Assert.That(GitRepositorySnapshot.FromJson(_output.ToString())).IsEquivalentTo(repo.Snapshot());
         }
     }
 
     [Test]
-    public void SnapshotWritesFile()
+    public async Task SnapshotWritesFile()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
@@ -96,15 +93,15 @@ public sealed class CliTests
 
         var exitCode = Run("snapshot", repo.Info.WorkingDirectory, "--output", file, "--include-working-tree");
 
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            exitCode.Should().Be(Cli.Success);
-            GitRepositorySnapshot.Load(file).WorkingTree.Should().NotBeNull();
+            await Assert.That(exitCode).IsEqualTo(Cli.Success);
+            await Assert.That(GitRepositorySnapshot.Load(file).WorkingTree).IsNotNull();
         }
     }
 
     [Test]
-    public void RestoreRestoresTheRepository()
+    public async Task RestoreRestoresTheRepository()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
@@ -114,15 +111,15 @@ public sealed class CliTests
 
         var exitCode = Run("restore", repo.Info.WorkingDirectory, file);
 
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            exitCode.Should().Be(Cli.Success);
-            repo.Reopen().Branches["feature"].Should().BeNull();
+            await Assert.That(exitCode).IsEqualTo(Cli.Success);
+            await Assert.That(repo.Reopen().Branches["feature"]).IsNull();
         }
     }
 
     [Test]
-    public void RestoreDryRunListsChangesWithoutApplyingThem()
+    public async Task RestoreDryRunListsChangesWithoutApplyingThem()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
@@ -132,16 +129,16 @@ public sealed class CliTests
 
         var exitCode = Run("restore", repo.Info.WorkingDirectory, file, "--dry-run");
 
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            exitCode.Should().Be(Cli.Success);
-            _output.ToString().Should().Contain("- Branch feature");
-            repo.Reopen().Branches["feature"].Should().NotBeNull();
+            await Assert.That(exitCode).IsEqualTo(Cli.Success);
+            await Assert.That(_output.ToString()).Contains("- Branch feature");
+            await Assert.That(repo.Reopen().Branches["feature"]).IsNotNull();
         }
     }
 
     [Test]
-    public void RestoreRefusingUncommittedChangesFails()
+    public async Task RestoreRefusingUncommittedChangesFails()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
@@ -152,18 +149,18 @@ public sealed class CliTests
 
         var exitCode = Run("restore", repo.Info.WorkingDirectory, file);
 
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            exitCode.Should().Be(Cli.Failure);
-            _error.ToString().Should().Contain("uncommitted changes");
+            await Assert.That(exitCode).IsEqualTo(Cli.Failure);
+            await Assert.That(_error.ToString()).Contains("uncommitted changes");
         }
 
-        Run("restore", repo.Info.WorkingDirectory, file, "--force").Should().Be(Cli.Success);
-        repo.ReadFile("a.txt").Should().Be("1");
+        await Assert.That(Run("restore", repo.Info.WorkingDirectory, file, "--force")).IsEqualTo(Cli.Success);
+        await Assert.That(repo.ReadFile("a.txt")).IsEqualTo("1");
     }
 
     [Test]
-    public void DiffListsChangesSinceSnapshot()
+    public async Task DiffListsChangesSinceSnapshot()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
@@ -173,15 +170,15 @@ public sealed class CliTests
 
         var exitCode = Run("diff", repo.Info.WorkingDirectory, file);
 
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            exitCode.Should().Be(Cli.Success);
-            _output.ToString().Should().Contain("+ Tag v1");
+            await Assert.That(exitCode).IsEqualTo(Cli.Success);
+            await Assert.That(_output.ToString()).Contains("+ Tag v1");
         }
     }
 
     [Test]
-    public void DiffWithoutChangesSaysSo()
+    public async Task DiffWithoutChangesSaysSo()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
@@ -190,26 +187,27 @@ public sealed class CliTests
 
         Run("diff", repo.Info.WorkingDirectory, file);
 
-        _output.ToString().Should().Contain("No changes");
+        await Assert.That(_output.ToString()).Contains("No changes");
     }
 
     [Test]
-    public void MissingRepositoryIsAnError()
+    public async Task MissingRepositoryIsAnError()
     {
         var exitCode = Run("snapshot", GitTasks.GetTempPath());
 
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            exitCode.Should().Be(Cli.Failure);
-            _error.ToString().Should().StartWith("error:");
+            await Assert.That(exitCode).IsEqualTo(Cli.Failure);
+            await Assert.That(_error.ToString()).StartsWith("error:");
         }
     }
 
     [Test]
-    public void MissingSnapshotFileIsAnError()
+    public async Task MissingSnapshotFileIsAnError()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
 
-        Run("restore", repo.Info.WorkingDirectory, GitTasks.GetTempPath() + ".json").Should().Be(Cli.Failure);
+        await Assert.That(Run("restore", repo.Info.WorkingDirectory, GitTasks.GetTempPath() + ".json"))
+            .IsEqualTo(Cli.Failure);
     }
 }

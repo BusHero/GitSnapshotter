@@ -1,7 +1,4 @@
-﻿using FluentAssertions;
-using FluentAssertions.Execution;
-
-using LibGit2Sharp;
+﻿using LibGit2Sharp;
 
 namespace GitSnapshotter.UnitTests;
 
@@ -10,7 +7,7 @@ public sealed class RestoreSafetyTests
     private const string UnknownSha = "0123456789abcdef0123456789abcdef01234567";
 
     [Test, AutoData]
-    public void MissingBranchTipFailsWithoutChangingAnything(string branchName, string tagName)
+    public async Task MissingBranchTipFailsWithoutChangingAnything(string branchName, string tagName)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
@@ -24,15 +21,16 @@ public sealed class RestoreSafetyTests
 
         var restore = () => repo.RestoreFrom(snapshot);
 
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            restore.Should().Throw<MissingObjectsException>().Which.MissingObjects.Should().Equal(UnknownSha);
-            repo.Reopen().Snapshot().Should().BeEquivalentTo(before);
+            var exception = await Assert.That(restore).Throws<MissingObjectsException>();
+            await Assert.That(exception!.MissingObjects).IsEquivalentTo([UnknownSha], CollectionOrdering.Matching);
+            await Assert.That(repo.Reopen().Snapshot()).IsEquivalentTo(before);
         }
     }
 
     [Test]
-    public void InvalidShaIsReportedAsMissing()
+    public async Task InvalidShaIsReportedAsMissing()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
@@ -43,11 +41,12 @@ public sealed class RestoreSafetyTests
 
         var restore = () => repo.RestoreFrom(snapshot);
 
-        restore.Should().Throw<MissingObjectsException>().Which.MissingObjects.Should().Equal("not-a-sha");
+        var exception2 = await Assert.That(restore).Throws<MissingObjectsException>();
+        await Assert.That(exception2!.MissingObjects).IsEquivalentTo(["not-a-sha"], CollectionOrdering.Matching);
     }
 
     [Test]
-    public void MissingObjectsInSkippedPartsAreIgnored()
+    public async Task MissingObjectsInSkippedPartsAreIgnored()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
@@ -58,11 +57,11 @@ public sealed class RestoreSafetyTests
 
         var restore = () => repo.RestoreFrom(snapshot, new RestoreOptions { Tags = false });
 
-        restore.Should().NotThrow();
+        await Assert.That(restore).ThrowsNothing();
     }
 
     [Test, AutoData]
-    public void TagsAreLeftAloneWhenOptionIsOff(string tagName)
+    public async Task TagsAreLeftAloneWhenOptionIsOff(string tagName)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
@@ -71,11 +70,11 @@ public sealed class RestoreSafetyTests
         repo.AddTag(tagName);
         repo.RestoreFrom(snapshot, new RestoreOptions { Tags = false });
 
-        repo.Tags[tagName].Should().NotBeNull();
+        await Assert.That(repo.Tags[tagName]).IsNotNull();
     }
 
     [Test, AutoData]
-    public void BranchesAreLeftAloneWhenOptionIsOff(string branchName)
+    public async Task BranchesAreLeftAloneWhenOptionIsOff(string branchName)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
@@ -84,11 +83,11 @@ public sealed class RestoreSafetyTests
         repo.AddBranch(branchName);
         repo.RestoreFrom(snapshot, new RestoreOptions { Branches = false });
 
-        repo.Branches[branchName].Should().NotBeNull();
+        await Assert.That(repo.Branches[branchName]).IsNotNull();
     }
 
     [Test, AutoData]
-    public void HeadIsLeftAloneWhenOptionIsOff(string branchName)
+    public async Task HeadIsLeftAloneWhenOptionIsOff(string branchName)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
@@ -99,15 +98,15 @@ public sealed class RestoreSafetyTests
         repo.RestoreFrom(snapshot, new RestoreOptions { Head = false });
 
         using var fresh = repo.Reopen();
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            fresh.Info.IsHeadDetached.Should().BeFalse();
-            fresh.Head.FriendlyName.Should().Be(branchName);
+            await Assert.That(fresh.Info.IsHeadDetached).IsFalse();
+            await Assert.That(fresh.Head.FriendlyName).IsEqualTo(branchName);
         }
     }
 
     [Test, AutoData]
-    public void HeadStaysDetachedWhenItsBranchIsRemovedAndHeadIsNotRestored(string branchName)
+    public async Task HeadStaysDetachedWhenItsBranchIsRemovedAndHeadIsNotRestored(string branchName)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         var commit = repo.CommitFile("a.txt", "1");
@@ -118,16 +117,16 @@ public sealed class RestoreSafetyTests
         repo.RestoreFrom(snapshot, new RestoreOptions { Head = false });
 
         using var fresh = repo.Reopen();
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            fresh.Branches[branchName].Should().BeNull();
-            fresh.Info.IsHeadDetached.Should().BeTrue();
-            fresh.Head.Tip.Sha.Should().Be(commit.Sha);
+            await Assert.That(fresh.Branches[branchName]).IsNull();
+            await Assert.That(fresh.Info.IsHeadDetached).IsTrue();
+            await Assert.That(fresh.Head.Tip.Sha).IsEqualTo(commit.Sha);
         }
     }
 
     [Test]
-    public void RestoreWorksOnAnOpenRepository()
+    public async Task RestoreWorksOnAnOpenRepository()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
@@ -137,11 +136,11 @@ public sealed class RestoreSafetyTests
         repo.AddBranch("feature");
         GitRepository.Restore(repo, snapshot);
 
-        GitRepository.GetSnapshot(repo).Should().BeEquivalentTo(snapshot);
+        await Assert.That(GitRepository.GetSnapshot(repo)).IsEquivalentTo(snapshot);
     }
 
     [Test, AutoData]
-    public void BranchNamesWithSlashesAreRestored(string suffix)
+    public async Task BranchNamesWithSlashesAreRestored(string suffix)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
@@ -151,6 +150,6 @@ public sealed class RestoreSafetyTests
         repo.Branches.Remove($"feature/{suffix}");
         repo.RestoreFrom(snapshot);
 
-        repo.Reopen().Snapshot().Should().BeEquivalentTo(snapshot);
+        await Assert.That(repo.Reopen().Snapshot()).IsEquivalentTo(snapshot);
     }
 }

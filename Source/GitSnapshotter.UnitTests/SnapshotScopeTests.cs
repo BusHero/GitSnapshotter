@@ -1,12 +1,9 @@
-﻿using FluentAssertions;
-using FluentAssertions.Execution;
-
-namespace GitSnapshotter.UnitTests;
+﻿namespace GitSnapshotter.UnitTests;
 
 public sealed class SnapshotScopeTests
 {
     [Test, AutoData]
-    public void DisposingTheScopeRestoresTheRepository(string branchName, string tagName)
+    public async Task DisposingTheScopeRestoresTheRepository(string branchName, string tagName)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
@@ -20,26 +17,26 @@ public sealed class SnapshotScopeTests
         }
 
         using var fresh = repo.Reopen();
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            fresh.Snapshot().Should().BeEquivalentTo(before);
-            fresh.ReadFile("a.txt").Should().Be("1");
+            await Assert.That(fresh.Snapshot()).IsEquivalentTo(before);
+            await Assert.That(fresh.ReadFile("a.txt")).IsEqualTo("1");
         }
     }
 
     [Test]
-    public void ScopeExposesTheSnapshot()
+    public async Task ScopeExposesTheSnapshot()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
 
         using var scope = GitRepository.Preserve(repo.Info.WorkingDirectory);
 
-        scope.Snapshot.Should().BeEquivalentTo(repo.Snapshot());
+        await Assert.That(scope.Snapshot).IsEquivalentTo(repo.Snapshot());
     }
 
     [Test, AutoData]
-    public void SecondDisposeDoesNothing(string tagName)
+    public async Task SecondDisposeDoesNothing(string tagName)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
@@ -49,11 +46,11 @@ public sealed class SnapshotScopeTests
         repo.AddTag(tagName);
         scope.Dispose();
 
-        repo.Tags[tagName].Should().NotBeNull();
+        await Assert.That(repo.Tags[tagName]).IsNotNull();
     }
 
     [Test]
-    public void ScopeCanPreserveTheWorkingTree()
+    public async Task ScopeCanPreserveTheWorkingTree()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
@@ -68,10 +65,10 @@ public sealed class SnapshotScopeTests
             repo.WriteFile("temp.txt", "temporary");
         }
 
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            repo.ReadFile("a.txt").Should().Be("work in progress");
-            repo.FileExists("temp.txt").Should().BeFalse();
+            await Assert.That(repo.ReadFile("a.txt")).IsEqualTo("work in progress");
+            await Assert.That(repo.FileExists("temp.txt")).IsFalse();
         }
     }
 }

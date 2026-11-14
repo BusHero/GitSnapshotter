@@ -1,14 +1,11 @@
-﻿using FluentAssertions;
-using FluentAssertions.Execution;
-
-using LibGit2Sharp;
+﻿using LibGit2Sharp;
 
 namespace GitSnapshotter.UnitTests;
 
 public sealed class RestoreHeadTests
 {
     [Test, AutoData]
-    public void RestoreHead(string branchName)
+    public async Task RestoreHead(string branchName)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.AddFileToRepository();
@@ -20,11 +17,11 @@ public sealed class RestoreHeadTests
         GitRepository.Restore(repo.Info.WorkingDirectory, originalSnapshot);
         var newSnapshot = GitRepository.GetSnapshot(repo.Info.WorkingDirectory);
 
-        newSnapshot.Should().BeEquivalentTo(originalSnapshot);
+        await Assert.That(newSnapshot).IsEquivalentTo(originalSnapshot);
     }
 
     [Test]
-    public void SnapshotOfDetachedHeadRecordsCommit()
+    public async Task SnapshotOfDetachedHeadRecordsCommit()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         var commit = repo.CommitFile("a.txt", "1");
@@ -32,24 +29,24 @@ public sealed class RestoreHeadTests
 
         var snapshot = repo.Snapshot();
 
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            snapshot.IsHeadDetached.Should().BeTrue();
-            snapshot.Head.Should().Be(commit.Sha);
+            await Assert.That(snapshot.IsHeadDetached).IsTrue();
+            await Assert.That(snapshot.Head).IsEqualTo(commit.Sha);
         }
     }
 
     [Test]
-    public void SnapshotOfAttachedHeadIsNotDetached()
+    public async Task SnapshotOfAttachedHeadIsNotDetached()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
 
-        repo.Snapshot().IsHeadDetached.Should().BeFalse();
+        await Assert.That(repo.Snapshot().IsHeadDetached).IsFalse();
     }
 
     [Test]
-    public void RestoreDetachedHead()
+    public async Task RestoreDetachedHead()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         var first = repo.CommitFile("a.txt", "1");
@@ -61,17 +58,17 @@ public sealed class RestoreHeadTests
         repo.RestoreFrom(snapshot);
 
         using var fresh = repo.Reopen();
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            fresh.Info.IsHeadDetached.Should().BeTrue();
-            fresh.Head.Tip.Sha.Should().Be(first.Sha);
-            fresh.ReadFile("a.txt").Should().Be("1");
-            fresh.Snapshot().Should().BeEquivalentTo(snapshot);
+            await Assert.That(fresh.Info.IsHeadDetached).IsTrue();
+            await Assert.That(fresh.Head.Tip.Sha).IsEqualTo(first.Sha);
+            await Assert.That(fresh.ReadFile("a.txt")).IsEqualTo("1");
+            await Assert.That(fresh.Snapshot()).IsEquivalentTo(snapshot);
         }
     }
 
     [Test]
-    public void RestoreBranchFromDetachedHead()
+    public async Task RestoreBranchFromDetachedHead()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         var first = repo.CommitFile("a.txt", "1");
@@ -82,16 +79,16 @@ public sealed class RestoreHeadTests
         repo.RestoreFrom(snapshot);
 
         using var fresh = repo.Reopen();
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            fresh.Info.IsHeadDetached.Should().BeFalse();
-            fresh.Head.FriendlyName.Should().Be("master");
-            fresh.ReadFile("a.txt").Should().Be("2");
+            await Assert.That(fresh.Info.IsHeadDetached).IsFalse();
+            await Assert.That(fresh.Head.FriendlyName).IsEqualTo("master");
+            await Assert.That(fresh.ReadFile("a.txt")).IsEqualTo("2");
         }
     }
 
     [Test, AutoData]
-    public void RestoreWhileOnBranchCreatedAfterSnapshot(string branchName)
+    public async Task RestoreWhileOnBranchCreatedAfterSnapshot(string branchName)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
@@ -103,18 +100,18 @@ public sealed class RestoreHeadTests
         repo.RestoreFrom(snapshot);
 
         using var fresh = repo.Reopen();
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            fresh.Branches[branchName].Should().BeNull();
-            fresh.Head.FriendlyName.Should().Be("master");
-            fresh.FileExists("b.txt").Should().BeFalse();
-            fresh.IsClean().Should().BeTrue();
-            fresh.Snapshot().Should().BeEquivalentTo(snapshot);
+            await Assert.That(fresh.Branches[branchName]).IsNull();
+            await Assert.That(fresh.Head.FriendlyName).IsEqualTo("master");
+            await Assert.That(fresh.FileExists("b.txt")).IsFalse();
+            await Assert.That(fresh.IsClean()).IsTrue();
+            await Assert.That(fresh.Snapshot()).IsEquivalentTo(snapshot);
         }
     }
 
     [Test]
-    public void RestoreMovesWorkingTreeWhenCheckedOutBranchTipMoves()
+    public async Task RestoreMovesWorkingTreeWhenCheckedOutBranchTipMoves()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
@@ -125,16 +122,16 @@ public sealed class RestoreHeadTests
         repo.RestoreFrom(snapshot);
 
         using var fresh = repo.Reopen();
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            fresh.ReadFile("a.txt").Should().Be("1");
-            fresh.FileExists("b.txt").Should().BeFalse();
-            fresh.IsClean().Should().BeTrue();
+            await Assert.That(fresh.ReadFile("a.txt")).IsEqualTo("1");
+            await Assert.That(fresh.FileExists("b.txt")).IsFalse();
+            await Assert.That(fresh.IsClean()).IsTrue();
         }
     }
 
     [Test]
-    public void RestoreRefusesToOverwriteUncommittedChanges()
+    public async Task RestoreRefusesToOverwriteUncommittedChanges()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
@@ -144,18 +141,19 @@ public sealed class RestoreHeadTests
 
         var restore = () => repo.RestoreFrom(snapshot);
 
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            restore.Should().Throw<UncommittedChangesException>()
-                .Which.Paths.Should().Equal("a.txt");
+            var exception = await Assert.That(restore).Throws<UncommittedChangesException>();
+            await Assert.That(exception!.Paths).IsEquivalentTo(["a.txt"], CollectionOrdering.Matching);
             using var fresh = repo.Reopen();
-            fresh.Head.Tip.Sha.Should().Be(tip.Sha, "nothing should change when the restore is refused");
-            fresh.ReadFile("a.txt").Should().Be("uncommitted");
+            await Assert.That(fresh.Head.Tip.Sha)
+                .IsEqualTo(tip.Sha).Because("nothing should change when the restore is refused");
+            await Assert.That(fresh.ReadFile("a.txt")).IsEqualTo("uncommitted");
         }
     }
 
     [Test]
-    public void RestoreRefusesToOverwriteStagedChanges()
+    public async Task RestoreRefusesToOverwriteStagedChanges()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
@@ -166,11 +164,11 @@ public sealed class RestoreHeadTests
 
         var restore = () => repo.RestoreFrom(snapshot);
 
-        restore.Should().Throw<UncommittedChangesException>();
+        await Assert.That(restore).Throws<UncommittedChangesException>();
     }
 
     [Test]
-    public void RestoreWithForceDiscardsUncommittedChanges()
+    public async Task RestoreWithForceDiscardsUncommittedChanges()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
@@ -181,15 +179,15 @@ public sealed class RestoreHeadTests
         repo.RestoreFrom(snapshot, new RestoreOptions { Force = true });
 
         using var fresh = repo.Reopen();
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            fresh.ReadFile("a.txt").Should().Be("1");
-            fresh.IsClean().Should().BeTrue();
+            await Assert.That(fresh.ReadFile("a.txt")).IsEqualTo("1");
+            await Assert.That(fresh.IsClean()).IsTrue();
         }
     }
 
     [Test]
-    public void UntrackedFilesSurviveRestoreWithoutWorkingTree()
+    public async Task UntrackedFilesSurviveRestoreWithoutWorkingTree()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
@@ -199,11 +197,11 @@ public sealed class RestoreHeadTests
 
         repo.RestoreFrom(snapshot);
 
-        repo.ReadFile("untracked.txt").Should().Be("keep me");
+        await Assert.That(repo.ReadFile("untracked.txt")).IsEqualTo("keep me");
     }
 
     [Test]
-    public void UntrackedFileThatWouldBeOverwrittenBlocksRestore()
+    public async Task UntrackedFileThatWouldBeOverwrittenBlocksRestore()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
@@ -216,11 +214,12 @@ public sealed class RestoreHeadTests
 
         var restore = () => repo.RestoreFrom(snapshot);
 
-        restore.Should().Throw<UncommittedChangesException>().Which.Paths.Should().Equal("b.txt");
+        var exception2 = await Assert.That(restore).Throws<UncommittedChangesException>();
+        await Assert.That(exception2!.Paths).IsEquivalentTo(["b.txt"], CollectionOrdering.Matching);
     }
 
     [Test, AutoData]
-    public void DirtyWorkingTreeDoesNotBlockRestoreThatKeepsHeadCommit(string tagName)
+    public async Task DirtyWorkingTreeDoesNotBlockRestoreThatKeepsHeadCommit(string tagName)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
@@ -230,15 +229,15 @@ public sealed class RestoreHeadTests
 
         repo.RestoreFrom(snapshot);
 
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            repo.Tags[tagName].Should().BeNull();
-            repo.ReadFile("a.txt").Should().Be("uncommitted");
+            await Assert.That(repo.Tags[tagName]).IsNull();
+            await Assert.That(repo.ReadFile("a.txt")).IsEqualTo("uncommitted");
         }
     }
 
     [Test]
-    public void RestoreEmptyRepository()
+    public async Task RestoreEmptyRepository()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         var snapshot = repo.Snapshot();
@@ -247,12 +246,12 @@ public sealed class RestoreHeadTests
         repo.RestoreFrom(snapshot);
 
         using var fresh = repo.Reopen();
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            fresh.Info.IsHeadUnborn.Should().BeTrue();
-            fresh.Branches.Should().BeEmpty();
-            fresh.FileExists("a.txt").Should().BeFalse();
-            fresh.Snapshot().Should().BeEquivalentTo(snapshot);
+            await Assert.That(fresh.Info.IsHeadUnborn).IsTrue();
+            await Assert.That(fresh.Branches).IsEmpty();
+            await Assert.That(fresh.FileExists("a.txt")).IsFalse();
+            await Assert.That(fresh.Snapshot()).IsEquivalentTo(snapshot);
         }
     }
 }

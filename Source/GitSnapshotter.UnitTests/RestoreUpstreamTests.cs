@@ -1,12 +1,9 @@
-﻿using FluentAssertions;
-using FluentAssertions.Execution;
-
-namespace GitSnapshotter.UnitTests;
+﻿namespace GitSnapshotter.UnitTests;
 
 public sealed class RestoreUpstreamTests
 {
     [Test]
-    public void SnapshotRecordsUpstreamBranch()
+    public async Task SnapshotRecordsUpstreamBranch()
     {
         var (clone, origin) = GitTasks.CreateClonedRepository();
         using var _ = clone;
@@ -14,16 +11,16 @@ public sealed class RestoreUpstreamTests
 
         var master = clone.Snapshot().Branches.Single(b => b.Name == "master");
 
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            master.RemoteName.Should().Be("origin");
-            master.UpstreamBranch.Should().Be("refs/heads/master");
-            master.TrackedBranch.Should().Be("origin/master");
+            await Assert.That(master.RemoteName).IsEqualTo("origin");
+            await Assert.That(master.UpstreamBranch).IsEqualTo("refs/heads/master");
+            await Assert.That(master.TrackedBranch).IsEqualTo("origin/master");
         }
     }
 
     [Test]
-    public void RemovedUpstreamIsRestored()
+    public async Task RemovedUpstreamIsRestored()
     {
         var (clone, origin) = GitTasks.CreateClonedRepository();
         using var _ = clone;
@@ -34,15 +31,15 @@ public sealed class RestoreUpstreamTests
         clone.RestoreFrom(snapshot);
 
         using var fresh = clone.Reopen();
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            fresh.Branches["master"].TrackedBranch.FriendlyName.Should().Be("origin/master");
-            fresh.Snapshot().Should().BeEquivalentTo(snapshot);
+            await Assert.That(fresh.Branches["master"].TrackedBranch.FriendlyName).IsEqualTo("origin/master");
+            await Assert.That(fresh.Snapshot()).IsEquivalentTo(snapshot);
         }
     }
 
     [Test, AutoData]
-    public void AddedUpstreamIsRemoved(string branchName)
+    public async Task AddedUpstreamIsRemoved(string branchName)
     {
         var (clone, origin) = GitTasks.CreateClonedRepository();
         using var _ = clone;
@@ -56,16 +53,16 @@ public sealed class RestoreUpstreamTests
         clone.RestoreFrom(snapshot);
 
         using var fresh = clone.Reopen();
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            fresh.Branches[branchName].IsTracking.Should().BeFalse();
-            fresh.Config.Get<string>($"branch.{branchName}.remote").Should().BeNull();
-            fresh.Config.Get<string>($"branch.{branchName}.merge").Should().BeNull();
+            await Assert.That(fresh.Branches[branchName].IsTracking).IsFalse();
+            await Assert.That(fresh.Config.Get<string>($"branch.{branchName}.remote")).IsNull();
+            await Assert.That(fresh.Config.Get<string>($"branch.{branchName}.merge")).IsNull();
         }
     }
 
     [Test, AutoData]
-    public void ChangedUpstreamIsRestored(string otherBranch)
+    public async Task ChangedUpstreamIsRestored(string otherBranch)
     {
         var (clone, origin) = GitTasks.CreateClonedRepository();
         using var _ = clone;
@@ -78,11 +75,11 @@ public sealed class RestoreUpstreamTests
         clone.RestoreFrom(snapshot);
 
         using var fresh = clone.Reopen();
-        fresh.Branches["master"].UpstreamBranchCanonicalName.Should().Be("refs/heads/master");
+        await Assert.That(fresh.Branches["master"].UpstreamBranchCanonicalName).IsEqualTo("refs/heads/master");
     }
 
     [Test]
-    public void UpstreamIsRestoredFromSnapshotWithoutUpstreamBranch()
+    public async Task UpstreamIsRestoredFromSnapshotWithoutUpstreamBranch()
     {
         var (clone, origin) = GitTasks.CreateClonedRepository();
         using var _ = clone;
@@ -98,6 +95,6 @@ public sealed class RestoreUpstreamTests
         clone.RestoreFrom(snapshot);
 
         using var fresh = clone.Reopen();
-        fresh.Branches["master"].UpstreamBranchCanonicalName.Should().Be("refs/heads/master");
+        await Assert.That(fresh.Branches["master"].UpstreamBranchCanonicalName).IsEqualTo("refs/heads/master");
     }
 }

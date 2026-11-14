@@ -1,38 +1,35 @@
-﻿using FluentAssertions;
-using FluentAssertions.Execution;
-
-using LibGit2Sharp;
+﻿using LibGit2Sharp;
 
 namespace GitSnapshotter.UnitTests;
 
 public sealed class WorkingTreeTests
 {
     [Test]
-    public void WorkingTreeIsNotCapturedByDefault()
+    public async Task WorkingTreeIsNotCapturedByDefault()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
 
-        repo.Snapshot().WorkingTree.Should().BeNull();
+        await Assert.That(repo.Snapshot().WorkingTree).IsNull();
     }
 
     [Test]
-    public void CleanWorkingTreeMatchesHeadTree()
+    public async Task CleanWorkingTreeMatchesHeadTree()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         var commit = repo.CommitFile("a.txt", "1");
 
         var state = repo.SnapshotWithWorkingTree().WorkingTree!;
 
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            state.IndexTree.Should().Be(commit.Tree.Sha);
-            state.WorkingDirectoryTree.Should().Be(commit.Tree.Sha);
+            await Assert.That(state.IndexTree).IsEqualTo(commit.Tree.Sha);
+            await Assert.That(state.WorkingDirectoryTree).IsEqualTo(commit.Tree.Sha);
         }
     }
 
     [Test]
-    public void CapturingDoesNotChangeTheWorkingTree()
+    public async Task CapturingDoesNotChangeTheWorkingTree()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
@@ -46,15 +43,15 @@ public sealed class WorkingTreeTests
         repo.SnapshotWithWorkingTree();
 
         using var fresh = repo.Reopen();
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            fresh.RetrieveStatus().Select(e => (e.FilePath, e.State)).Should().BeEquivalentTo(statusBefore);
-            fresh.Refs.Select(r => (r.CanonicalName, r.TargetIdentifier)).Should().BeEquivalentTo(refsBefore);
+            await Assert.That(fresh.RetrieveStatus().Select(e => (e.FilePath, e.State))).IsEquivalentTo(statusBefore);
+            await Assert.That(fresh.Refs.Select(r => (r.CanonicalName, r.TargetIdentifier))).IsEquivalentTo(refsBefore);
         }
     }
 
     [Test]
-    public void ModifiedFileIsRestored()
+    public async Task ModifiedFileIsRestored()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
@@ -65,15 +62,15 @@ public sealed class WorkingTreeTests
         repo.RestoreFrom(snapshot, new RestoreOptions { Force = true });
 
         using var fresh = repo.Reopen();
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            fresh.ReadFile("a.txt").Should().Be("work in progress");
-            fresh.SnapshotWithWorkingTree().Should().BeEquivalentTo(snapshot);
+            await Assert.That(fresh.ReadFile("a.txt")).IsEqualTo("work in progress");
+            await Assert.That(fresh.SnapshotWithWorkingTree()).IsEquivalentTo(snapshot);
         }
     }
 
     [Test]
-    public void UncommittedChangesComeBackAfterACommit()
+    public async Task UncommittedChangesComeBackAfterACommit()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
@@ -85,16 +82,16 @@ public sealed class WorkingTreeTests
         repo.RestoreFrom(snapshot);
 
         using var fresh = repo.Reopen();
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            fresh.ReadFile("a.txt").Should().Be("work in progress");
-            fresh.RetrieveStatus("a.txt").Should().Be(FileStatus.ModifiedInWorkdir);
-            fresh.SnapshotWithWorkingTree().Should().BeEquivalentTo(snapshot);
+            await Assert.That(fresh.ReadFile("a.txt")).IsEqualTo("work in progress");
+            await Assert.That(fresh.RetrieveStatus("a.txt")).IsEqualTo(FileStatus.ModifiedInWorkdir);
+            await Assert.That(fresh.SnapshotWithWorkingTree()).IsEquivalentTo(snapshot);
         }
     }
 
     [Test]
-    public void DeletedFileIsRestored()
+    public async Task DeletedFileIsRestored()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
@@ -103,11 +100,11 @@ public sealed class WorkingTreeTests
         repo.DeleteFile("a.txt");
         repo.RestoreFrom(snapshot);
 
-        repo.ReadFile("a.txt").Should().Be("1");
+        await Assert.That(repo.ReadFile("a.txt")).IsEqualTo("1");
     }
 
     [Test]
-    public void FileDeletedInSnapshotIsDeletedAgain()
+    public async Task FileDeletedInSnapshotIsDeletedAgain()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
@@ -118,15 +115,15 @@ public sealed class WorkingTreeTests
         repo.RestoreFrom(snapshot);
 
         using var fresh = repo.Reopen();
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            fresh.FileExists("a.txt").Should().BeFalse();
-            fresh.RetrieveStatus("a.txt").Should().Be(FileStatus.DeletedFromWorkdir);
+            await Assert.That(fresh.FileExists("a.txt")).IsFalse();
+            await Assert.That(fresh.RetrieveStatus("a.txt")).IsEqualTo(FileStatus.DeletedFromWorkdir);
         }
     }
 
     [Test]
-    public void UntrackedFileIsRestored()
+    public async Task UntrackedFileIsRestored()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
@@ -137,15 +134,15 @@ public sealed class WorkingTreeTests
         repo.RestoreFrom(snapshot);
 
         using var fresh = repo.Reopen();
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            fresh.ReadFile(Path.Combine("dir", "untracked.txt")).Should().Be("untracked");
-            fresh.RetrieveStatus("dir/untracked.txt").Should().Be(FileStatus.NewInWorkdir);
+            await Assert.That(fresh.ReadFile(Path.Combine("dir", "untracked.txt"))).IsEqualTo("untracked");
+            await Assert.That(fresh.RetrieveStatus("dir/untracked.txt")).IsEqualTo(FileStatus.NewInWorkdir);
         }
     }
 
     [Test]
-    public void UntrackedFileNotInSnapshotBlocksRestoreUnlessForced()
+    public async Task UntrackedFileNotInSnapshotBlocksRestoreUnlessForced()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
@@ -154,18 +151,19 @@ public sealed class WorkingTreeTests
         repo.WriteFile("new.txt", "new");
         var restore = () => repo.RestoreFrom(snapshot);
 
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            restore.Should().Throw<UncommittedChangesException>().Which.Paths.Should().Equal("new.txt");
-            repo.FileExists("new.txt").Should().BeTrue();
+            var exception = await Assert.That(restore).Throws<UncommittedChangesException>();
+            await Assert.That(exception!.Paths).IsEquivalentTo(["new.txt"], CollectionOrdering.Matching);
+            await Assert.That(repo.FileExists("new.txt")).IsTrue();
         }
 
         repo.RestoreFrom(snapshot, new RestoreOptions { Force = true });
-        repo.FileExists("new.txt").Should().BeFalse();
+        await Assert.That(repo.FileExists("new.txt")).IsFalse();
     }
 
     [Test]
-    public void IgnoredFilesAreLeftAlone()
+    public async Task IgnoredFilesAreLeftAlone()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile(".gitignore", "*.log\n");
@@ -174,11 +172,11 @@ public sealed class WorkingTreeTests
         repo.WriteFile("build.log", "ignored");
         repo.RestoreFrom(snapshot);
 
-        repo.ReadFile("build.log").Should().Be("ignored");
+        await Assert.That(repo.ReadFile("build.log")).IsEqualTo("ignored");
     }
 
     [Test]
-    public void StagedContentIsRestoredSeparatelyFromWorkingDirectory()
+    public async Task StagedContentIsRestoredSeparatelyFromWorkingDirectory()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "committed");
@@ -193,16 +191,17 @@ public sealed class WorkingTreeTests
 
         using var fresh = repo.Reopen();
         var staged = fresh.Lookup<Blob>(fresh.Index["a.txt"].Id).GetContentText();
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            staged.Should().Be("staged");
-            fresh.ReadFile("a.txt").Should().Be("in working directory");
-            fresh.RetrieveStatus("a.txt").Should().Be(FileStatus.ModifiedInIndex | FileStatus.ModifiedInWorkdir);
+            await Assert.That(staged).IsEqualTo("staged");
+            await Assert.That(fresh.ReadFile("a.txt")).IsEqualTo("in working directory");
+            await Assert.That(fresh.RetrieveStatus("a.txt"))
+                .IsEqualTo(FileStatus.ModifiedInIndex | FileStatus.ModifiedInWorkdir);
         }
     }
 
     [Test]
-    public void RestoreIsNotBlockedWhenCurrentContentMatchesSnapshot()
+    public async Task RestoreIsNotBlockedWhenCurrentContentMatchesSnapshot()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
@@ -212,15 +211,15 @@ public sealed class WorkingTreeTests
         repo.AddTag("v1");
         repo.RestoreFrom(snapshot);
 
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            repo.Tags["v1"].Should().BeNull();
-            repo.ReadFile("a.txt").Should().Be("work in progress");
+            await Assert.That(repo.Tags["v1"]).IsNull();
+            await Assert.That(repo.ReadFile("a.txt")).IsEqualTo("work in progress");
         }
     }
 
     [Test]
-    public void WorkingTreeIsNotRestoredWhenOptionIsOff()
+    public async Task WorkingTreeIsNotRestoredWhenOptionIsOff()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
@@ -230,11 +229,11 @@ public sealed class WorkingTreeTests
         repo.WriteFile("a.txt", "changed later");
         repo.RestoreFrom(snapshot, new RestoreOptions { WorkingTree = false });
 
-        repo.ReadFile("a.txt").Should().Be("changed later");
+        await Assert.That(repo.ReadFile("a.txt")).IsEqualTo("changed later");
     }
 
     [Test]
-    public void ExecutableBitIsRestored()
+    public async Task ExecutableBitIsRestored()
     {
         if (OperatingSystem.IsWindows())
         {
@@ -250,15 +249,16 @@ public sealed class WorkingTreeTests
         repo.DeleteFile("script.sh");
         repo.RestoreFrom(snapshot);
 
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            (File.GetUnixFileMode(repo.FullPath("script.sh")) & UnixFileMode.UserExecute).Should().Be(UnixFileMode.UserExecute);
-            repo.Reopen().SnapshotWithWorkingTree().Should().BeEquivalentTo(snapshot);
+            await Assert.That((File.GetUnixFileMode(repo.FullPath("script.sh")) & UnixFileMode.UserExecute))
+                .IsEqualTo(UnixFileMode.UserExecute);
+            await Assert.That(repo.Reopen().SnapshotWithWorkingTree()).IsEquivalentTo(snapshot);
         }
     }
 
     [Test]
-    public void WorkingTreeOfUnbornRepositoryIsRestored()
+    public async Task WorkingTreeOfUnbornRepositoryIsRestored()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.WriteFile("a.txt", "staged");
@@ -270,11 +270,11 @@ public sealed class WorkingTreeTests
         repo.RestoreFrom(snapshot, new RestoreOptions { Force = true });
 
         using var fresh = repo.Reopen();
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            fresh.Info.IsHeadUnborn.Should().BeTrue();
-            fresh.FileExists("b.txt").Should().BeFalse();
-            fresh.RetrieveStatus("a.txt").Should().Be(FileStatus.NewInIndex);
+            await Assert.That(fresh.Info.IsHeadUnborn).IsTrue();
+            await Assert.That(fresh.FileExists("b.txt")).IsFalse();
+            await Assert.That(fresh.RetrieveStatus("a.txt")).IsEqualTo(FileStatus.NewInIndex);
         }
     }
 }

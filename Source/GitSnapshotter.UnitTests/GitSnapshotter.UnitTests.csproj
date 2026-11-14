@@ -10,12 +10,11 @@
 
     <ItemGroup>
         <PackageReference Include="AutoFixture" />
-        <PackageReference Include="FluentAssertions" />
-        <PackageReference Include="FluentAssertions.Analyzers">
-          <PrivateAssets>all</PrivateAssets>
-          <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-        </PackageReference>
         <PackageReference Include="TUnit" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Using Include="TUnit.Assertions.Enums" />
     </ItemGroup>
 
     <ItemGroup>

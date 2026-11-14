@@ -1,7 +1,5 @@
 ﻿using Constants;
 
-using FluentAssertions;
-using FluentAssertions.Execution;
 
 using LibGit2Sharp;
 
@@ -11,7 +9,7 @@ namespace GitSnapshotter.UnitTests;
 public sealed class Lib2GitExploratoryTests
 {
     [Test]
-    public void EmptyRepositoryContainsNoBranches()
+    public async Task EmptyRepositoryContainsNoBranches()
     {
         var path = GitTasks.GetTempPath();
 
@@ -19,25 +17,25 @@ public sealed class Lib2GitExploratoryTests
 
         using var repo = new Repository(path);
 
-        repo.Branches.Should().BeEmpty();
+        await Assert.That(repo.Branches).IsEmpty();
     }
 
     [Test]
-    public void RepositoryInitiation()
+    public async Task RepositoryInitiation()
     {
         var path = GitTasks.GetTempPath();
 
         var repo = Repository.Init(path);
 
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            repo.Should().StartWith(path);
-            Directory.Exists(path).Should().BeTrue();
+            await Assert.That(repo).StartsWith(path);
+            await Assert.That(Directory.Exists(path)).IsTrue();
         }
     }
 
     [Test, AutoData]
-    public void CommitFile(
+    public async Task CommitFile(
         string filename,
         string[] contents,
         string commitMessage)
@@ -55,11 +53,11 @@ public sealed class Lib2GitExploratoryTests
         var signature = repo.Config.BuildSignature(DateTimeOffset.Now);
         var commit = repo.Commit(commitMessage, signature, signature);
 
-        commit.MessageShort.Should().Be(commitMessage);
+        await Assert.That(commit.MessageShort).IsEqualTo(commitMessage);
     }
 
     [Test, AutoData]
-    public void CommitedFileIsStaged(
+    public async Task CommitedFileIsStaged(
         string filename,
         string[] contents,
         string commitMessage)
@@ -77,11 +75,11 @@ public sealed class Lib2GitExploratoryTests
         var signature = repo.Config.BuildSignature(DateTimeOffset.Now);
         repo.Commit(commitMessage, signature, signature);
 
-        repo.Index[filename].StageLevel.Should().Be(StageLevel.Staged);
+        await Assert.That(repo.Index[filename].StageLevel).IsEqualTo(StageLevel.Staged);
     }
 
     [Test, AutoData]
-    public void FileNotAddedToIndexIsNotPresent(
+    public async Task FileNotAddedToIndexIsNotPresent(
         string filename,
         string[] contents)
     {
@@ -92,11 +90,11 @@ public sealed class Lib2GitExploratoryTests
         File.WriteAllLines(Path.Combine(path, filename), contents);
         using var repo = new Repository(path);
 
-        repo.Index.Select(x => x.Path).Should().NotContain(filename);
+        await Assert.That(repo.Index.Select(x => x.Path)).DoesNotContain(filename);
     }
 
     [Test, AutoData]
-    public void FileAddedToIndexButNotToFilesystemIsPresent(
+    public async Task FileAddedToIndexButNotToFilesystemIsPresent(
         string filename,
         string[] contents)
     {
@@ -108,11 +106,11 @@ public sealed class Lib2GitExploratoryTests
         using var repo = new Repository(path);
         repo.Index.Add(filename);
 
-        repo.Index[filename].StageLevel.Should().Be(StageLevel.Staged);
+        await Assert.That(repo.Index[filename].StageLevel).IsEqualTo(StageLevel.Staged);
     }
 
     [Test, AutoData]
-    public void Branch(
+    public async Task Branch(
         string filename,
         string[] contents,
         string commitMessage)
@@ -132,15 +130,15 @@ public sealed class Lib2GitExploratoryTests
 
         var branch = repo.Head;
 
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            branch.CanonicalName.Should().Be("refs/heads/master");
-            branch.FriendlyName.Should().Be("master");
+            await Assert.That(branch.CanonicalName).IsEqualTo("refs/heads/master");
+            await Assert.That(branch.FriendlyName).IsEqualTo("master");
         }
     }
 
     [Test, AutoData]
-    public void CreateNewBranch(
+    public async Task CreateNewBranch(
         string filename,
         string[] contents,
         string commitMessage,
@@ -161,11 +159,11 @@ public sealed class Lib2GitExploratoryTests
 
         repo.CreateBranch(branchName);
 
-        repo.Branches.Select(x => x.FriendlyName).Should().Contain(branchName);
+        await Assert.That(repo.Branches.Select(x => x.FriendlyName)).Contains(branchName);
     }
 
     [Test, AutoData]
-    public void SwitchBranches(
+    public async Task SwitchBranches(
         string filename,
         string[] contents,
         string commitMessage,
@@ -188,6 +186,6 @@ public sealed class Lib2GitExploratoryTests
 
         Commands.Checkout(repo, branch);
 
-        repo.Head.FriendlyName.Should().Be(branchName);
+        await Assert.That(repo.Head.FriendlyName).IsEqualTo(branchName);
     }
 }

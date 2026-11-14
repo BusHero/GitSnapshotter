@@ -1,14 +1,11 @@
-﻿using FluentAssertions;
-using FluentAssertions.Execution;
-
-using LibGit2Sharp;
+﻿using LibGit2Sharp;
 
 namespace GitSnapshotter.UnitTests;
 
 public sealed class RestoreTagsTests
 {
     [Test, AutoData]
-    public void RemovedTagIsAddedBack(string tagName)
+    public async Task RemovedTagIsAddedBack(string tagName)
     {
         using var repository = GitTasks.CreateTemporaryGitRepository();
         repository.AddFileToRepository();
@@ -20,11 +17,11 @@ public sealed class RestoreTagsTests
         GitRepository.Restore(repository.Info.WorkingDirectory, originalSnapshot);
 
         var newSnapshot = GitRepository.GetSnapshot(repository.Info.WorkingDirectory);
-        newSnapshot.Should().BeEquivalentTo(originalSnapshot);
+        await Assert.That(newSnapshot).IsEquivalentTo(originalSnapshot);
     }
 
     [Test, AutoData]
-    public void RemovedAnnotatedTagIsAddedBack(string tagName, string message)
+    public async Task RemovedAnnotatedTagIsAddedBack(string tagName, string message)
     {
         using var repository = GitTasks.CreateTemporaryGitRepository();
         repository.AddFileToRepository();
@@ -37,11 +34,11 @@ public sealed class RestoreTagsTests
         GitRepository.Restore(repository.Info.WorkingDirectory, originalSnapshot);
 
         var newSnapshot = GitRepository.GetSnapshot(repository.Info.WorkingDirectory);
-        newSnapshot.Should().BeEquivalentTo(originalSnapshot);
+        await Assert.That(newSnapshot).IsEquivalentTo(originalSnapshot);
     }
 
     [Test, AutoData]
-    public void AddedTagIsRemoved(string tagName)
+    public async Task AddedTagIsRemoved(string tagName)
     {
         using var repository = GitTasks.CreateTemporaryGitRepository();
         repository.AddFileToRepository();
@@ -52,11 +49,11 @@ public sealed class RestoreTagsTests
         GitRepository.Restore(repository.Info.WorkingDirectory, originalSnapshot);
 
         var newSnapshot = GitRepository.GetSnapshot(repository.Info.WorkingDirectory);
-        newSnapshot.Should().BeEquivalentTo(originalSnapshot);
+        await Assert.That(newSnapshot).IsEquivalentTo(originalSnapshot);
     }
 
     [Test, AutoData]
-    public void RestoreTagReference(string tagName)
+    public async Task RestoreTagReference(string tagName)
     {
         using var repository = GitTasks.CreateTemporaryGitRepository();
         repository.AddFileToRepository();
@@ -70,11 +67,11 @@ public sealed class RestoreTagsTests
         GitRepository.Restore(repository.Info.WorkingDirectory, originalSnapshot);
 
         var newSnapshot = GitRepository.GetSnapshot(repository.Info.WorkingDirectory);
-        newSnapshot.Should().BeEquivalentTo(originalSnapshot);
+        await Assert.That(newSnapshot).IsEquivalentTo(originalSnapshot);
     }
 
     [Test, AutoData]
-    public void SeveralMovedTagsAreAllRestored(string tag1, string tag2, string tag3)
+    public async Task SeveralMovedTagsAreAllRestored(string tag1, string tag2, string tag3)
     {
         using var repository = GitTasks.CreateTemporaryGitRepository();
         var first = repository.CommitFile("a.txt", "1");
@@ -89,17 +86,17 @@ public sealed class RestoreTagsTests
         repository.MoveTag(tag3, second);
         repository.RestoreFrom(snapshot);
 
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            repository.Tags[tag1].Target.Sha.Should().Be(first.Sha);
-            repository.Tags[tag2].Target.Sha.Should().Be(first.Sha);
-            repository.Tags[tag3].Target.Sha.Should().Be(first.Sha);
-            repository.Snapshot().Should().BeEquivalentTo(snapshot);
+            await Assert.That(repository.Tags[tag1].Target.Sha).IsEqualTo(first.Sha);
+            await Assert.That(repository.Tags[tag2].Target.Sha).IsEqualTo(first.Sha);
+            await Assert.That(repository.Tags[tag3].Target.Sha).IsEqualTo(first.Sha);
+            await Assert.That(repository.Snapshot()).IsEquivalentTo(snapshot);
         }
     }
 
     [Test, AutoData]
-    public void OnlyTheMovedTagIsChanged(string unchanged, string moved)
+    public async Task OnlyTheMovedTagIsChanged(string unchanged, string moved)
     {
         using var repository = GitTasks.CreateTemporaryGitRepository();
         repository.CommitFile("a.txt", "1");
@@ -111,11 +108,11 @@ public sealed class RestoreTagsTests
         repository.MoveTag(moved, second);
         repository.RestoreFrom(snapshot);
 
-        repository.Snapshot().Should().BeEquivalentTo(snapshot);
+        await Assert.That(repository.Snapshot()).IsEquivalentTo(snapshot);
     }
 
     [Test, AutoData]
-    public void MovedAnnotatedTagGetsItsOriginalAnnotationBack(string tagName, string message)
+    public async Task MovedAnnotatedTagGetsItsOriginalAnnotationBack(string tagName, string message)
     {
         using var repository = GitTasks.CreateTemporaryGitRepository();
         repository.CommitFile("a.txt", "1");
@@ -130,15 +127,15 @@ public sealed class RestoreTagsTests
         repository.Tags.Add(tagName, repository.Head.Tip, tagger, "another message");
         repository.RestoreFrom(snapshot);
 
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            repository.Tags[tagName].Annotation.Sha.Should().Be(originalAnnotation);
-            repository.Snapshot().Should().BeEquivalentTo(snapshot);
+            await Assert.That(repository.Tags[tagName].Annotation.Sha).IsEqualTo(originalAnnotation);
+            await Assert.That(repository.Snapshot()).IsEquivalentTo(snapshot);
         }
     }
 
     [Test, AutoData]
-    public void AnnotatedTagIsRecreatedWhenSnapshotHasNoAnnotationId(string tagName, string message)
+    public async Task AnnotatedTagIsRecreatedWhenSnapshotHasNoAnnotationId(string tagName, string message)
     {
         using var repository = GitTasks.CreateTemporaryGitRepository();
         var commit = repository.CommitFile("a.txt", "1");
@@ -153,16 +150,16 @@ public sealed class RestoreTagsTests
         repository.RestoreFrom(snapshot);
 
         var tag = repository.Tags[tagName];
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            tag.IsAnnotated.Should().BeTrue();
-            tag.Target.Sha.Should().Be(commit.Sha);
-            tag.Annotation.Message.TrimEnd().Should().Be(message);
+            await Assert.That(tag.IsAnnotated).IsTrue();
+            await Assert.That(tag.Target.Sha).IsEqualTo(commit.Sha);
+            await Assert.That(tag.Annotation.Message.TrimEnd()).IsEqualTo(message);
         }
     }
 
     [Test, AutoData]
-    public void LightweightTagReplacedByAnnotatedTagIsRestored(string tagName, string message)
+    public async Task LightweightTagReplacedByAnnotatedTagIsRestored(string tagName, string message)
     {
         using var repository = GitTasks.CreateTemporaryGitRepository();
         repository.CommitFile("a.txt", "1");
@@ -173,15 +170,15 @@ public sealed class RestoreTagsTests
         repository.AddAnnotatedTag(tagName, message);
         repository.RestoreFrom(snapshot);
 
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            repository.Tags[tagName].IsAnnotated.Should().BeFalse();
-            repository.Snapshot().Should().BeEquivalentTo(snapshot);
+            await Assert.That(repository.Tags[tagName].IsAnnotated).IsFalse();
+            await Assert.That(repository.Snapshot()).IsEquivalentTo(snapshot);
         }
     }
 
     [Test, AutoData]
-    public void AnnotatedTagReplacedByLightweightTagIsRestored(string tagName, string message)
+    public async Task AnnotatedTagReplacedByLightweightTagIsRestored(string tagName, string message)
     {
         using var repository = GitTasks.CreateTemporaryGitRepository();
         repository.CommitFile("a.txt", "1");
@@ -192,11 +189,11 @@ public sealed class RestoreTagsTests
         repository.AddTag(tagName);
         repository.RestoreFrom(snapshot);
 
-        repository.Snapshot().Should().BeEquivalentTo(snapshot);
+        await Assert.That(repository.Snapshot()).IsEquivalentTo(snapshot);
     }
 
     [Test, AutoData]
-    public void SnapshotRecordsAnnotationId(string tagName, string message)
+    public async Task SnapshotRecordsAnnotationId(string tagName, string message)
     {
         using var repository = GitTasks.CreateTemporaryGitRepository();
         repository.CommitFile("a.txt", "1");
@@ -205,11 +202,11 @@ public sealed class RestoreTagsTests
 
         var snapshot = repository.Snapshot();
 
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            snapshot.Tags.Single(t => t.Name == tagName).AnnotationSha
-                .Should().Be(repository.Tags[tagName].Annotation.Sha);
-            snapshot.Tags.Single(t => t.Name == tagName + "-light").AnnotationSha.Should().BeNull();
+            await Assert.That(snapshot.Tags.Single(t => t.Name == tagName).AnnotationSha)
+                .IsEqualTo(repository.Tags[tagName].Annotation.Sha);
+            await Assert.That(snapshot.Tags.Single(t => t.Name == tagName + "-light").AnnotationSha).IsNull();
         }
     }
 }

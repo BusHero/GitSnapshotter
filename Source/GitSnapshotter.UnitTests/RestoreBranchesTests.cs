@@ -1,13 +1,11 @@
-﻿using FluentAssertions;
-
-using LibGit2Sharp;
+﻿using LibGit2Sharp;
 
 namespace GitSnapshotter.UnitTests;
 
 public sealed class RestoreBranchesTests
 {
     [Test, AutoData]
-    public void RestoreBranch(string branchName)
+    public async Task RestoreBranch(string branchName)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.AddFileToRepository();
@@ -20,11 +18,11 @@ public sealed class RestoreBranchesTests
         GitRepository.Restore(repo.Info.WorkingDirectory, originalSnapshot);
         var newSnapshot = GitRepository.GetSnapshot(repo.Info.WorkingDirectory);
 
-        newSnapshot.Should().BeEquivalentTo(originalSnapshot);
+        await Assert.That(newSnapshot).IsEquivalentTo(originalSnapshot);
     }
 
     [Test, AutoData]
-    public void RestoreTwoBranches(string branchName1, string branchName2)
+    public async Task RestoreTwoBranches(string branchName1, string branchName2)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.AddFileToRepository();
@@ -39,11 +37,11 @@ public sealed class RestoreBranchesTests
         GitRepository.Restore(repo.Info.WorkingDirectory, originalSnapshot);
         var newSnapshot = GitRepository.GetSnapshot(repo.Info.WorkingDirectory);
 
-        newSnapshot.Should().BeEquivalentTo(originalSnapshot);
+        await Assert.That(newSnapshot).IsEquivalentTo(originalSnapshot);
     }
 
     [Test, AutoData]
-    public void RestoreMaster(string branchName)
+    public async Task RestoreMaster(string branchName)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.AddFileToRepository();
@@ -58,11 +56,11 @@ public sealed class RestoreBranchesTests
         GitRepository.Restore(repo.Info.WorkingDirectory, originalSnapshot);
         var newSnapshot = GitRepository.GetSnapshot(repo.Info.WorkingDirectory);
 
-        newSnapshot.Should().BeEquivalentTo(originalSnapshot);
+        await Assert.That(newSnapshot).IsEquivalentTo(originalSnapshot);
     }
 
     [Test, AutoData]
-    public void RestoreBranchThatIsNotAtTop(string branchName)
+    public async Task RestoreBranchThatIsNotAtTop(string branchName)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.AddFileToRepository();
@@ -77,11 +75,11 @@ public sealed class RestoreBranchesTests
         GitRepository.Restore(repo.Info.WorkingDirectory, originalSnapshot);
         var newSnapshot = GitRepository.GetSnapshot(repo.Info.WorkingDirectory);
 
-        newSnapshot.Should().BeEquivalentTo(originalSnapshot);
+        await Assert.That(newSnapshot).IsEquivalentTo(originalSnapshot);
     }
 
     [Test]
-    public void RestoreIsIdempotent()
+    public async Task RestoreIsIdempotent()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.AddFileToRepository();
@@ -91,11 +89,11 @@ public sealed class RestoreBranchesTests
         GitRepository.Restore(repo.Info.WorkingDirectory, originalSnapshot);
         var newSnapshot = GitRepository.GetSnapshot(repo.Info.WorkingDirectory);
 
-        newSnapshot.Should().BeEquivalentTo(originalSnapshot);
+        await Assert.That(newSnapshot).IsEquivalentTo(originalSnapshot);
     }
     
     [Test, AutoData]
-    public void RestoreTip(string branchName)
+    public async Task RestoreTip(string branchName)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.AddFileToRepository();
@@ -109,6 +107,6 @@ public sealed class RestoreBranchesTests
         GitRepository.Restore(repo.Info.WorkingDirectory, originalSnapshot);
         var newSnapshot = GitRepository.GetSnapshot(repo.Info.WorkingDirectory);
         
-        newSnapshot.Should().BeEquivalentTo(originalSnapshot);
+        await Assert.That(newSnapshot).IsEquivalentTo(originalSnapshot);
     }
 }

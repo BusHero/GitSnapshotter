@@ -1,14 +1,11 @@
-﻿using FluentAssertions;
-using FluentAssertions.Execution;
-
-using LibGit2Sharp;
+﻿using LibGit2Sharp;
 
 namespace GitSnapshotter.UnitTests;
 
 public sealed class GitTasksTests
 {
     [Test, AutoData]
-    public void AddBranchAddsABranchTest(string branch)
+    public async Task AddBranchAddsABranchTest(string branch)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
 
@@ -17,37 +14,37 @@ public sealed class GitTasksTests
         repo.CommitChanges();
         repo.AddBranch(branch);
 
-        repo.Branches.Select(x => x.FriendlyName).Should().Contain(branch);
+        await Assert.That(repo.Branches.Select(x => x.FriendlyName)).Contains(branch);
     }
 
     [Test]
-    public void CreateTemporaryGitRepositoryReturnsTemporaryGitRepository()
+    public async Task CreateTemporaryGitRepositoryReturnsTemporaryGitRepository()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         var pathToRepo = repo.Info.WorkingDirectory;
 
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            Repository.IsValid(pathToRepo).Should().BeTrue();
-            pathToRepo.Should().StartWith(Path.GetTempPath());
-            pathToRepo.Should().NotEndWith(".git");
+            await Assert.That(Repository.IsValid(pathToRepo)).IsTrue();
+            await Assert.That(pathToRepo).StartsWith(Path.GetTempPath());
+            await Assert.That(pathToRepo).DoesNotEndWith(".git");
         }
     }
 
     [Test]
-    public void AddFileToRepositoryAddsFileToRepository()
+    public async Task AddFileToRepositoryAddsFileToRepository()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
 
         var filename = repo.AddFileToRepository();
 
-        File.Exists(Path.Combine(repo.Info.WorkingDirectory, filename)).Should().BeTrue();
+        await Assert.That(File.Exists(Path.Combine(repo.Info.WorkingDirectory, filename))).IsTrue();
 
-        repo.Index.Index().Select(x => x.Item.Path).Should().Contain(filename);
+        await Assert.That(repo.Index.Index().Select(x => x.Item.Path)).Contains(filename);
     }
 
     [Test]
-    public void CommitCommitsTest()
+    public async Task CommitCommitsTest()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
 
@@ -55,11 +52,11 @@ public sealed class GitTasksTests
 
         repo.CommitChanges();
 
-        repo.Commits.Should().ContainSingle();
+        await Assert.That(repo.Commits).HasSingleItem();
     }
 
     [Test, AutoData]
-    public void IsValidCommit_ValidCommitReturnsTrue(
+    public async Task IsValidCommit_ValidCommitReturnsTrue(
         string filename,
         string[] contents,
         string commitMessage)
@@ -81,11 +78,11 @@ public sealed class GitTasksTests
 
         var result = repo.IsValidCommit(sha);
 
-        result.Should().BeTrue();
+        await Assert.That(result).IsTrue();
     }
 
     [Test, AutoData]
-    public void IsValidCommit_InvalidCommitReturnsFalse(
+    public async Task IsValidCommit_InvalidCommitReturnsFalse(
         string filename,
         string[] contents,
         string commitMessage)
@@ -105,6 +102,6 @@ public sealed class GitTasksTests
 
         var result = repo.IsValidCommit(Guid.NewGuid().ToString("N"));
 
-        result.Should().BeFalse();
+        await Assert.That(result).IsFalse();
     }
 }

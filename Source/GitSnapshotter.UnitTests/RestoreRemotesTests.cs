@@ -1,12 +1,9 @@
-﻿using FluentAssertions;
-using FluentAssertions.Execution;
-
-namespace GitSnapshotter.UnitTests;
+﻿namespace GitSnapshotter.UnitTests;
 
 public sealed class RestoreRemotesTests
 {
     [Test]
-    public void RemovedRemoteIsAddedBackWithItsBranches()
+    public async Task RemovedRemoteIsAddedBackWithItsBranches()
     {
         var (clone, origin) = GitTasks.CreateClonedRepository();
         using var _ = clone;
@@ -17,17 +14,17 @@ public sealed class RestoreRemotesTests
         clone.RestoreFrom(snapshot);
 
         using var fresh = clone.Reopen();
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            fresh.Network.Remotes["origin"].Url.Should().Be(origin.Info.Path);
-            fresh.Branches["origin/master"].Should().NotBeNull();
-            fresh.Branches["master"].TrackedBranch.FriendlyName.Should().Be("origin/master");
-            fresh.Snapshot().Should().BeEquivalentTo(snapshot);
+            await Assert.That(fresh.Network.Remotes["origin"].Url).IsEqualTo(origin.Info.Path);
+            await Assert.That(fresh.Branches["origin/master"]).IsNotNull();
+            await Assert.That(fresh.Branches["master"].TrackedBranch.FriendlyName).IsEqualTo("origin/master");
+            await Assert.That(fresh.Snapshot()).IsEquivalentTo(snapshot);
         }
     }
 
     [Test, AutoData]
-    public void AddedRemoteIsRemoved(string remoteName)
+    public async Task AddedRemoteIsRemoved(string remoteName)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
@@ -40,15 +37,15 @@ public sealed class RestoreRemotesTests
         repo.RestoreFrom(snapshot);
 
         using var fresh = repo.Reopen();
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            fresh.Network.Remotes[remoteName].Should().BeNull();
-            fresh.Refs.Where(r => r.CanonicalName.StartsWith("refs/remotes/")).Should().BeEmpty();
+            await Assert.That(fresh.Network.Remotes[remoteName]).IsNull();
+            await Assert.That(fresh.Refs.Where(r => r.CanonicalName.StartsWith("refs/remotes/"))).IsEmpty();
         }
     }
 
     [Test, AutoData]
-    public void ChangedUrlIsRestored(string newUrl)
+    public async Task ChangedUrlIsRestored(string newUrl)
     {
         var (clone, origin) = GitTasks.CreateClonedRepository();
         using var _ = clone;
@@ -59,11 +56,11 @@ public sealed class RestoreRemotesTests
         clone.RestoreFrom(snapshot);
 
         using var fresh = clone.Reopen();
-        fresh.Network.Remotes["origin"].Url.Should().Be(origin.Info.Path);
+        await Assert.That(fresh.Network.Remotes["origin"].Url).IsEqualTo(origin.Info.Path);
     }
 
     [Test]
-    public void DeletedRemoteTrackingBranchIsRestored()
+    public async Task DeletedRemoteTrackingBranchIsRestored()
     {
         var (clone, origin) = GitTasks.CreateClonedRepository();
         using var _ = clone;
@@ -73,11 +70,11 @@ public sealed class RestoreRemotesTests
         clone.Refs.Remove("refs/remotes/origin/master");
         clone.RestoreFrom(snapshot);
 
-        clone.Reopen().Snapshot().Should().BeEquivalentTo(snapshot);
+        await Assert.That(clone.Reopen().Snapshot()).IsEquivalentTo(snapshot);
     }
 
     [Test, AutoData]
-    public void FetchedRemoteTrackingBranchIsRemoved(string branchName)
+    public async Task FetchedRemoteTrackingBranchIsRemoved(string branchName)
     {
         var (clone, origin) = GitTasks.CreateClonedRepository();
         using var _ = clone;
@@ -89,15 +86,15 @@ public sealed class RestoreRemotesTests
         clone.RestoreFrom(snapshot);
 
         using var fresh = clone.Reopen();
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            fresh.Branches[$"origin/{branchName}"].Should().BeNull();
-            fresh.Snapshot().Should().BeEquivalentTo(snapshot);
+            await Assert.That(fresh.Branches[$"origin/{branchName}"]).IsNull();
+            await Assert.That(fresh.Snapshot()).IsEquivalentTo(snapshot);
         }
     }
 
     [Test]
-    public void MovedRemoteTrackingBranchIsRestored()
+    public async Task MovedRemoteTrackingBranchIsRestored()
     {
         var (clone, origin) = GitTasks.CreateClonedRepository();
         using var _ = clone;
@@ -110,11 +107,11 @@ public sealed class RestoreRemotesTests
         clone.RestoreFrom(snapshot);
 
         using var fresh = clone.Reopen();
-        fresh.Branches["origin/master"].Tip.Sha.Should().Be(originalTip);
+        await Assert.That(fresh.Branches["origin/master"].Tip.Sha).IsEqualTo(originalTip);
     }
 
     [Test]
-    public void SnapshotRecordsRemoteHeadSeparately()
+    public async Task SnapshotRecordsRemoteHeadSeparately()
     {
         var (clone, origin) = GitTasks.CreateClonedRepository();
         using var _ = clone;
@@ -122,15 +119,15 @@ public sealed class RestoreRemotesTests
 
         var remote = clone.Snapshot().Remotes.Single();
 
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            remote.Head.Should().Be("origin/master");
-            remote.Branches.Keys.Should().Equal("origin/master");
+            await Assert.That(remote.Head).IsEqualTo("origin/master");
+            await Assert.That(remote.Branches.Keys).IsEquivalentTo(["origin/master"], CollectionOrdering.Matching);
         }
     }
 
     [Test]
-    public void RemovedRemoteHeadIsRestoredAsSymbolicReference()
+    public async Task RemovedRemoteHeadIsRestoredAsSymbolicReference()
     {
         var (clone, origin) = GitTasks.CreateClonedRepository();
         using var _ = clone;
@@ -141,11 +138,12 @@ public sealed class RestoreRemotesTests
         clone.RestoreFrom(snapshot);
 
         using var fresh = clone.Reopen();
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            fresh.Refs["refs/remotes/origin/HEAD"].Should().BeOfType<LibGit2Sharp.SymbolicReference>()
-                .Which.TargetIdentifier.Should().Be("refs/remotes/origin/master");
-            fresh.Snapshot().Should().BeEquivalentTo(snapshot);
+            var typed = await Assert.That(fresh.Refs["refs/remotes/origin/HEAD"])
+                .IsTypeOf<LibGit2Sharp.SymbolicReference>();
+            await Assert.That(typed!.TargetIdentifier).IsEqualTo("refs/remotes/origin/master");
+            await Assert.That(fresh.Snapshot()).IsEquivalentTo(snapshot);
         }
     }
 }

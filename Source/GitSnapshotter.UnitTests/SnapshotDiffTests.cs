@@ -1,27 +1,24 @@
-﻿using FluentAssertions;
-using FluentAssertions.Execution;
-
-namespace GitSnapshotter.UnitTests;
+﻿namespace GitSnapshotter.UnitTests;
 
 public sealed class SnapshotDiffTests
 {
     [Test]
-    public void IdenticalSnapshotsHaveNoChanges()
+    public async Task IdenticalSnapshotsHaveNoChanges()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
 
         var diff = SnapshotDiff.Compare(repo.Snapshot(), repo.Snapshot());
 
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            diff.HasChanges.Should().BeFalse();
-            diff.Changes.Should().BeEmpty();
+            await Assert.That(diff.HasChanges).IsFalse();
+            await Assert.That(diff.Changes).IsEmpty();
         }
     }
 
     [Test, AutoData]
-    public void AddedBranchIsReported(string branchName)
+    public async Task AddedBranchIsReported(string branchName)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         var commit = repo.CommitFile("a.txt", "1");
@@ -30,12 +27,16 @@ public sealed class SnapshotDiffTests
 
         var diff = SnapshotDiff.Compare(before, repo.Snapshot());
 
-        diff.Changes.Should().Equal(
-            new SnapshotChange(SnapshotChangeKind.Added, ChangeCategory.Branch, branchName, null, commit.Sha));
+        await Assert.That(diff.Changes)
+            .IsEquivalentTo(
+                [
+                    new SnapshotChange(SnapshotChangeKind.Added, ChangeCategory.Branch, branchName, null, commit.Sha),
+                ],
+                CollectionOrdering.Matching);
     }
 
     [Test, AutoData]
-    public void RemovedBranchIsReported(string branchName)
+    public async Task RemovedBranchIsReported(string branchName)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         var commit = repo.CommitFile("a.txt", "1");
@@ -45,12 +46,16 @@ public sealed class SnapshotDiffTests
 
         var diff = SnapshotDiff.Compare(before, repo.Snapshot());
 
-        diff.Changes.Should().Equal(
-            new SnapshotChange(SnapshotChangeKind.Removed, ChangeCategory.Branch, branchName, commit.Sha, null));
+        await Assert.That(diff.Changes)
+            .IsEquivalentTo(
+                [
+                    new SnapshotChange(SnapshotChangeKind.Removed, ChangeCategory.Branch, branchName, commit.Sha, null),
+                ],
+                CollectionOrdering.Matching);
     }
 
     [Test]
-    public void MovedBranchIsReported()
+    public async Task MovedBranchIsReported()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         var first = repo.CommitFile("a.txt", "1");
@@ -59,12 +64,16 @@ public sealed class SnapshotDiffTests
 
         var diff = SnapshotDiff.Compare(before, repo.Snapshot());
 
-        diff.Changes.Should().Equal(
-            new SnapshotChange(SnapshotChangeKind.Modified, ChangeCategory.Branch, "master", first.Sha, second.Sha));
+        await Assert.That(diff.Changes)
+            .IsEquivalentTo(
+                [
+                    new SnapshotChange(SnapshotChangeKind.Modified, ChangeCategory.Branch, "master", first.Sha, second.Sha),
+                ],
+                CollectionOrdering.Matching);
     }
 
     [Test, AutoData]
-    public void HeadChangeIsReported(string branchName)
+    public async Task HeadChangeIsReported(string branchName)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
@@ -74,12 +83,16 @@ public sealed class SnapshotDiffTests
 
         var diff = SnapshotDiff.Compare(before, repo.Snapshot());
 
-        diff.Changes.Should().Equal(
-            new SnapshotChange(SnapshotChangeKind.Modified, ChangeCategory.Head, "HEAD", "master", branchName));
+        await Assert.That(diff.Changes)
+            .IsEquivalentTo(
+                [
+                    new SnapshotChange(SnapshotChangeKind.Modified, ChangeCategory.Head, "HEAD", "master", branchName),
+                ],
+                CollectionOrdering.Matching);
     }
 
     [Test, AutoData]
-    public void TagChangesAreReported(string added, string removed)
+    public async Task TagChangesAreReported(string added, string removed)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         var commit = repo.CommitFile("a.txt", "1");
@@ -90,14 +103,16 @@ public sealed class SnapshotDiffTests
 
         var diff = SnapshotDiff.Compare(before, repo.Snapshot());
 
-        diff.Changes.Should().BeEquivalentTo([
-            new SnapshotChange(SnapshotChangeKind.Removed, ChangeCategory.Tag, removed, commit.Sha, null),
-            new SnapshotChange(SnapshotChangeKind.Added, ChangeCategory.Tag, added, null, commit.Sha),
-        ]);
+        await Assert.That(diff.Changes)
+            .IsEquivalentTo(
+                [
+                    new SnapshotChange(SnapshotChangeKind.Removed, ChangeCategory.Tag, removed, commit.Sha, null),
+                    new SnapshotChange(SnapshotChangeKind.Added, ChangeCategory.Tag, added, null, commit.Sha),
+                ]);
     }
 
     [Test, AutoData]
-    public void RemoteAndUpstreamChangesAreReported(string newUrl)
+    public async Task RemoteAndUpstreamChangesAreReported(string newUrl)
     {
         var (clone, origin) = GitTasks.CreateClonedRepository();
         using var _ = clone;
@@ -108,14 +123,16 @@ public sealed class SnapshotDiffTests
 
         var diff = SnapshotDiff.Compare(before, clone.Snapshot());
 
-        diff.Changes.Should().BeEquivalentTo([
-            new SnapshotChange(SnapshotChangeKind.Removed, ChangeCategory.Upstream, "master", "origin refs/heads/master", null),
-            new SnapshotChange(SnapshotChangeKind.Modified, ChangeCategory.Remote, "origin", origin.Info.Path, newUrl),
-        ]);
+        await Assert.That(diff.Changes)
+            .IsEquivalentTo(
+                [
+                    new SnapshotChange(SnapshotChangeKind.Removed, ChangeCategory.Upstream, "master", "origin refs/heads/master", null),
+                    new SnapshotChange(SnapshotChangeKind.Modified, ChangeCategory.Remote, "origin", origin.Info.Path, newUrl),
+                ]);
     }
 
     [Test]
-    public void RemoteBranchChangesAreReported()
+    public async Task RemoteBranchChangesAreReported()
     {
         var (clone, origin) = GitTasks.CreateClonedRepository();
         using var _ = clone;
@@ -125,12 +142,16 @@ public sealed class SnapshotDiffTests
 
         var diff = SnapshotDiff.Compare(before, clone.Snapshot());
 
-        diff.Changes.Should().Equal(
-            new SnapshotChange(SnapshotChangeKind.Removed, ChangeCategory.RemoteBranch, "origin/HEAD", "-> origin/master", null));
+        await Assert.That(diff.Changes)
+            .IsEquivalentTo(
+                [
+                    new SnapshotChange(SnapshotChangeKind.Removed, ChangeCategory.RemoteBranch, "origin/HEAD", "-> origin/master", null),
+                ],
+                CollectionOrdering.Matching);
     }
 
     [Test]
-    public void ReferenceChangesAreReported()
+    public async Task ReferenceChangesAreReported()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         var commit = repo.CommitFile("a.txt", "1");
@@ -139,12 +160,16 @@ public sealed class SnapshotDiffTests
 
         var diff = SnapshotDiff.Compare(before, repo.Snapshot());
 
-        diff.Changes.Should().Equal(
-            new SnapshotChange(SnapshotChangeKind.Added, ChangeCategory.Reference, "refs/custom/marker", null, commit.Sha));
+        await Assert.That(diff.Changes)
+            .IsEquivalentTo(
+                [
+                    new SnapshotChange(SnapshotChangeKind.Added, ChangeCategory.Reference, "refs/custom/marker", null, commit.Sha),
+                ],
+                CollectionOrdering.Matching);
     }
 
     [Test]
-    public void WorkingTreeChangesAreReportedOnlyWhenBothSnapshotsHaveIt()
+    public async Task WorkingTreeChangesAreReportedOnlyWhenBothSnapshotsHaveIt()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
@@ -152,20 +177,20 @@ public sealed class SnapshotDiffTests
         repo.WriteFile("a.txt", "changed");
         var after = repo.SnapshotWithWorkingTree();
 
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            SnapshotDiff.Compare(before, after).Changes.Should().ContainSingle()
-                .Which.Should().Match<SnapshotChange>(c =>
-                    c.Category == ChangeCategory.WorkingTree && c.Name == "working directory");
-            SnapshotDiff.Compare(before, repo.Snapshot()).HasChanges.Should().BeFalse();
+            var change = await Assert.That(SnapshotDiff.Compare(before, after).Changes).HasSingleItem();
+            await Assert.That(change.Category).IsEqualTo(ChangeCategory.WorkingTree);
+            await Assert.That(change.Name).IsEqualTo("working directory");
+            await Assert.That(SnapshotDiff.Compare(before, repo.Snapshot()).HasChanges).IsFalse();
         }
     }
 
     [Test]
-    public void ChangesHaveReadableText()
+    public async Task ChangesHaveReadableText()
     {
         var change = new SnapshotChange(SnapshotChangeKind.Modified, ChangeCategory.Branch, "main", "aaa", "bbb");
 
-        change.ToString().Should().Be("~ Branch main aaa -> bbb");
+        await Assert.That(change.ToString()).IsEqualTo("~ Branch main aaa -> bbb");
     }
 }

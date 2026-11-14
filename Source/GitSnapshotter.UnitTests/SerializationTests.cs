@@ -1,14 +1,12 @@
 ﻿using System.Text.Json;
 
-using FluentAssertions;
-using FluentAssertions.Execution;
 
 namespace GitSnapshotter.UnitTests;
 
 public sealed class SerializationTests
 {
     [Test, AutoData]
-    public void JsonRoundTripKeepsEverything(string tagName, string message)
+    public async Task JsonRoundTripKeepsEverything(string tagName, string message)
     {
         var (clone, origin) = GitTasks.CreateClonedRepository();
         using var _ = clone;
@@ -21,11 +19,11 @@ public sealed class SerializationTests
 
         var copy = GitRepositorySnapshot.FromJson(snapshot.ToJson());
 
-        copy.Should().BeEquivalentTo(snapshot);
+        await Assert.That(copy).IsEquivalentTo(snapshot);
     }
 
     [Test]
-    public void SaveAndLoadUseAFile()
+    public async Task SaveAndLoadUseAFile()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
@@ -34,15 +32,15 @@ public sealed class SerializationTests
 
         snapshot.Save(file);
 
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            File.Exists(file).Should().BeTrue();
-            GitRepositorySnapshot.Load(file).Should().BeEquivalentTo(snapshot);
+            await Assert.That(File.Exists(file)).IsTrue();
+            await Assert.That(GitRepositorySnapshot.Load(file)).IsEquivalentTo(snapshot);
         }
     }
 
     [Test]
-    public void LoadedSnapshotCanBeRestored()
+    public async Task LoadedSnapshotCanBeRestored()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
@@ -53,11 +51,11 @@ public sealed class SerializationTests
         repo.AddTag("v1");
         repo.RestoreFrom(GitRepositorySnapshot.Load(file));
 
-        repo.Reopen().Snapshot().Should().BeEquivalentTo(GitRepositorySnapshot.Load(file));
+        await Assert.That(repo.Reopen().Snapshot()).IsEquivalentTo(GitRepositorySnapshot.Load(file));
     }
 
     [Test]
-    public void SnapshotFromEarlierVersionCanBeRead()
+    public async Task SnapshotFromEarlierVersionCanBeRead()
     {
         // The format written by version 0.0.5's console app.
         const string json = """
@@ -75,30 +73,32 @@ public sealed class SerializationTests
 
         var snapshot = GitRepositorySnapshot.FromJson(json);
 
-        using (new AssertionScope())
+        using (Assert.Multiple())
         {
-            snapshot.Head.Should().Be("master");
-            snapshot.IsHeadDetached.Should().BeFalse();
-            snapshot.Branches.Should().ContainSingle().Which.Name.Should().Be("master");
-            snapshot.Tags.Should().ContainSingle().Which.AnnotationSha.Should().BeNull();
-            snapshot.References.Should().BeEmpty();
-            snapshot.WorkingTree.Should().BeNull();
+            await Assert.That(snapshot.Head).IsEqualTo("master");
+            await Assert.That(snapshot.IsHeadDetached).IsFalse();
+            var item = await Assert.That(snapshot.Branches).HasSingleItem();
+            await Assert.That(item.Name).IsEqualTo("master");
+            var item2 = await Assert.That(snapshot.Tags).HasSingleItem();
+            await Assert.That(item2.AnnotationSha).IsNull();
+            await Assert.That(snapshot.References).IsEmpty();
+            await Assert.That(snapshot.WorkingTree).IsNull();
         }
     }
 
     [Test]
-    public void JsonWithoutRequiredFieldsIsRejected()
+    public async Task JsonWithoutRequiredFieldsIsRejected()
     {
         var read = () => GitRepositorySnapshot.FromJson("""{ "Head": "master" }""");
 
-        read.Should().Throw<JsonException>();
+        await Assert.That(read).Throws<JsonException>();
     }
 
     [Test]
-    public void NullJsonIsRejected()
+    public async Task NullJsonIsRejected()
     {
         var read = () => GitRepositorySnapshot.FromJson("null");
 
-        read.Should().Throw<JsonException>();
+        await Assert.That(read).Throws<JsonException>();
     }
 }
