@@ -17,7 +17,6 @@ builder.Services
     .AddModule<ThirdPartyNoticesModule>()
     .AddModule<PackModule>()
     .AddModule<PublishConsoleModule>()
-    .AddModule<PackToolModule>()
     .AddModule<PushPackageModule>();
 
 var pipeline = await builder.BuildAsync();

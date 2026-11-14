@@ -79,10 +79,15 @@ published. From a terminal:
 gh workflow run build.yml --ref trunk -f version=1.2.0
 ```
 
+The release description comes from [`CHANGELOG.md`](CHANGELOG.md). Record each change under **Unreleased** as it is
+made. Before a stable release, rename **Unreleased** to the version (`## [1.2.0] - 2026-12-01`) and start a new,
+empty **Unreleased** above it; the release fails if the version has no section. A prerelease uses its own section if
+there is one, otherwise **Unreleased**.
+
 The workflow (`.github/workflows/build.yml`) never publishes without approval:
 
-1. **verify** checks that the version is valid and has no tag yet, that the run is on the default branch, and that
-   the `nuget` environment requires a reviewer. If anyone removes that protection, releases fail instead of
+1. **verify** checks that the version is valid and has no tag yet, that the run is on the default branch, that
+   `CHANGELOG.md` describes it, and that the `nuget` environment requires a reviewer. If anyone removes that protection, releases fail instead of
    publishing unattended.
 2. **windows-latest** runs the tests on Windows.
 3. **ubuntu-latest** runs the pipeline with `Build:Version` set to the version. On a release it gets no token, so the

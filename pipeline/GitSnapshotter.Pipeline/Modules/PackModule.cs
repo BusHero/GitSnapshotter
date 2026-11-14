@@ -10,8 +10,9 @@ using ModularPipelines.Modules;
 namespace GitSnapshotter.Pipeline.Modules;
 
 /// <summary>
-/// Packs the library and the console app's .NET tool package as prereleases named after the branch and the build
-/// time, each with its third-party notices. Both get the same version suffix.
+/// Packs the library and the console app's .NET tool package, each with its third-party notices: as the release
+/// version on a release build, otherwise as prereleases named after the branch and the build time. Both get the same
+/// version. The only module that packs, so no two packs write to the publish directory at once.
 /// </summary>
 [DependsOn<CompileModule>]
 [DependsOn<ThirdPartyNoticesModule>]
@@ -44,7 +45,11 @@ public sealed class PackModule(IOptions<BuildSettings> settings) : Module<string
                     VersionSuffix = suffix,
                     Output = output,
                     Nologo = true,
-                    Properties = [new KeyValue("ThirdPartyNoticesFile", thirdPartyNotices)],
+                    Properties =
+                    [
+                        new KeyValue("ThirdPartyNoticesFile", thirdPartyNotices),
+                        .. settings.Value.VersionProperties,
+                    ],
                 },
                 cancellationToken: cancellationToken);
     }

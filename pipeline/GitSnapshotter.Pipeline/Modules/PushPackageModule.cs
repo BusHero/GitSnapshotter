@@ -15,7 +15,6 @@ namespace GitSnapshotter.Pipeline.Modules;
 /// configured.
 /// </summary>
 [DependsOn<PackModule>]
-[DependsOn<PackToolModule>]
 [DependsOn<RunUnitTestsModule>]
 public sealed class PushPackageModule(IOptions<BuildSettings> settings) : Module<CommandResult>
 {
