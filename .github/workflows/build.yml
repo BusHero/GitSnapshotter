@@ -135,7 +135,7 @@ jobs:
           key: ${{ runner.os }}-${{ hashFiles('**/global.json', '**/packages.lock.json') }}
 
       # The runtime token is only given to actions; the test platform needs it to upload its report as an artifact.
-      - name: Enable Automated Test Report Artifact Upload
+      - name: 'Setup: test report upload'
         uses: actions/github-script@v9
         with:
           script: |
