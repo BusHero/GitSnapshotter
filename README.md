@@ -53,6 +53,13 @@ the `Build` configuration section, as environment variables (`Build__PublishDire
 | `SmokeTestCommit` | none | The commit the release was made from; `SmokeTest` checks the packages, Source Link and the release tag against it (otherwise the commit the library package names) |
 | `SmokeTestVerifySignatures` | `true` | Whether `SmokeTest` verifies the packages' signatures; off for a feed that doesn't sign, like GitHub Packages |
 | `SmokeTestGitHubRelease` | `true` | Whether `SmokeTest` checks the GitHub release; reads it with `GITHUB_TOKEN` |
+| `SmokeTestFeedMetadata` | `true` | Whether `SmokeTest` checks what the feed shows (nuget.org's registration API) |
+| `SmokeTestSymbols` | `true` | Whether `SmokeTest` downloads the PDBs from `SmokeTestSymbolServer` |
+| `SmokeTestPreviousSource` | nuget.org | Where the previous releases and our packages' dependencies come from |
+| `SmokeTestSourceUsername`, `SmokeTestSourcePassword` | none | Credentials for `SmokeTestSource` (GitHub Packages) |
+| `SmokeTestDocs`, `SmokeTestDocsPage` | `true`, the installation page | Whether and which published page `SmokeTest` checks against the release |
+| `SmokeTestMaxGrowthPercent` | `25` | How much each framework's part of a package may grow over the previous release |
+| `SmokeTestAboveReleases` | `false` | Fail when the version sorts below a release (CI builds: raise `VersionPrefix` after each release) |
 
 The CI workflows run the pipeline too, one target per job, so a job only sets up the machine and hands files to
 the next. Each target runs on a developer machine as well (`./build.sh --Build:Target=Test`):
@@ -61,7 +68,7 @@ the next. Each target runs on a developer machine as well (`./build.sh --Build:T
 |---|---|---|
 | `All` | Format check, compile, tests, third-party notices, console app, packages, push; on a release, the release assets (packages, console app zip, `SHA256SUMS.txt`) | Build and release > Build and package |
 | `VerifyRelease` | Checks the release may go ahead and writes its description from `CHANGELOG.md`; needs `GITHUB_TOKEN` | Build and release > Check release |
-| `SmokeTest` | Checks `Version` was published and works, building nothing. From the feed: installs the tool, snapshots and restores a repository with it, upgrades it from the previous stable version and uninstalls it; runs an app using the library on each framework it is built for (.NET Framework on Windows only) and the newest runtime. Checks both packages' third-party notices and contents (an assembly must be ours or covered by the notices; the library may depend only on packages its project passes on), signatures, and known vulnerabilities in them and everything they ship; what the feed shows about them; our PDBs on the symbol server; that our assemblies are deterministic and Source Link maps every source file to the commit; and the GitHub release (published, flagged right, tagged on the commit, described by `CHANGELOG.md`, with the release assets). With `SmokeTestReleaseDirectory`, also compares the packages, PDBs and console app zip with the release's | Build and release > Smoke test (Linux x64, ARM64 and Alpine, Windows, macOS) |
+| `SmokeTest` | Checks `Version` was published and works, building nothing. From the feed: installs the tool (globally, as a local tool from a manifest, with `dotnet tool exec`), runs each framework's build, snapshots and restores a repository and its working tree, also from a snapshot the previous release took, upgrades from the previous release and uninstalls; uses the library as a test would (snapshot, `Preserve`, JSON, `Restore`) on each framework it is built for and the newest runtime. Checks the notices, contents, signatures, known vulnerabilities, API compatibility (a break must be under a "Breaking" heading in `CHANGELOG.md`) and size against the previous release, what the feed shows, the symbols, deterministic builds and Source Link, the GitHub release and the published installation page; with `SmokeTestReleaseDirectory`, compares the packages, PDBs and console app zip with the release's | Build and release > Smoke test (Linux x64, ARM64 and Alpine, Windows, macOS), after every release and on every CI build (from GitHub Packages, without the release-only checks) |
 | `Test` | Compile and tests | Build and release > Test on Windows |
 | `Compile` | Compile | CodeQL |
 | `Restore` | Restore the solution | Build and release > Submit dependency graph |

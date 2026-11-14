@@ -12,7 +12,8 @@ namespace GitSnapshotter.Pipeline.Modules;
 /// <summary>
 /// Packs the library and the console app's .NET tool package, each with its third-party notices: as the release
 /// version on a release build, otherwise as prereleases named after the branch and the build time. Both get the same
-/// version. The only module that packs, so no two packs write to the publish directory at once.
+/// version, which goes to the step's <c>package-version</c> output on GitHub Actions. The only module that packs, so
+/// no two packs write to the publish directory at once.
 /// </summary>
 [DependsOn<CompileModule>]
 [DependsOn<ThirdPartyNoticesModule>]
@@ -31,6 +32,12 @@ public sealed class PackModule(IOptions<BuildSettings> settings) : Module<string
         // The library's notices cover the packages compiled into it; the tool's cover every package it ships.
         await Pack(Paths.Library(context), notices.ValueOrDefault!.Library);
         await Pack(Paths.Console(context), notices.ValueOrDefault!.Console);
+
+        // For the jobs that test the packages: the version they were packed at.
+        var version = settings.Value.Version
+            ?? SmokeTestChecks.PackedVersion(Directory.EnumerateFiles(output, "*.nupkg").Select(file => Path.GetFileName(file)), suffix)
+            ?? throw new InvalidOperationException($"No {SmokeTestChecks.LibraryId} package ending in {suffix} in {output}.");
+        await GitHubActions.SetOutputAsync("package-version", version, cancellationToken);
 
         return output;
 

@@ -766,4 +766,192 @@ public sealed class SmokeTestTests : IDisposable
             "lib/net8.0/GitSnapshotter.Console.dll",
         ])).IsEquivalentTo(["net11.0", "net8.0"], CollectionOrdering.Matching);
     }
+
+    // ---- Feeds ----------------------------------------------------------------------------------------------------
+
+    [Test]
+    public async Task OurPackagesComeFromTheTestedFeedAndTheRestFromNuGetOrg()
+    {
+        var configuration = XDocument.Parse(SmokeTestChecks.NuGetConfig(
+            "https://nuget.pkg.github.com/BusHero/index.json", SmokeTestChecks.NuGetOrg, "someone", "token")).Root!;
+        string[] Patterns(string key) =>
+        [
+            .. configuration.Element("packageSourceMapping")!.Elements()
+                .Single(source => source.Attribute("key")!.Value == key)
+                .Elements().Select(package => package.Attribute("pattern")!.Value),
+        ];
+
+        using (Assert.Multiple())
+        {
+            await Assert.That(configuration.Element("packageSources")!.Elements("add").Select(add => add.Attribute("value")!.Value))
+                .IsEquivalentTo(["https://nuget.pkg.github.com/BusHero/index.json", SmokeTestChecks.NuGetOrg]);
+            await Assert.That(Patterns("smoke-test")).IsEquivalentTo([SmokeTestChecks.LibraryId, SmokeTestChecks.ToolId]);
+            await Assert.That(Patterns("dependencies")).IsEquivalentTo(["*"]);
+            await Assert.That(configuration.Element("packageSourceCredentials")!.Element("smoke-test")!.Elements()
+                    .Select(add => $"{add.Attribute("key")!.Value}={add.Attribute("value")!.Value}"))
+                .IsEquivalentTo(["Username=someone", "ClearTextPassword=token"]);
+        }
+    }
+
+    [Test]
+    public async Task NuGetOrgAloneNeedsNoMappingOrCredentials()
+    {
+        var configuration = XDocument.Parse(SmokeTestChecks.NuGetConfig(SmokeTestChecks.NuGetOrg, SmokeTestChecks.NuGetOrg)).Root!;
+
+        using (Assert.Multiple())
+        {
+            await Assert.That(configuration.Element("packageSources")!.Elements("add").Count()).IsEqualTo(1);
+            await Assert.That(configuration.Element("packageSourceMapping")).IsNull();
+            await Assert.That(configuration.Element("packageSourceCredentials")).IsNull();
+        }
+    }
+
+    [Test]
+    [Arguments(new[] { "GitSnapshotter.0.4.0-trunk-20261114.nupkg", "GitSnapshotter.Tool.0.4.0-trunk-20261114.nupkg", "GitSnapshotter.0.3.0-old.nupkg" }, "trunk-20261114", "0.4.0-trunk-20261114")]
+    [Arguments(new[] { "GitSnapshotter.Tool.0.4.0-x.nupkg" }, "x", null)]
+    public async Task PackedVersionIsTheLibrarysWithTheSuffix(string[] files, string suffix, string? expected)
+    {
+        await Assert.That(SmokeTestChecks.PackedVersion(files, suffix)).IsEqualTo(expected);
+    }
+
+    // ---- Breaking changes and size ----------------------------------------------------------------------------------
+
+    [Test]
+    [Arguments("### Breaking changes\n\n- `Restore` throws when...", true)]
+    [Arguments("### Changed (breaking)\n", true)]
+    [Arguments("### Changed\n\n- Nothing breaking here.", false)]
+    [Arguments("", false)]
+    public async Task OnlyAChangelogHeadingAllowsBreakingChanges(string notes, bool allowed)
+    {
+        await Assert.That(SmokeTestChecks.AllowsBreakingChanges(notes)).IsEqualTo(allowed);
+    }
+
+    private static Dictionary<string, byte[]> Sized(params (string Name, int Size)[] entries) =>
+        entries.ToDictionary(e => e.Name, e => new byte[e.Size]);
+
+    [Test]
+    public async Task PackageGrowingWithinTheLimitPasses()
+    {
+        var previous = Sized(("tools/net11.0/any/a.dll", 1_000_000), ("README.md", 1000));
+        var current = Sized(("tools/net11.0/any/a.dll", 1_200_000), ("README.md", 2000), (".signature.p7s", 50_000));
+
+        await Assert.That(SmokeTestChecks.CheckGrowth(current, previous, 25)).IsEmpty();
+    }
+
+    [Test]
+    public async Task PartGrowingTooMuchFails()
+    {
+        var previous = Sized(("lib/net8.0/GitSnapshotter.dll", 1_000_000));
+        var current = Sized(("lib/net8.0/GitSnapshotter.dll", 1_300_000));
+
+        await Assert.That(SmokeTestChecks.CheckGrowth(current, previous, 25)).IsEquivalentTo(
+            [$"lib/net8.0 is {1_300_000:N0} bytes, 30% more than the previous release's {1_000_000:N0}"]);
+    }
+
+    [Test]
+    public async Task NewFrameworkIsComparedWithThePreviousLargestOfItsKind()
+    {
+        // 0.4.0 adds a net8.0 build of the tool next to net11.0: each is compared with 0.3.0's net11.0 build.
+        var previous = Sized(("tools/net11.0/any/a.dll", 1_000_000));
+        var current = Sized(("tools/net8.0/any/a.dll", 1_000_000), ("tools/net11.0/any/a.dll", 1_000_000));
+        var bloated = Sized(("tools/net8.0/any/a.dll", 2_000_000), ("tools/net11.0/any/a.dll", 1_000_000));
+
+        using (Assert.Multiple())
+        {
+            await Assert.That(SmokeTestChecks.CheckGrowth(current, previous, 25)).IsEmpty();
+            await Assert.That(SmokeTestChecks.CheckGrowth(bloated, previous, 25)).Count().IsEqualTo(1);
+        }
+    }
+
+    [Test]
+    public async Task SmallPartsMayGrowBySomeKilobytes()
+    {
+        await Assert.That(SmokeTestChecks.CheckGrowth(Sized(("README.md", 30_000)), Sized(("README.md", 1000)), 25)).IsEmpty();
+    }
+
+    // ---- Local tools ------------------------------------------------------------------------------------------------
+
+    [Test]
+    public async Task ToolManifestPinsTheVersion()
+    {
+        var manifest = System.Text.Json.Nodes.JsonNode.Parse(SmokeTestChecks.ToolManifest("0.4.0-rc.1"))!;
+        var tool = manifest["tools"]!["gitsnapshotter.tool"]!;
+
+        using (Assert.Multiple())
+        {
+            await Assert.That(manifest["isRoot"]!.GetValue<bool>()).IsTrue();
+            await Assert.That(tool["version"]!.GetValue<string>()).IsEqualTo("0.4.0-rc.1");
+            await Assert.That(tool["commands"]![0]!.GetValue<string>()).IsEqualTo("gitsnapshotter");
+        }
+    }
+
+    // ---- The docs -----------------------------------------------------------------------------------------------------
+
+    // As Starlight's code blocks render it: a token per span, entities, a copy button carrying the code again.
+    private const string InstallationPage = """
+        <html><head><style>.x{}</style><script>var a = "dotnet tool install --global Wrong";</script></head><body>
+        <p>The <code>GitSnapshotter</code> package targets <code>net8.0</code> and <code>net472</code>.</p>
+        <pre><code><span>dotnet</span><span> add package </span><span>GitSnapshotter</span></code></pre>
+        <p>It needs the <a href="https://dotnet.microsoft.com/download">.NET 8 runtime</a> or later.</p>
+        <pre><code><span>dotnet tool install</span> <span>--global</span> <span>GitSnapshotter.Tool</span></code></pre>
+        <button data-code="dotnet tool install --global GitSnapshotter.Tool">Copy</button>
+        <p>Use &lt;PackageReference&gt; &amp; friends.</p>
+        </body></html>
+        """;
+
+    [Test]
+    public async Task PageTextDropsTagsAndScriptsAndDecodesEntities()
+    {
+        var text = SmokeTestChecks.PageText(InstallationPage);
+
+        using (Assert.Multiple())
+        {
+            await Assert.That(text).Contains("dotnet tool install --global GitSnapshotter.Tool");
+            await Assert.That(text).Contains("Use <PackageReference> & friends.");
+            await Assert.That(text).DoesNotContain("Wrong");
+            await Assert.That(text).DoesNotContain("<span>");
+        }
+    }
+
+    [Test]
+    public async Task InstallationPageMatchingTheReleasePasses()
+    {
+        var text = SmokeTestChecks.PageText(InstallationPage);
+
+        await Assert.That(SmokeTestChecks.CheckDocs(text, ["net8.0", "net472"], ["net8.0", "net11.0"])).IsEmpty();
+    }
+
+    [Test]
+    public async Task InstallationPageBehindTheReleaseFails()
+    {
+        var text = SmokeTestChecks.PageText(InstallationPage);
+
+        // A release whose tool needs .NET 11 and whose library adds netstandard2.0, on a page that says neither.
+        await Assert.That(SmokeTestChecks.CheckDocs(text, ["net8.0", "net472", "netstandard2.0"], ["net11.0"])).IsEquivalentTo(
+        [
+            "it doesn't say the library is built for netstandard2.0",
+            "it doesn't say the tool needs the .NET 11 runtime",
+        ]);
+    }
+
+    [Test]
+    public async Task InstallationPageWithoutTheCommandsFails()
+    {
+        await Assert.That(SmokeTestChecks.CheckDocs("Nothing to see.", [], [])).IsEquivalentTo(
+        [
+            "it doesn't give 'dotnet add package GitSnapshotter'",
+            "it doesn't give 'dotnet tool install --global GitSnapshotter.Tool'",
+        ]);
+    }
+
+    [Test]
+    [Arguments("0.3.0-trunk-20261114", "0.3.0")]
+    [Arguments("0.2.5", "0.3.0")]
+    [Arguments("0.3.0", "0.3.0")]
+    [Arguments("0.4.0-trunk-20261114", null)]
+    [Arguments("0.4.0-rc.1", null)]
+    public async Task BuildSortingBelowAReleaseIsFound(string version, string? released)
+    {
+        await Assert.That(SmokeTestChecks.ReleasedAtOrAbove(["0.1.0", "0.2.0", "0.3.0", "0.4.0-rc.1"], version)).IsEqualTo(released);
+    }
 }

@@ -69,6 +69,12 @@ public sealed class BuildSettings
     public string SmokeTestSymbolServer { get; set; } = "https://symbols.nuget.org/download/symbols";
 
     /// <summary>
+    /// Whether <see cref="BuildTarget.SmokeTest"/> downloads the PDBs from <see cref="SmokeTestSymbolServer"/>. A
+    /// setting of its own, not an empty server: on Windows an empty environment variable is no variable at all.
+    /// </summary>
+    public bool SmokeTestSymbols { get; set; } = true;
+
+    /// <summary>
     /// The commit the release was made from. When set, <see cref="BuildTarget.SmokeTest"/> checks that both packages
     /// were built from it (the commit in their nuspec, which the feed shows).
     /// </summary>
@@ -85,6 +91,48 @@ public sealed class BuildSettings
     /// commit, described by CHANGELOG.md and with the release assets. Reads the repository with <c>GITHUB_TOKEN</c>.
     /// </summary>
     public bool SmokeTestGitHubRelease { get; set; } = true;
+
+    /// <summary>
+    /// Whether <see cref="BuildTarget.SmokeTest"/> checks what the feed shows about the packages (metadata, readme,
+    /// icon), with nuget.org's registration API. Off for a feed without it, like GitHub Packages.
+    /// </summary>
+    public bool SmokeTestFeedMetadata { get; set; } = true;
+
+    /// <summary>
+    /// Where <see cref="BuildTarget.SmokeTest"/> gets the previous releases (to upgrade from, restore old snapshots,
+    /// compare the API and the package size with) and every package ours depend on.
+    /// </summary>
+    public string SmokeTestPreviousSource { get; set; } = SmokeTestChecks.NuGetOrg;
+
+    /// <summary>The user name for <see cref="SmokeTestSource"/>, when it needs one (GitHub Packages).</summary>
+    public string? SmokeTestSourceUsername { get; set; }
+
+    /// <summary>The password or token for <see cref="SmokeTestSource"/>, when it needs one (GitHub Packages).</summary>
+    [SecretValue]
+    public string? SmokeTestSourcePassword { get; set; }
+
+    /// <summary>
+    /// The published installation page <see cref="BuildTarget.SmokeTest"/> checks against the release. When empty, the
+    /// docs are not checked.
+    /// </summary>
+    public string? SmokeTestDocsPage { get; set; } = "https://bushero.github.io/GitSnapshotter/installation/";
+
+    /// <summary>Whether <see cref="BuildTarget.SmokeTest"/> checks <see cref="SmokeTestDocsPage"/>.</summary>
+    public bool SmokeTestDocs { get; set; } = true;
+
+    /// <summary>
+    /// How much (in percent) each framework's part of a package may grow over the previous release before
+    /// <see cref="BuildTarget.SmokeTest"/> fails.
+    /// </summary>
+    public int SmokeTestMaxGrowthPercent { get; set; } = 25;
+
+    /// <summary>
+    /// Whether <see cref="BuildTarget.SmokeTest"/> fails when the version sorts below a stable release on
+    /// <see cref="SmokeTestPreviousSource"/>. On for CI builds, which are versioned after the <c>VersionPrefix</c> in
+    /// Source/Directory.Build.props: it must be raised after each stable release. Off for releases, as a fix for an
+    /// older line (a 0.3.1 after 0.4.0) may sort below.
+    /// </summary>
+    public bool SmokeTestAboveReleases { get; set; }
 
     /// <summary>
     /// The release version, like <c>1.2.0</c> or <c>1.2.0-rc.1</c>. When set, the assemblies, the package and the

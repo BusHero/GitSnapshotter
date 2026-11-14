@@ -50,16 +50,56 @@ internal static class SmokeTestChecks
 
     // ---- Installing --------------------------------------------------------------------------------------------
 
-    /// <summary>A nuget.config that uses <paramref name="source"/> only, so no package comes from another feed.</summary>
-    public static string NuGetConfig(string source) =>
-        new XDocument(
-            new XElement(
-                "configuration",
+    /// <summary>nuget.org's V3 feed, where releases and every package the packages depend on come from.</summary>
+    public const string NuGetOrg = "https://api.nuget.org/v3/index.json";
+
+    /// <summary>
+    /// A nuget.config that uses <paramref name="source"/> only, so no package comes from another feed. When
+    /// <paramref name="dependencies"/> is another feed, our two packages come only from <paramref name="source"/>
+    /// (package source mapping) and every other package from <paramref name="dependencies"/>, as a feed like GitHub
+    /// Packages doesn't mirror nuget.org.
+    /// </summary>
+    /// <param name="source">The feed our packages are tested from.</param>
+    /// <param name="dependencies">The feed for everything else; none or the same feed for <paramref name="source"/> only.</param>
+    /// <param name="username">The user name <paramref name="source"/> needs, if any.</param>
+    /// <param name="password">The password or token <paramref name="source"/> needs, if any.</param>
+    public static string NuGetConfig(string source, string? dependencies = null, string? username = null, string? password = null)
+    {
+        const string Tested = "smoke-test";
+        const string Other = "dependencies";
+        var separate = !string.IsNullOrEmpty(dependencies) && !string.Equals(dependencies, source, StringComparison.OrdinalIgnoreCase);
+
+        var sources = new XElement(
+            "packageSources",
+            new XElement("clear"),
+            new XElement("add", new XAttribute("key", Tested), new XAttribute("value", source)));
+        var configuration = new XElement("configuration", sources);
+
+        if (separate)
+        {
+            sources.Add(new XElement("add", new XAttribute("key", Other), new XAttribute("value", dependencies!)));
+            configuration.Add(new XElement(
+                "packageSourceMapping",
                 new XElement(
-                    "packageSources",
-                    new XElement("clear"),
-                    new XElement("add", new XAttribute("key", "smoke-test"), new XAttribute("value", source)))))
-            .ToString();
+                    "packageSource",
+                    new XAttribute("key", Tested),
+                    new XElement("package", new XAttribute("pattern", LibraryId)),
+                    new XElement("package", new XAttribute("pattern", ToolId))),
+                new XElement("packageSource", new XAttribute("key", Other), new XElement("package", new XAttribute("pattern", "*")))));
+        }
+
+        if (!string.IsNullOrEmpty(password))
+        {
+            configuration.Add(new XElement(
+                "packageSourceCredentials",
+                new XElement(
+                    Tested,
+                    new XElement("add", new XAttribute("key", "Username"), new XAttribute("value", username ?? "smoke-test")),
+                    new XElement("add", new XAttribute("key", "ClearTextPassword"), new XAttribute("value", password)))));
+        }
+
+        return new XDocument(configuration).ToString();
+    }
 
     /// <summary>
     /// An app that references exactly <paramref name="version"/> of the library and builds for each of
@@ -96,14 +136,56 @@ internal static class SmokeTestChecks
     }
 
     /// <summary>
-    /// Takes a snapshot, which loads LibGit2Sharp and its native libgit2 from the package's dependencies. Written for
-    /// every target framework: no implicit usings, which .NET Framework projects don't get.
+    /// Uses the library as a test would, on the repository in <c>args[0]</c>: takes a snapshot with its working tree;
+    /// inside <c>GitRepository.Preserve</c> adds a branch, a tag and an untracked file through LibGit2Sharp (which
+    /// loads the native libgit2); then checks the repository is back as it was, and that the snapshot survives a JSON
+    /// round trip and restores. Written for every target framework: no implicit usings, which .NET Framework projects
+    /// don't get.
     /// </summary>
     public const string LibraryProgram = """
-        var snapshot = GitSnapshotter.GitRepository.GetSnapshot(args[0]);
-        System.Console.WriteLine(
-            $"{System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription}: snapshot of {args[0]} has "
-            + $"{snapshot.Branches.Count} branches and {snapshot.Tags.Count} tags");
+        using System;
+        using System.IO;
+        using GitSnapshotter;
+        using LibGit2Sharp;
+
+        var path = args[0];
+        var options = new SnapshotOptions { IncludeWorkingTree = true };
+        var force = new RestoreOptions { Force = true };
+        var before = GitRepository.GetSnapshot(path, options);
+
+        using (GitRepository.Preserve(path, options, force))
+        {
+            using var repository = new LibGit2Sharp.Repository(path);
+            repository.CreateBranch("library-smoke-test");
+            repository.ApplyTag("library-smoke-test");
+            File.WriteAllText(Path.Combine(path, "library-smoke-test.txt"), "untracked\n");
+        }
+
+        Check("Preserve put the repository back", before, GitRepository.GetSnapshot(path, options));
+
+        var saved = GitRepositorySnapshot.FromJson(before.ToJson());
+        Check("the snapshot survives JSON", before, saved);
+        using (var repository = new LibGit2Sharp.Repository(path))
+        {
+            repository.CreateBranch("library-smoke-test-2");
+        }
+
+        GitRepository.Restore(path, saved, force);
+        Check("Restore put the repository back", before, GitRepository.GetSnapshot(path, options));
+
+        Console.WriteLine(
+            $"{System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription}: snapshot, Preserve and Restore "
+            + $"work on {path} ({before.Branches.Count} branches, {before.Tags.Count} tags)");
+        return 0;
+
+        static void Check(string what, GitRepositorySnapshot expected, GitRepositorySnapshot actual)
+        {
+            var diff = SnapshotDiff.Compare(expected, actual);
+            if (diff.HasChanges)
+            {
+                throw new InvalidOperationException($"Not true that {what}: {string.Join("; ", diff.Changes)}");
+            }
+        }
         """;
 
     /// <summary>
@@ -629,6 +711,17 @@ internal static class SmokeTestChecks
             .OrderBy(v => v, Comparer<string>.Create(CompareVersions))
             .LastOrDefault();
 
+    /// <summary>
+    /// The newest stable version in <paramref name="versions"/> that <paramref name="version"/> doesn't sort above:
+    /// a build that sorts below what is released, so <c>--prerelease</c> and updates would never pick it. None when
+    /// <paramref name="version"/> is newer than every release.
+    /// </summary>
+    public static string? ReleasedAtOrAbove(IEnumerable<string> versions, string version) =>
+        versions
+            .Where(v => !v.Contains('-', StringComparison.Ordinal) && CompareVersions(v, version) >= 0)
+            .OrderBy(v => v, Comparer<string>.Create(CompareVersions))
+            .LastOrDefault();
+
     /// <summary>Orders SemVer versions, as NuGet does: by number, a prerelease before its release.</summary>
     public static int CompareVersions(string? left, string? right)
     {
@@ -936,4 +1029,142 @@ internal static class SmokeTestChecks
 
         return problems;
     }
+
+    // ---- Breaking changes and package size ----------------------------------------------------------------------------
+
+    /// <summary>
+    /// Whether a version's CHANGELOG.md section owns up to breaking changes: it has a heading with "breaking" in it,
+    /// like <c>### Breaking changes</c>. Then the API compatibility check reports them without failing.
+    /// </summary>
+    public static bool AllowsBreakingChanges(string? notes) =>
+        (notes ?? "").Split('\n').Any(line => line.TrimStart().StartsWith('#', StringComparison.Ordinal)
+            && line.Contains("breaking", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// Compares the size of each part of a package with the previous release's: each <c>lib/&lt;framework&gt;</c> and
+    /// <c>tools/&lt;framework&gt;</c> folder, and the rest. A new framework's folder is compared with the previous
+    /// release's largest one of the same kind. A part may grow by <paramref name="maxPercent"/>, or by
+    /// <paramref name="slackBytes"/>, whichever is more, so small packages don't fail on a few added lines.
+    /// </summary>
+    /// <returns>Each part that grew too much.</returns>
+    public static IReadOnlyList<string> CheckGrowth(
+        IReadOnlyDictionary<string, byte[]> current, IReadOnlyDictionary<string, byte[]> previous, int maxPercent, long slackBytes = 64 * 1024)
+    {
+        ArgumentNullException.ThrowIfNull(current);
+        ArgumentNullException.ThrowIfNull(previous);
+
+        static Dictionary<string, long> Parts(IReadOnlyDictionary<string, byte[]> entries) =>
+            entries
+                .Where(entry => entry.Key != RepositorySignature)
+                .GroupBy(entry => entry.Key.Split('/') is [("lib" or "tools") and var kind, var framework, _, ..] ? $"{kind}/{framework}" : "(root)")
+                .ToDictionary(group => group.Key, group => group.Sum(entry => (long)entry.Value.Length), StringComparer.Ordinal);
+
+        var now = Parts(current);
+        var before = Parts(previous);
+        var problems = new List<string>();
+        foreach (var (part, size) in now.OrderBy(p => p.Key, StringComparer.Ordinal))
+        {
+            var kind = part.Split('/')[0];
+            var baseline = before.TryGetValue(part, out var same)
+                ? same
+                : before.Where(p => p.Key.StartsWith(kind + "/", StringComparison.Ordinal)).Select(p => p.Value).DefaultIfEmpty(0).Max();
+            if (baseline == 0)
+            {
+                continue; // Nothing to compare with.
+            }
+
+            var allowed = Math.Max(baseline * (100 + maxPercent) / 100, baseline + slackBytes);
+            if (size > allowed)
+            {
+                problems.Add($"{part} is {size:N0} bytes, {(size - baseline) * 100 / baseline}% more than the previous release's {baseline:N0}");
+            }
+        }
+
+        return problems;
+    }
+
+    // ---- Local tools ------------------------------------------------------------------------------------------------
+
+    /// <summary>A tool manifest (<c>.config/dotnet-tools.json</c>) that pins the tool at <paramref name="version"/>.</summary>
+    public static string ToolManifest(string version) =>
+        new JsonObject
+        {
+            ["version"] = 1,
+            ["isRoot"] = true,
+            ["tools"] = new JsonObject
+            {
+                [Lower(ToolId)] = new JsonObject
+                {
+                    ["version"] = version,
+                    ["commands"] = new JsonArray(ToolCommand),
+                    ["rollForward"] = false,
+                },
+            },
+        }.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+
+    // ---- The docs -----------------------------------------------------------------------------------------------------
+
+    /// <summary>A web page's text: its tags dropped, its entities decoded and its white space collapsed.</summary>
+    public static string PageText(string html)
+    {
+        var withoutScripts = System.Text.RegularExpressions.Regex.Replace(
+            html, "<(script|style)[^>]*>.*?</\\1>", " ", System.Text.RegularExpressions.RegexOptions.Singleline | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        var text = System.Text.RegularExpressions.Regex.Replace(withoutScripts, "<[^>]+>", "");
+        return System.Text.RegularExpressions.Regex.Replace(System.Net.WebUtility.HtmlDecode(text), "\\s+", " ");
+    }
+
+    /// <summary>
+    /// Checks the published installation page against what was released: it gives the install commands, names each
+    /// framework the library is built for, and the oldest .NET runtime the tool runs on.
+    /// </summary>
+    /// <returns>What the page gets wrong or leaves out.</returns>
+    public static IReadOnlyList<string> CheckDocs(string pageText, IEnumerable<string> libraryFrameworks, IEnumerable<string> toolFrameworks)
+    {
+        ArgumentNullException.ThrowIfNull(pageText);
+
+        var problems = new List<string>();
+        foreach (var command in new[] { $"dotnet add package {LibraryId}", $"dotnet tool install --global {ToolId}" })
+        {
+            if (!pageText.Contains(command, StringComparison.Ordinal))
+            {
+                problems.Add($"it doesn't give '{command}'");
+            }
+        }
+
+        foreach (var framework in libraryFrameworks.Order(StringComparer.Ordinal))
+        {
+            if (!pageText.Contains(framework, StringComparison.Ordinal))
+            {
+                problems.Add($"it doesn't say the library is built for {framework}");
+            }
+        }
+
+        var oldest = toolFrameworks
+            .Where(framework => !IsNetFramework(framework))
+            .Select(framework => int.TryParse(framework[3..].Split('.')[0], out var major) ? major : int.MaxValue)
+            .DefaultIfEmpty(int.MaxValue)
+            .Min();
+        if (oldest != int.MaxValue && !pageText.Contains($".NET {oldest} runtime", StringComparison.Ordinal))
+        {
+            problems.Add($"it doesn't say the tool needs the .NET {oldest} runtime");
+        }
+
+        return problems;
+    }
+
+    // ---- The CI build's version ---------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// The version the library was packed at, from the package file names in the publish directory: the one ending
+    /// in <paramref name="suffix"/> on a CI build, the release version otherwise.
+    /// </summary>
+    public static string? PackedVersion(IEnumerable<string> fileNames, string? suffix) =>
+        fileNames
+            .Where(name => name.StartsWith($"{LibraryId}.", StringComparison.Ordinal)
+                && !name.StartsWith($"{ToolId}.", StringComparison.Ordinal)
+                && name.EndsWith(".nupkg", StringComparison.Ordinal))
+            .Select(name => name[(LibraryId.Length + 1)..^".nupkg".Length])
+            .Where(version => suffix is null || version.EndsWith("-" + suffix, StringComparison.Ordinal))
+            .Order(StringComparer.Ordinal)
+            .LastOrDefault();
 }

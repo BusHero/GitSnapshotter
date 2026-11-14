@@ -7,8 +7,8 @@ run-name: ${{ inputs.version && format('release {0}', inputs.version) || '' }}
 # each job sets up the machine, runs one pipeline target (Build__Target) and hands files to the next job.
 #
 # CI build: every push to a branch that touches the code, or Run workflow with no version. Tests on Windows, runs the
-# pipeline on Linux, uploads the console app and the packages as artifacts, and pushes prerelease packages to GitHub
-# Packages.
+# pipeline on Linux, uploads the console app and the packages as artifacts, pushes prerelease packages to GitHub
+# Packages, and smoke tests them from there on every platform.
 #
 # Release: Actions > Build and release > Run workflow, on the default branch, with the version to release (1.2.0, or 1.2.0-rc.1
 # for a prerelease). The same jobs build with that version, then:
@@ -20,12 +20,14 @@ run-name: ${{ inputs.version && format('release {0}', inputs.version) || '' }}
 #            to the repository or get a nuget.org key. It stays in this file: it never checks out or runs the
 #            repository's code, so nothing built from the repository can reach its credentials.
 #   smoke-test  (Smoke test) on Linux (x64, ARM64, Alpine), Windows and macOS, uses the published packages from nuget.org as a user
-#            would: installs the tool, snapshots and restores a repository with it, upgrades it from the previous
-#            version; runs an app that uses the library on each framework it supports. Checks the packages' notices,
-#            contents, signatures and known vulnerabilities, what nuget.org shows about them, their symbols,
-#            deterministic builds and Source Link, the GitHub release, and that the packages, symbols and console app
-#            zip are the release's, built from the released commit (SmokeTest target). Read-only: it gets no
-#            credentials beyond reading the repository.
+#            would: installs the tool (globally, as a local tool, with dnx), snapshots and restores a repository and
+#            its working tree with it, also from a snapshot the previous release took, upgrades it from the previous
+#            release; uses the library as a test would on each framework it supports. Checks the packages' notices,
+#            contents, signatures, known vulnerabilities, API compatibility and size against the previous release,
+#            what nuget.org shows about them, their symbols, deterministic builds and Source Link, the GitHub release,
+#            the published installation page, and that the packages, symbols and console app zip are the release's,
+#            built from the released commit (SmokeTest target). Read-only: it gets no credentials beyond reading the
+#            repository. CI builds run it too, on the prerelease packages in GitHub Packages.
 on:
   push:
     branches: ['**']
@@ -153,6 +155,9 @@ jobs:
     name: Build and package
     needs: [verify, test]
     runs-on: ubuntu-latest
+    outputs:
+      # The version the packages were packed at; CI builds smoke test it from GitHub Packages.
+      package-version: ${{ steps.pipeline.outputs.package-version }}
     permissions:
       contents: read
       # CI builds push prerelease packages to GitHub Packages with GITHUB_TOKEN. Release builds get no token.
@@ -296,9 +301,17 @@ jobs:
   # After publish: is the release usable from nuget.org, on every OS? Waits for nuget.org to list the packages, their
   # metadata and their symbols (it validates and indexes them for a few minutes after the push), then checks them
   # against the GitHub release's assets and the released commit.
+  # On a release, once published: the packages from nuget.org. On a CI build: the prerelease packages the build pushed
+  # to GitHub Packages, without the checks only a release can pass (signatures, nuget.org's metadata and symbols, the
+  # GitHub release, the published docs); everything else comes from nuget.org as for a release. So the smoke test
+  # itself, on every platform, is tested before a release depends on it.
   smoke-test:
     name: Smoke test on ${{ matrix.name }}
-    needs: [verify, publish]
+    needs: [verify, build, publish]
+    # publish is skipped on a CI build.
+    if: >-
+      !cancelled() && needs.build.result == 'success'
+      && (needs.verify.outputs.release != 'true' || needs.publish.result == 'success')
     strategy:
       # Every platform reports, even when one fails.
       fail-fast: false
@@ -314,6 +327,8 @@ jobs:
     container: ${{ matrix.container }}
     permissions:
       contents: read
+      # A CI build's packages are on GitHub Packages, which needs a token even for public packages.
+      packages: read
     environment:
       name: smoke tests
     steps:
@@ -347,6 +362,7 @@ jobs:
       # From the published release, not this run's artifacts: what users download is what gets compared. The
       # pipeline checks them against SHA256SUMS.txt.
       - name: 'Download GitHub release assets'
+        if: needs.verify.outputs.release == 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -358,9 +374,23 @@ jobs:
         shell: bash
         env:
           Build__Target: SmokeTest
-          Build__Version: ${{ needs.verify.outputs.version }}
-          Build__SmokeTestReleaseDirectory: ${{ runner.temp }}/release
+          Build__Version: ${{ needs.verify.outputs.release == 'true' && needs.verify.outputs.version || needs.build.outputs.package-version }}
           Build__SmokeTestCommit: ${{ github.sha }}
+          Build__SmokeTestSource: >-
+            ${{ needs.verify.outputs.release == 'true' && 'https://api.nuget.org/v3/index.json'
+            || format('https://nuget.pkg.github.com/{0}/index.json', github.repository_owner) }}
+          Build__SmokeTestSourceUsername: ${{ needs.verify.outputs.release != 'true' && github.actor || '' }}
+          Build__SmokeTestSourcePassword: ${{ needs.verify.outputs.release != 'true' && github.token || '' }}
+          Build__SmokeTestReleaseDirectory: ${{ needs.verify.outputs.release == 'true' && format('{0}/release', runner.temp) || '' }}
+          # Only a release is signed, shown and indexed by nuget.org, has a GitHub release and matches the published docs.
+          # true/false, never empty: on Windows an empty variable is no variable, and the default would apply.
+          Build__SmokeTestVerifySignatures: ${{ needs.verify.outputs.release == 'true' }}
+          Build__SmokeTestFeedMetadata: ${{ needs.verify.outputs.release == 'true' }}
+          Build__SmokeTestGitHubRelease: ${{ needs.verify.outputs.release == 'true' }}
+          Build__SmokeTestSymbols: ${{ needs.verify.outputs.release == 'true' }}
+          Build__SmokeTestDocs: ${{ needs.verify.outputs.release == 'true' }}
+          # A CI build must sort above every release (VersionPrefix raised after each one).
+          Build__SmokeTestAboveReleases: ${{ needs.verify.outputs.release != 'true' }}
           # Reads the GitHub release.
           GITHUB_TOKEN: ${{ github.token }}
         run: dotnet run --project pipeline/GitSnapshotter.Pipeline --configuration Release

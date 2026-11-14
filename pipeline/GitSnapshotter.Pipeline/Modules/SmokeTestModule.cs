@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO.Compression;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Xml.Linq;
@@ -22,23 +23,26 @@ namespace GitSnapshotter.Pipeline.Modules;
 
 /// <summary>
 /// Checks that a published version can be used the way a user would use it. Works in an empty temporary directory,
-/// with its own NuGet packages folder and only <see cref="BuildSettings.SmokeTestSource"/> as a feed, so nothing comes
-/// from this build or from the machine's NuGet cache. It:
+/// with its own NuGet packages folder; our packages come only from <see cref="BuildSettings.SmokeTestSource"/> and
+/// everything else from <see cref="BuildSettings.SmokeTestPreviousSource"/>, so nothing comes from this build or from
+/// the machine's NuGet cache. It:
 /// <list type="bullet">
-/// <item>installs the .NET tool, checks its <c>--version</c> (and that of each framework's build in it), takes a snapshot with it, and has it put a changed
-/// repository back the way the snapshot found it;</item>
-/// <item>upgrades the tool from the previous stable version, then uninstalls it;</item>
-/// <item>builds an app that references the library, and runs it on every framework the library is built for (.NET
-/// Framework on Windows only) and on the newest runtime;</item>
+/// <item>installs the .NET tool, checks its <c>--version</c> (and that of each framework's build in it), and has it
+/// put a changed repository, working tree included, back the way a snapshot found it, from a snapshot taken by this
+/// version and one taken by the previous release;</item>
+/// <item>upgrades the tool from the previous release, then uninstalls it; installs it as a local tool from a tool
+/// manifest; and runs it with <c>dotnet tool exec</c> (<c>dnx</c>);</item>
+/// <item>builds an app that uses the library as a test would (snapshot, <c>Preserve</c>, JSON, <c>Restore</c>), and
+/// runs it on every framework the library is built for (.NET Framework on Windows only) and on the newest
+/// runtime;</item>
 /// <item>checks that both packages carry their third-party notices, hold nothing but what they should, are signed,
 /// and that neither the library nor anything the tool ships has a known vulnerability;</item>
-/// <item>checks that the feed shows the packages' metadata (license, readme, icon, repository and commit) and serves
-/// their readme and icon;</item>
-/// <item>checks that the symbol server (<see cref="BuildSettings.SmokeTestSymbolServer"/>) has the PDB of each of our
-/// assemblies; that our assemblies were built deterministically; and that Source Link maps every source file to the
-/// released commit, where it can be downloaded as it was built;</item>
-/// <item>checks the GitHub release: published, flagged as a prerelease or the latest release, tagged on the commit,
-/// described by CHANGELOG.md and with the release assets;</item>
+/// <item>checks the library's API has no breaking change from the previous release (unless the changelog says so),
+/// and that no part of either package grew by more than <see cref="BuildSettings.SmokeTestMaxGrowthPercent"/>;</item>
+/// <item>checks that the feed shows the packages' metadata and serves their readme and icon;</item>
+/// <item>checks that the symbol server has the PDB of each of our assemblies; that our assemblies were built
+/// deterministically; and that Source Link maps every source file to the released commit;</item>
+/// <item>checks the GitHub release, and that the published installation page matches the release;</item>
 /// <item>with <see cref="BuildSettings.SmokeTestReleaseDirectory"/>: checks the release assets against
 /// SHA256SUMS.txt, that the feed's packages and the symbol server's PDBs are the release's, and that the console app
 /// zip has its notices and runs.</item>
@@ -57,6 +61,7 @@ public sealed class SmokeTestModule(IOptions<BuildSettings> settings) : Module<s
         var version = settings.Value.Version
             ?? throw new InvalidOperationException("Set the version to smoke test (Build__Version).");
         var source = settings.Value.SmokeTestSource;
+        var previousSource = settings.Value.SmokeTestPreviousSource;
         var deadline = Stopwatch.StartNew();
         var wait = TimeSpan.FromMinutes(settings.Value.SmokeTestWaitMinutes);
         var root = Paths.Root(context);
@@ -64,8 +69,10 @@ public sealed class SmokeTestModule(IOptions<BuildSettings> settings) : Module<s
             ? null
             : Path.GetFullPath(settings.Value.SmokeTestReleaseDirectory, root);
         var commit = string.IsNullOrEmpty(settings.Value.SmokeTestCommit) ? null : settings.Value.SmokeTestCommit;
+        var currentRuntime = $"net{Environment.Version.Major}.0";
+        var toolFile = OperatingSystem.IsWindows() ? ToolCommand + ".exe" : ToolCommand;
 
-        // Any git repository will do for the tool and the apps to take a snapshot of; this one is at hand.
+        // This repository, for read-only snapshots; the round trips use a repository of their own.
         var repository = root;
 
         // The registration API serves gzip.
@@ -91,26 +98,43 @@ public sealed class SmokeTestModule(IOptions<BuildSettings> settings) : Module<s
             var app = Path.Combine(work, "app");
             var project = Path.Combine(app, "SmokeTest.csproj");
             var nugetConfig = Path.Combine(work, "nuget.config");
-            var currentRuntime = $"net{Environment.Version.Major}.0";
+            var previousConfig = Path.Combine(work, "previous", "nuget.config");
 
-            await Write(nugetConfig, NuGetConfig(source));
+            await Write(nugetConfig, NuGetConfig(source, previousSource, settings.Value.SmokeTestSourceUsername, settings.Value.SmokeTestSourcePassword));
+            Directory.CreateDirectory(Path.GetDirectoryName(previousConfig)!);
+            await Write(previousConfig, NuGetConfig(previousSource));
             Directory.CreateDirectory(app);
             await Write(project, LibraryProject(version, [currentRuntime]));
             await Write(Path.Combine(app, "Program.cs"), LibraryProgram);
 
             context.Logger.LogInformation("Smoke testing {Version} from {Source} in {Directory}", version, source, work);
 
+            // The previous releases, from the feed users have them from.
+            using var previousIndex = JsonDocument.Parse(await http.GetStringAsync(new Uri(previousSource), cancellationToken));
+            var previousFeed = ServiceResource(previousIndex.RootElement, "PackageBaseAddress/3.0.0").TrimEnd('/');
+            var previousTool = await PreviousVersionAsync(ToolId);
+            var previousLibrary = await PreviousVersionAsync(LibraryId);
+
             // The tool: install it as a user would, then run it.
             await RetryAsync($"install {ToolId}", attempt => Dotnet(
                 attempt, ["tool", "install", ToolId, "--version", version, "--tool-path", tools, "--configfile", nugetConfig]));
 
-            var tool = Path.Combine(tools, OperatingSystem.IsWindows() ? ToolCommand + ".exe" : ToolCommand);
+            var tool = Path.Combine(tools, toolFile);
             CheckToolVersion((await Run(tool, ["--version"])).StandardOutput, version);
             await Run(tool, ["snapshot", repository]);
-            await RoundTripAsync(tool);
 
-            using var serviceIndex = JsonDocument.Parse(await http.GetStringAsync(new Uri(source), cancellationToken));
-            await UpgradeAsync(serviceIndex.RootElement);
+            string? oldTool = null;
+            if (previousTool is not null)
+            {
+                var oldTools = Path.Combine(work, "previous", "tools");
+                await Dotnet(0, ["tool", "install", ToolId, "--version", previousTool, "--tool-path", oldTools, "--configfile", previousConfig]);
+                oldTool = Path.Combine(oldTools, toolFile);
+            }
+
+            var roundTrip = await RoundTripAsync(tool, oldTool);
+            await UpgradeAsync();
+            await LocalToolAsync();
+            await ToolExecAsync();
 
             // The library: restore an app that references it (the nuget.config above is picked up from the parent
             // directory), then build and run it on every framework the package has assemblies for.
@@ -136,7 +160,7 @@ public sealed class SmokeTestModule(IOptions<BuildSettings> settings) : Module<s
             await RetryAsync($"restore the app for {string.Join(", ", frameworks)} with", attempt => Dotnet(attempt, ["restore", app]));
             foreach (var framework in frameworks)
             {
-                await Dotnet(0, ["run", "--project", app, "--framework", framework, "--no-restore", "--", repository]);
+                await Dotnet(0, ["run", "--project", app, "--framework", framework, "--no-restore", "--", roundTrip]);
             }
 
             // What the packages hold.
@@ -169,10 +193,38 @@ public sealed class SmokeTestModule(IOptions<BuildSettings> settings) : Module<s
             await AuditAsync("audit-tool", toolNoticed);
             context.Logger.LogInformation("Neither package, nor anything they ship or depend on, has a known vulnerability");
 
-            // What the feed shows about them.
-            foreach (var (id, entries) in new[] { (ToolId, toolEntries), (LibraryId, libraryEntries) })
+            // Compared with the previous release: the library's API, and both packages' size.
+            var previousLibraryPackage = previousLibrary is null ? null : await DownloadPreviousAsync(LibraryId, previousLibrary);
+            var previousToolPackage = previousTool is null ? null : await DownloadPreviousAsync(ToolId, previousTool);
+            if (previousLibraryPackage is not null)
             {
-                await RetryAsync($"read the metadata of {id}", _ => CheckFeedMetadataAsync(serviceIndex.RootElement, id, entries));
+                await CheckApiCompatibilityAsync(libraryPackage, previousLibraryPackage, previousLibrary!);
+            }
+
+            var growth = new List<string>();
+            foreach (var (id, package, previous) in new[] { (ToolId, toolEntries, previousToolPackage), (LibraryId, libraryEntries, previousLibraryPackage) })
+            {
+                if (previous is not null)
+                {
+                    growth.AddRange(CheckGrowth(package, ReadEntries(previous), settings.Value.SmokeTestMaxGrowthPercent).Select(problem => $"{id}: {problem}"));
+                }
+            }
+
+            if (growth.Count > 0)
+            {
+                throw new InvalidOperationException($"The packages grew more than {settings.Value.SmokeTestMaxGrowthPercent}%: {string.Join("; ", growth)}");
+            }
+
+            context.Logger.LogInformation("Neither package grew more than {Percent}% since the previous release", settings.Value.SmokeTestMaxGrowthPercent);
+
+            // What the feed shows about them.
+            if (settings.Value.SmokeTestFeedMetadata)
+            {
+                using var serviceIndex = JsonDocument.Parse(await http.GetStringAsync(new Uri(source), cancellationToken));
+                foreach (var (id, entries) in new[] { (ToolId, toolEntries), (LibraryId, libraryEntries) })
+                {
+                    await RetryAsync($"read the metadata of {id}", _ => CheckFeedMetadataAsync(serviceIndex.RootElement, id, entries));
+                }
             }
 
             // The symbols: each of our assemblies' PDB, from the symbol server, the release's symbol package or the
@@ -188,7 +240,7 @@ public sealed class SmokeTestModule(IOptions<BuildSettings> settings) : Module<s
                 {
                     var name = $"{id} {assembly}";
                     var pdb = (symbolEntries is null ? null : ReleasedPdb(symbolEntries, assembly)) ?? ReleasedPdb(entries, assembly);
-                    if (!string.IsNullOrEmpty(settings.Value.SmokeTestSymbolServer))
+                    if (settings.Value.SmokeTestSymbols && !string.IsNullOrEmpty(settings.Value.SmokeTestSymbolServer))
                     {
                         var released = pdb;
                         await RetryAsync(
@@ -205,6 +257,11 @@ public sealed class SmokeTestModule(IOptions<BuildSettings> settings) : Module<s
             if (settings.Value.SmokeTestGitHubRelease)
             {
                 await CheckGitHubReleaseAsync(expectedCommit);
+            }
+
+            if (settings.Value.SmokeTestDocs && !string.IsNullOrEmpty(settings.Value.SmokeTestDocsPage))
+            {
+                await CheckDocsAsync(settings.Value.SmokeTestDocsPage, LibFrameworks(libraryEntries.Keys), ToolFrameworks(toolEntries.Keys));
             }
 
             context.Logger.LogInformation("{Tool} and {Library} {Version} are published and work", ToolId, LibraryId, version);
@@ -232,6 +289,226 @@ public sealed class SmokeTestModule(IOptions<BuildSettings> settings) : Module<s
                 await Dotnet(0, [dll, "snapshot", repository]);
                 context.Logger.LogInformation("{Zip} has its notices and runs", Path.GetFileName(zip));
             }
+
+            async Task<string> RoundTripAsync(string tool, string? previous)
+            {
+                // A repository of its own, so the round trip can change it freely: commits, a tag, branches, and a
+                // working tree with a modified, a staged and an untracked file.
+                var repo = Path.Combine(work, "repository");
+                var file = Path.Combine(repo, "file.txt");
+                Directory.CreateDirectory(repo);
+                await File.WriteAllTextAsync(Path.Combine(work, "gitconfig"), "", cancellationToken);
+
+                await Git(repo, "init", "--initial-branch=main");
+                await File.WriteAllTextAsync(file, "one\n", cancellationToken);
+                await Git(repo, "add", "file.txt");
+                await Git(repo, "commit", "--message", "one");
+                await Git(repo, "tag", "v1");
+                await Git(repo, "branch", "feature");
+                await File.WriteAllTextAsync(file, "one, modified\n", cancellationToken);
+                await File.WriteAllTextAsync(Path.Combine(repo, "staged.txt"), "staged\n", cancellationToken);
+                await Git(repo, "add", "staged.txt");
+                await File.WriteAllTextAsync(Path.Combine(repo, "untracked.txt"), "untracked\n", cancellationToken);
+
+                var before = await Snapshot(tool, "before");
+                (string Path, string Json)? old = previous is null ? null : await Snapshot(previous, "previous");
+
+                await ChangeAndRestore(before.Path, "a snapshot it took");
+                if (old is not null)
+                {
+                    await ChangeAndRestore(old.Value.Path, "a snapshot the previous release took");
+                }
+
+                context.Logger.LogInformation(
+                    "{Tool} restores a changed repository and working tree to its snapshot{Previous}",
+                    ToolCommand,
+                    old is null ? "" : $", and to one {ToolId} {previousTool} took");
+                return repo;
+
+                // Commits everything (so the restore loses nothing), checks out a new branch, moves the tag and deletes a
+                // branch; then restores the snapshot and checks the repository is back as it was.
+                async Task ChangeAndRestore(string snapshot, string what)
+                {
+                    await Git(repo, "add", "--all");
+                    await Git(repo, "commit", "--message", "two");
+                    await Git(repo, "checkout", "--quiet", "-b", "extra");
+                    await File.WriteAllTextAsync(file, "three\n", cancellationToken);
+                    await Git(repo, "commit", "--all", "--message", "three");
+                    await Git(repo, "tag", "--force", "v1");
+                    await Git(repo, "branch", "--delete", "--force", "feature");
+                    if (SameSnapshot(before.Json, (await Snapshot(tool, "changed")).Json))
+                    {
+                        throw new InvalidOperationException($"{ToolCommand} snapshot didn't see the repository change.");
+                    }
+
+                    await Run(tool, ["restore", repo, snapshot]);
+                    if (!SameSnapshot(before.Json, (await Snapshot(tool, "after")).Json))
+                    {
+                        throw new InvalidOperationException($"{ToolCommand} restore of {what} didn't put the repository back as it was.");
+                    }
+
+                    var staged = (await Git(repo, "diff", "--cached", "--name-only")).StandardOutput.Trim();
+                    var status = (await Git(repo, "status", "--porcelain", "--untracked-files=all")).StandardOutput;
+                    if (await File.ReadAllTextAsync(file, cancellationToken) != "one, modified\n"
+                        || staged != "staged.txt"
+                        || !status.Contains("?? untracked.txt", StringComparison.Ordinal))
+                    {
+                        throw new InvalidOperationException($"{ToolCommand} restore of {what} didn't put the working tree back:\n{status}");
+                    }
+                }
+
+                async Task<(string Path, string Json)> Snapshot(string with, string name)
+                {
+                    var path = Path.Combine(work, $"{name}.json");
+                    await Run(with, ["snapshot", repo, "--output", path, "--include-working-tree"]);
+                    return (path, await File.ReadAllTextAsync(path, cancellationToken));
+                }
+            }
+
+            async Task UpgradeAsync()
+            {
+                if (previousTool is null)
+                {
+                    context.Logger.LogInformation("No release before {Version} to upgrade from", version);
+                    return;
+                }
+
+                var upgrade = Path.Combine(work, "upgrade");
+                var upgraded = Path.Combine(upgrade, toolFile);
+                await Dotnet(0, ["tool", "install", ToolId, "--version", previousTool, "--tool-path", upgrade, "--configfile", previousConfig]);
+                await Dotnet(0, ["tool", "update", ToolId, "--version", version, "--tool-path", upgrade, "--configfile", nugetConfig]);
+                CheckToolVersion((await Run(upgraded, ["--version"])).StandardOutput, version);
+
+                await Dotnet(0, ["tool", "uninstall", ToolId, "--tool-path", upgrade]);
+                if (File.Exists(upgraded))
+                {
+                    throw new InvalidOperationException($"dotnet tool uninstall left {upgraded} behind.");
+                }
+
+                context.Logger.LogInformation("{Tool} upgrades from {Previous} to {Version} and uninstalls", ToolId, previousTool, version);
+            }
+
+            // As a team uses it: the version pinned in .config/dotnet-tools.json, restored after a clone.
+            async Task LocalToolAsync()
+            {
+                var local = Path.Combine(work, "local");
+                Directory.CreateDirectory(Path.Combine(local, ".config"));
+                await Write(Path.Combine(local, ".config", "dotnet-tools.json"), ToolManifest(version));
+                await Dotnet(0, ["tool", "restore", "--configfile", nugetConfig], local);
+                CheckToolVersion((await Dotnet(0, ["tool", "run", ToolCommand, "--version"], local)).StandardOutput, version);
+                CheckToolVersion((await Dotnet(0, [ToolCommand, "--version"], local)).StandardOutput, version);
+                context.Logger.LogInformation("{Tool} restores and runs as a local tool", ToolId);
+            }
+
+            // dnx: run without installing.
+            async Task ToolExecAsync()
+            {
+                var output = (await Dotnet(0, ["tool", "exec", $"{ToolId}@{version}", "--configfile", nugetConfig, "--", "--version"])).StandardOutput;
+                CheckToolVersion(output.Split('\n', StringSplitOptions.RemoveEmptyEntries).Last(), version);
+                context.Logger.LogInformation("{Tool} runs with dotnet tool exec (dnx)", ToolId);
+            }
+
+            async Task<string?> PreviousVersionAsync(string id)
+            {
+                using var index = JsonDocument.Parse(await http.GetStringAsync(new Uri($"{previousFeed}/{Lower(id)}/index.json"), cancellationToken));
+                var versions = index.RootElement.GetProperty("versions").EnumerateArray().Select(v => v.GetString()!).ToList();
+                if (settings.Value.SmokeTestAboveReleases && ReleasedAtOrAbove(versions, version) is { } released)
+                {
+                    throw new InvalidOperationException(
+                        $"{id} {version} sorts below the released {released}, so updates and --prerelease never pick it. Raise "
+                        + "<VersionPrefix> in Source/Directory.Build.props above the last release.");
+                }
+
+                var previous = PreviousStable(versions, version);
+                context.Logger.LogInformation("The release of {Id} before {Version}: {Previous}", id, version, previous ?? "none");
+                return previous;
+            }
+
+            async Task<string> DownloadPreviousAsync(string id, string previous)
+            {
+                var path = Path.Combine(work, "previous", $"{id}.{previous}.nupkg");
+                await File.WriteAllBytesAsync(
+                    path,
+                    await http.GetByteArrayAsync(new Uri($"{previousFeed}/{Lower(id)}/{Lower(previous)}/{Lower(id)}.{Lower(previous)}.nupkg"), cancellationToken),
+                    cancellationToken);
+                return path;
+            }
+
+            async Task CheckApiCompatibilityAsync(string current, string previous, string previousVersion)
+            {
+                var apiCompat = Path.Combine(work, "apicompat");
+                await Dotnet(0, ["tool", "install", "Microsoft.DotNet.ApiCompat.Tool", "--tool-path", apiCompat, "--configfile", previousConfig]);
+
+                var result = await context.Shell.Command.ExecuteCommandLineTool(
+                    new GenericCommandLineToolOptions(Path.Combine(apiCompat, OperatingSystem.IsWindows() ? "apicompat.exe" : "apicompat"))
+                    {
+                        Arguments = ["package", current, "--baseline-package", previous],
+                    },
+                    new CommandExecutionOptions { WorkingDirectory = work, ThrowOnNonZeroExitCode = false },
+                    cancellationToken);
+
+                if (result.ExitCode == 0)
+                {
+                    context.Logger.LogInformation("{Library} has no breaking change from {Previous}", LibraryId, previousVersion);
+                    return;
+                }
+
+                string? notes;
+                try
+                {
+                    (_, notes) = Changelog.ReleaseNotes(
+                        await File.ReadAllLinesAsync(Paths.Changelog(context), cancellationToken), ReleaseVersion.Parse(version));
+                }
+                catch (Exception exception) when (exception is InvalidOperationException or ArgumentException)
+                {
+                    notes = null;
+                }
+
+                if (!AllowsBreakingChanges(notes))
+                {
+                    throw new InvalidOperationException(
+                        $"{LibraryId} {version} breaks the API of {previousVersion}. If that is intended, list the breaking "
+                        + $"changes in the version's {Changelog.FileName} section, under a heading like '### Breaking changes':\n"
+                        + result.StandardOutput);
+                }
+
+                context.Logger.LogWarning(
+                    "{Library} {Version} breaks the API of {Previous}, as its changelog says:\n{Output}",
+                    LibraryId,
+                    version,
+                    previousVersion,
+                    result.StandardOutput);
+            }
+
+            async Task CheckDocsAsync(string url, IEnumerable<string> libraryFrameworks, IEnumerable<string> toolFrameworks)
+            {
+                var problems = CheckDocs(PageText(await http.GetStringAsync(new Uri(url), cancellationToken)), libraryFrameworks, toolFrameworks);
+                if (problems.Count > 0)
+                {
+                    throw new InvalidOperationException($"{url} doesn't match the release: {string.Join("; ", problems)}");
+                }
+
+                context.Logger.LogInformation("{Url} matches the release", url);
+            }
+
+            Task<CommandResult> Git(string directory, params string[] arguments) =>
+                context.Shell.Command.ExecuteCommandLineTool(
+                    new GenericCommandLineToolOptions("git") { Arguments = arguments },
+                    new CommandExecutionOptions
+                    {
+                        WorkingDirectory = directory,
+                        EnvironmentVariables = new Dictionary<string, string?>
+                        {
+                            // Left alone by the machine's and the user's git configuration (signing, hooks, defaults).
+                            ["GIT_CONFIG_NOSYSTEM"] = "1",
+                            ["GIT_CONFIG_GLOBAL"] = Path.Combine(work, "gitconfig"),
+                            ["GIT_AUTHOR_NAME"] = "Smoke Test",
+                            ["GIT_AUTHOR_EMAIL"] = "smoke-test@example.invalid",
+                            ["GIT_COMMITTER_NAME"] = "Smoke Test",
+                            ["GIT_COMMITTER_EMAIL"] = "smoke-test@example.invalid",
+                        },
+                    },
+                    cancellationToken);
         }
         finally
         {
@@ -241,12 +518,12 @@ public sealed class SmokeTestModule(IOptions<BuildSettings> settings) : Module<s
         Task Write(string path, string content) =>
             File.WriteAllTextAsync(path, content, new UTF8Encoding(false), cancellationToken);
 
-        Task<CommandResult> Dotnet(int attempt, string[] arguments) =>
+        Task<CommandResult> Dotnet(int attempt, string[] arguments, string? directory = null) =>
             context.Shell.Command.ExecuteCommandLineTool(
                 new GenericCommandLineToolOptions("dotnet") { Arguments = arguments },
                 new CommandExecutionOptions
                 {
-                    WorkingDirectory = work,
+                    WorkingDirectory = directory ?? work,
                     EnvironmentVariables = new Dictionary<string, string?>
                     {
                         // An empty packages folder, so every package is downloaded from the feed.
@@ -254,6 +531,10 @@ public sealed class SmokeTestModule(IOptions<BuildSettings> settings) : Module<s
 
                         // A new HTTP cache on every attempt: NuGet caches "no such version" for 30 minutes.
                         ["NUGET_HTTP_CACHE_PATH"] = Path.Combine(work, $"http-cache-{attempt}"),
+
+                        // Its own .NET CLI home: the machine's would remember local tools from earlier runs
+                        // (toolResolverCache), pointing at packages folders long deleted.
+                        ["DOTNET_CLI_HOME"] = Path.Combine(work, "cli-home"),
                         ["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1",
                         ["DOTNET_NOLOGO"] = "1",
                     },
@@ -324,99 +605,6 @@ public sealed class SmokeTestModule(IOptions<BuildSettings> settings) : Module<s
 
             context.Logger.LogInformation("The symbol server has {Pdb} for {Name}", query.PdbName, name);
             return pdb;
-        }
-
-        async Task RoundTripAsync(string tool)
-        {
-            // A repository of its own, so the round trip can change it freely.
-            var repo = Path.Combine(work, "repository");
-            var file = Path.Combine(repo, "file.txt");
-            Directory.CreateDirectory(repo);
-            await File.WriteAllTextAsync(Path.Combine(work, "gitconfig"), "", cancellationToken);
-
-            await Git(repo, "init", "--initial-branch=main");
-            await File.WriteAllTextAsync(file, "one\n", cancellationToken);
-            await Git(repo, "add", "file.txt");
-            await Git(repo, "commit", "--message", "one");
-            await Git(repo, "tag", "v1");
-            await Git(repo, "branch", "feature");
-            var before = await Snapshot("before");
-
-            // A new branch checked out, a commit on it, a moved tag and a deleted branch.
-            await Git(repo, "checkout", "--quiet", "-b", "extra");
-            await File.WriteAllTextAsync(file, "two\n", cancellationToken);
-            await Git(repo, "commit", "--all", "--message", "two");
-            await Git(repo, "tag", "--force", "v1");
-            await Git(repo, "branch", "--delete", "--force", "feature");
-            if (SameSnapshot(before.Json, (await Snapshot("changed")).Json))
-            {
-                throw new InvalidOperationException($"{ToolCommand} snapshot didn't see the repository change.");
-            }
-
-            await Run(tool, ["restore", repo, before.Path]);
-            if (!SameSnapshot(before.Json, (await Snapshot("after")).Json))
-            {
-                throw new InvalidOperationException($"{ToolCommand} restore didn't put the repository back as the snapshot found it.");
-            }
-
-            if (await File.ReadAllTextAsync(file, cancellationToken) != "one\n")
-            {
-                throw new InvalidOperationException($"{ToolCommand} restore didn't put the working tree back.");
-            }
-
-            context.Logger.LogInformation("{Tool} restores a changed repository to its snapshot", ToolCommand);
-
-            async Task<(string Path, string Json)> Snapshot(string name)
-            {
-                var path = Path.Combine(work, $"{name}.json");
-                await Run(tool, ["snapshot", repo, "--output", path]);
-                return (path, await File.ReadAllTextAsync(path, cancellationToken));
-            }
-
-            Task<CommandResult> Git(string directory, params string[] arguments) =>
-                context.Shell.Command.ExecuteCommandLineTool(
-                    new GenericCommandLineToolOptions("git") { Arguments = arguments },
-                    new CommandExecutionOptions
-                    {
-                        WorkingDirectory = directory,
-                        EnvironmentVariables = new Dictionary<string, string?>
-                        {
-                            // Left alone by the machine's and the user's git configuration (signing, hooks, defaults).
-                            ["GIT_CONFIG_NOSYSTEM"] = "1",
-                            ["GIT_CONFIG_GLOBAL"] = Path.Combine(work, "gitconfig"),
-                            ["GIT_AUTHOR_NAME"] = "Smoke Test",
-                            ["GIT_AUTHOR_EMAIL"] = "smoke-test@example.invalid",
-                            ["GIT_COMMITTER_NAME"] = "Smoke Test",
-                            ["GIT_COMMITTER_EMAIL"] = "smoke-test@example.invalid",
-                        },
-                    },
-                    cancellationToken);
-        }
-
-        async Task UpgradeAsync(JsonElement serviceIndex)
-        {
-            var flat = ServiceResource(serviceIndex, "PackageBaseAddress/3.0.0").TrimEnd('/');
-            using var index = JsonDocument.Parse(await http.GetStringAsync(new Uri($"{flat}/{Lower(ToolId)}/index.json"), cancellationToken));
-            var previous = PreviousStable(index.RootElement.GetProperty("versions").EnumerateArray().Select(v => v.GetString()!), version);
-            if (previous is null)
-            {
-                context.Logger.LogInformation("No stable version before {Version} to upgrade from", version);
-                return;
-            }
-
-            var upgrade = Path.Combine(work, "upgrade");
-            var tool = Path.Combine(upgrade, OperatingSystem.IsWindows() ? ToolCommand + ".exe" : ToolCommand);
-            await Dotnet(0, ["tool", "install", ToolId, "--version", previous, "--tool-path", upgrade, "--configfile", Path.Combine(work, "nuget.config")]);
-            await Dotnet(0, ["tool", "update", ToolId, "--version", version, "--tool-path", upgrade, "--configfile", Path.Combine(work, "nuget.config")]);
-            CheckToolVersion((await Run(tool, ["--version"])).StandardOutput, version);
-
-            await Dotnet(0, ["tool", "uninstall", ToolId, "--tool-path", upgrade]);
-            if (File.Exists(tool))
-            {
-                throw new InvalidOperationException($"dotnet tool uninstall left {tool} behind.");
-            }
-
-            context.Logger.LogInformation("{Tool} upgrades from {Previous} to {Version} and uninstalls", ToolId, previous, version);
         }
 
         async Task AuditAsync(string name, IEnumerable<KeyValuePair<string, string>> audited)
