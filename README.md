@@ -34,6 +34,12 @@ The pipeline is written with [ModularPipelines](https://github.com/thomhurst/Mod
 | `NuGetApiKey` | none | Pushes the package when set; otherwise the push is skipped |
 | `NuGetSource` | GitHub Packages | Feed to push to |
 
+The pipeline also generates `THIRD-PARTY-NOTICES.txt` from each project's restore graph: one next to the console app
+in the publish directory, covering every package the app ships, and one inside the NuGet package, covering the
+packages compiled into the library (Polyfill). License texts come from the packages themselves; a package whose
+license has no text there (an expression other than MIT, or none) fails the build until its text is added to
+`pipeline/GitSnapshotter.Pipeline/ThirdPartyNotices.cs`.
+
 Package versions live in `Directory.Packages.props`, and each project's resolved package graph is recorded in its
 `packages.lock.json`. A normal restore updates the lock files; commit them with the version change. CI (and the
 pre-push hook) restore in locked mode and fail if a lock file is out of date.
