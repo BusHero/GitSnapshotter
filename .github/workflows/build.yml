@@ -13,6 +13,10 @@ on:
       - 'build.sh'
       - 'build.cmd'
 
+# Least privilege by default; jobs that need more ask for it explicitly.
+permissions:
+  contents: read
+
 jobs:
   # .NET Framework tests only run on Windows; this job runs every test framework there.
   windows-latest:
@@ -52,6 +56,10 @@ jobs:
     name: ubuntu-latest
     needs: windows-latest
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # The pipeline pushes the package to GitHub Packages with GITHUB_TOKEN.
+      packages: write
     steps:
       - uses: actions/checkout@v7
 
