@@ -10,5 +10,11 @@
     <PackageIcon>icon.png</PackageIcon>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/BusHero/GitSnapshotter.git</RepositoryUrl>
+    <!-- SourceLink (built into the SDK): record the repository in the package and embed generated sources. -->
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <!-- A .snupkg symbol package next to each .nupkg; nuget.org serves it to debuggers. -->
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
 </Project>

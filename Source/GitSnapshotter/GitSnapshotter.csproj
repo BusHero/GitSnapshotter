@@ -2,7 +2,6 @@
 
     <PropertyGroup>
         <TargetFrameworks>net8.0;net472</TargetFrameworks>
-        <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <!-- Polyfill: include ArgumentNullException.ThrowIfNull and friends on .NET Framework. -->
         <PolyArgumentExceptions>true</PolyArgumentExceptions>
     </PropertyGroup>
@@ -11,10 +10,15 @@
         <PackageId>GitSnapshotter</PackageId>
         <Description>Take a snapshot of a git repository's branches, tags, remotes, HEAD and (optionally) working tree, and restore it later.</Description>
         <PackageTags>git;snapshot;restore;libgit2sharp;testing</PackageTags>
+        <!-- Checks the package's target frameworks agree. Once 1.0.0 ships, set PackageValidationBaselineVersion
+             to it so pack also fails on breaking changes against that release. -->
+        <EnablePackageValidation>true</EnablePackageValidation>
     </PropertyGroup>
 
     <ItemGroup>
       <PackageReference Include="LibGit2Sharp" />
+      <!-- Tracks the public API in PublicAPI.Shipped.txt and PublicAPI.Unshipped.txt (RS0016, RS0017). -->
+      <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" PrivateAssets="all" />
     </ItemGroup>
     <!-- .NET Framework needs polyfills for newer C# and BCL features, and System.Text.Json as a package. -->
     <ItemGroup Condition="'$(TargetFramework)' == 'net472'">

@@ -1,0 +1,206 @@
+#nullable enable
+GitSnapshotter.Branch
+GitSnapshotter.Branch.<Clone>$() -> GitSnapshotter.Branch!
+GitSnapshotter.Branch.Branch() -> void
+GitSnapshotter.Branch.Deconstruct(out string! name, out string! tip) -> void
+GitSnapshotter.Branch.Equals(GitSnapshotter.Branch? other) -> bool
+GitSnapshotter.Branch.Name.get -> string!
+GitSnapshotter.Branch.Name.init -> void
+GitSnapshotter.Branch.RemoteName.get -> string?
+GitSnapshotter.Branch.RemoteName.init -> void
+GitSnapshotter.Branch.Tip.get -> string!
+GitSnapshotter.Branch.Tip.init -> void
+GitSnapshotter.Branch.TrackedBranch.get -> string?
+GitSnapshotter.Branch.TrackedBranch.init -> void
+GitSnapshotter.Branch.UpstreamBranch.get -> string?
+GitSnapshotter.Branch.UpstreamBranch.init -> void
+GitSnapshotter.ChangeCategory
+GitSnapshotter.ChangeCategory.Branch = 1 -> GitSnapshotter.ChangeCategory
+GitSnapshotter.ChangeCategory.Head = 0 -> GitSnapshotter.ChangeCategory
+GitSnapshotter.ChangeCategory.Reference = 6 -> GitSnapshotter.ChangeCategory
+GitSnapshotter.ChangeCategory.Remote = 3 -> GitSnapshotter.ChangeCategory
+GitSnapshotter.ChangeCategory.RemoteBranch = 4 -> GitSnapshotter.ChangeCategory
+GitSnapshotter.ChangeCategory.Tag = 5 -> GitSnapshotter.ChangeCategory
+GitSnapshotter.ChangeCategory.Upstream = 2 -> GitSnapshotter.ChangeCategory
+GitSnapshotter.ChangeCategory.WorkingTree = 7 -> GitSnapshotter.ChangeCategory
+GitSnapshotter.GitRepository
+GitSnapshotter.GitRepositorySnapshot
+GitSnapshotter.GitRepositorySnapshot.<Clone>$() -> GitSnapshotter.GitRepositorySnapshot!
+GitSnapshotter.GitRepositorySnapshot.Branches.get -> System.Collections.Generic.IReadOnlyList<GitSnapshotter.Branch!>!
+GitSnapshotter.GitRepositorySnapshot.Branches.init -> void
+GitSnapshotter.GitRepositorySnapshot.Equals(GitSnapshotter.GitRepositorySnapshot? other) -> bool
+GitSnapshotter.GitRepositorySnapshot.GitRepositorySnapshot() -> void
+GitSnapshotter.GitRepositorySnapshot.Head.get -> string!
+GitSnapshotter.GitRepositorySnapshot.Head.init -> void
+GitSnapshotter.GitRepositorySnapshot.IsHeadDetached.get -> bool
+GitSnapshotter.GitRepositorySnapshot.IsHeadDetached.init -> void
+GitSnapshotter.GitRepositorySnapshot.References.get -> System.Collections.Generic.Dictionary<string!, string!>!
+GitSnapshotter.GitRepositorySnapshot.References.init -> void
+GitSnapshotter.GitRepositorySnapshot.Remotes.get -> System.Collections.Generic.IReadOnlyList<GitSnapshotter.Remote!>!
+GitSnapshotter.GitRepositorySnapshot.Remotes.init -> void
+GitSnapshotter.GitRepositorySnapshot.Save(string! path) -> void
+GitSnapshotter.GitRepositorySnapshot.Tags.get -> System.Collections.Generic.IReadOnlyList<GitSnapshotter.Tag!>!
+GitSnapshotter.GitRepositorySnapshot.Tags.init -> void
+GitSnapshotter.GitRepositorySnapshot.ToJson() -> string!
+GitSnapshotter.GitRepositorySnapshot.WorkingTree.get -> GitSnapshotter.WorkingTreeState?
+GitSnapshotter.GitRepositorySnapshot.WorkingTree.init -> void
+GitSnapshotter.GitSnapshotterException
+GitSnapshotter.GitSnapshotterException.GitSnapshotterException() -> void
+GitSnapshotter.GitSnapshotterException.GitSnapshotterException(string! message) -> void
+GitSnapshotter.GitSnapshotterException.GitSnapshotterException(string! message, System.Exception! innerException) -> void
+GitSnapshotter.MissingObjectsException
+GitSnapshotter.MissingObjectsException.MissingObjects.get -> System.Collections.Generic.IReadOnlyList<string!>!
+GitSnapshotter.MissingObjectsException.MissingObjectsException() -> void
+GitSnapshotter.MissingObjectsException.MissingObjectsException(string! message) -> void
+GitSnapshotter.MissingObjectsException.MissingObjectsException(string! message, System.Exception! innerException) -> void
+GitSnapshotter.MissingObjectsException.MissingObjectsException(System.Collections.Generic.IReadOnlyList<string!>! missingObjects) -> void
+GitSnapshotter.Remote
+GitSnapshotter.Remote.<Clone>$() -> GitSnapshotter.Remote!
+GitSnapshotter.Remote.Branches.get -> System.Collections.Generic.Dictionary<string!, string!>!
+GitSnapshotter.Remote.Branches.init -> void
+GitSnapshotter.Remote.Equals(GitSnapshotter.Remote? other) -> bool
+GitSnapshotter.Remote.Head.get -> string?
+GitSnapshotter.Remote.Head.init -> void
+GitSnapshotter.Remote.Name.get -> string!
+GitSnapshotter.Remote.Name.init -> void
+GitSnapshotter.Remote.Remote() -> void
+GitSnapshotter.Remote.Url.get -> System.Uri!
+GitSnapshotter.Remote.Url.init -> void
+GitSnapshotter.RestoreOptions
+GitSnapshotter.RestoreOptions.<Clone>$() -> GitSnapshotter.RestoreOptions!
+GitSnapshotter.RestoreOptions.Branches.get -> bool
+GitSnapshotter.RestoreOptions.Branches.init -> void
+GitSnapshotter.RestoreOptions.Equals(GitSnapshotter.RestoreOptions? other) -> bool
+GitSnapshotter.RestoreOptions.Force.get -> bool
+GitSnapshotter.RestoreOptions.Force.init -> void
+GitSnapshotter.RestoreOptions.Head.get -> bool
+GitSnapshotter.RestoreOptions.Head.init -> void
+GitSnapshotter.RestoreOptions.References.get -> bool
+GitSnapshotter.RestoreOptions.References.init -> void
+GitSnapshotter.RestoreOptions.Remotes.get -> bool
+GitSnapshotter.RestoreOptions.Remotes.init -> void
+GitSnapshotter.RestoreOptions.RestoreOptions() -> void
+GitSnapshotter.RestoreOptions.Tags.get -> bool
+GitSnapshotter.RestoreOptions.Tags.init -> void
+GitSnapshotter.RestoreOptions.WorkingTree.get -> bool
+GitSnapshotter.RestoreOptions.WorkingTree.init -> void
+GitSnapshotter.SnapshotChange
+GitSnapshotter.SnapshotChange.<Clone>$() -> GitSnapshotter.SnapshotChange!
+GitSnapshotter.SnapshotChange.After.get -> string?
+GitSnapshotter.SnapshotChange.After.init -> void
+GitSnapshotter.SnapshotChange.Before.get -> string?
+GitSnapshotter.SnapshotChange.Before.init -> void
+GitSnapshotter.SnapshotChange.Category.get -> GitSnapshotter.ChangeCategory
+GitSnapshotter.SnapshotChange.Category.init -> void
+GitSnapshotter.SnapshotChange.Deconstruct(out GitSnapshotter.SnapshotChangeKind Kind, out GitSnapshotter.ChangeCategory Category, out string! Name, out string? Before, out string? After) -> void
+GitSnapshotter.SnapshotChange.Equals(GitSnapshotter.SnapshotChange? other) -> bool
+GitSnapshotter.SnapshotChange.Kind.get -> GitSnapshotter.SnapshotChangeKind
+GitSnapshotter.SnapshotChange.Kind.init -> void
+GitSnapshotter.SnapshotChange.Name.get -> string!
+GitSnapshotter.SnapshotChange.Name.init -> void
+GitSnapshotter.SnapshotChange.SnapshotChange(GitSnapshotter.SnapshotChangeKind Kind, GitSnapshotter.ChangeCategory Category, string! Name, string? Before, string? After) -> void
+GitSnapshotter.SnapshotChangeKind
+GitSnapshotter.SnapshotChangeKind.Added = 0 -> GitSnapshotter.SnapshotChangeKind
+GitSnapshotter.SnapshotChangeKind.Modified = 2 -> GitSnapshotter.SnapshotChangeKind
+GitSnapshotter.SnapshotChangeKind.Removed = 1 -> GitSnapshotter.SnapshotChangeKind
+GitSnapshotter.SnapshotDiff
+GitSnapshotter.SnapshotDiff.<Clone>$() -> GitSnapshotter.SnapshotDiff!
+GitSnapshotter.SnapshotDiff.Changes.get -> System.Collections.Generic.IReadOnlyList<GitSnapshotter.SnapshotChange!>!
+GitSnapshotter.SnapshotDiff.Equals(GitSnapshotter.SnapshotDiff? other) -> bool
+GitSnapshotter.SnapshotDiff.HasChanges.get -> bool
+GitSnapshotter.SnapshotOptions
+GitSnapshotter.SnapshotOptions.<Clone>$() -> GitSnapshotter.SnapshotOptions!
+GitSnapshotter.SnapshotOptions.Equals(GitSnapshotter.SnapshotOptions? other) -> bool
+GitSnapshotter.SnapshotOptions.IncludeWorkingTree.get -> bool
+GitSnapshotter.SnapshotOptions.IncludeWorkingTree.init -> void
+GitSnapshotter.SnapshotOptions.SnapshotOptions() -> void
+GitSnapshotter.SnapshotScope
+GitSnapshotter.SnapshotScope.Dispose() -> void
+GitSnapshotter.SnapshotScope.Snapshot.get -> GitSnapshotter.GitRepositorySnapshot!
+GitSnapshotter.Tag
+GitSnapshotter.Tag.<Clone>$() -> GitSnapshotter.Tag!
+GitSnapshotter.Tag.AnnotationSha.get -> string?
+GitSnapshotter.Tag.AnnotationSha.init -> void
+GitSnapshotter.Tag.Deconstruct(out string! name, out string! target) -> void
+GitSnapshotter.Tag.Deconstruct(out string! name, out string! target, out string? message) -> void
+GitSnapshotter.Tag.Equals(GitSnapshotter.Tag? other) -> bool
+GitSnapshotter.Tag.Message.get -> string?
+GitSnapshotter.Tag.Message.init -> void
+GitSnapshotter.Tag.Name.get -> string!
+GitSnapshotter.Tag.Name.init -> void
+GitSnapshotter.Tag.Tag() -> void
+GitSnapshotter.Tag.Target.get -> string!
+GitSnapshotter.Tag.Target.init -> void
+GitSnapshotter.UncommittedChangesException
+GitSnapshotter.UncommittedChangesException.Paths.get -> System.Collections.Generic.IReadOnlyList<string!>!
+GitSnapshotter.UncommittedChangesException.UncommittedChangesException() -> void
+GitSnapshotter.UncommittedChangesException.UncommittedChangesException(string! message) -> void
+GitSnapshotter.UncommittedChangesException.UncommittedChangesException(string! message, System.Exception! innerException) -> void
+GitSnapshotter.UncommittedChangesException.UncommittedChangesException(System.Collections.Generic.IReadOnlyList<string!>! paths) -> void
+GitSnapshotter.WorkingTreeState
+GitSnapshotter.WorkingTreeState.<Clone>$() -> GitSnapshotter.WorkingTreeState!
+GitSnapshotter.WorkingTreeState.Equals(GitSnapshotter.WorkingTreeState? other) -> bool
+GitSnapshotter.WorkingTreeState.IndexTree.get -> string!
+GitSnapshotter.WorkingTreeState.IndexTree.init -> void
+GitSnapshotter.WorkingTreeState.WorkingDirectoryTree.get -> string!
+GitSnapshotter.WorkingTreeState.WorkingDirectoryTree.init -> void
+GitSnapshotter.WorkingTreeState.WorkingTreeState() -> void
+override GitSnapshotter.Branch.Equals(object? obj) -> bool
+override GitSnapshotter.Branch.GetHashCode() -> int
+override GitSnapshotter.Branch.ToString() -> string!
+override GitSnapshotter.GitRepositorySnapshot.Equals(object? obj) -> bool
+override GitSnapshotter.GitRepositorySnapshot.GetHashCode() -> int
+override GitSnapshotter.GitRepositorySnapshot.ToString() -> string!
+override GitSnapshotter.Remote.Equals(object? obj) -> bool
+override GitSnapshotter.Remote.GetHashCode() -> int
+override GitSnapshotter.Remote.ToString() -> string!
+override GitSnapshotter.RestoreOptions.Equals(object? obj) -> bool
+override GitSnapshotter.RestoreOptions.GetHashCode() -> int
+override GitSnapshotter.RestoreOptions.ToString() -> string!
+override GitSnapshotter.SnapshotChange.Equals(object? obj) -> bool
+override GitSnapshotter.SnapshotChange.GetHashCode() -> int
+override GitSnapshotter.SnapshotChange.ToString() -> string!
+override GitSnapshotter.SnapshotDiff.Equals(object? obj) -> bool
+override GitSnapshotter.SnapshotDiff.GetHashCode() -> int
+override GitSnapshotter.SnapshotDiff.ToString() -> string!
+override GitSnapshotter.SnapshotOptions.Equals(object? obj) -> bool
+override GitSnapshotter.SnapshotOptions.GetHashCode() -> int
+override GitSnapshotter.SnapshotOptions.ToString() -> string!
+override GitSnapshotter.Tag.Equals(object? obj) -> bool
+override GitSnapshotter.Tag.GetHashCode() -> int
+override GitSnapshotter.Tag.ToString() -> string!
+override GitSnapshotter.WorkingTreeState.Equals(object? obj) -> bool
+override GitSnapshotter.WorkingTreeState.GetHashCode() -> int
+override GitSnapshotter.WorkingTreeState.ToString() -> string!
+static GitSnapshotter.Branch.operator !=(GitSnapshotter.Branch? left, GitSnapshotter.Branch? right) -> bool
+static GitSnapshotter.Branch.operator ==(GitSnapshotter.Branch? left, GitSnapshotter.Branch? right) -> bool
+static GitSnapshotter.GitRepository.GetSnapshot(LibGit2Sharp.IRepository! repository) -> GitSnapshotter.GitRepositorySnapshot!
+static GitSnapshotter.GitRepository.GetSnapshot(LibGit2Sharp.IRepository! repository, GitSnapshotter.SnapshotOptions? options) -> GitSnapshotter.GitRepositorySnapshot!
+static GitSnapshotter.GitRepository.GetSnapshot(string! pathToRepository) -> GitSnapshotter.GitRepositorySnapshot!
+static GitSnapshotter.GitRepository.GetSnapshot(string! pathToRepository, GitSnapshotter.SnapshotOptions? options) -> GitSnapshotter.GitRepositorySnapshot!
+static GitSnapshotter.GitRepository.Preserve(string! pathToRepository, GitSnapshotter.SnapshotOptions? snapshotOptions = null, GitSnapshotter.RestoreOptions? restoreOptions = null) -> GitSnapshotter.SnapshotScope!
+static GitSnapshotter.GitRepository.Restore(LibGit2Sharp.IRepository! repository, GitSnapshotter.GitRepositorySnapshot! snapshot) -> void
+static GitSnapshotter.GitRepository.Restore(LibGit2Sharp.IRepository! repository, GitSnapshotter.GitRepositorySnapshot! snapshot, GitSnapshotter.RestoreOptions? options) -> void
+static GitSnapshotter.GitRepository.Restore(string! pathToRepository, GitSnapshotter.GitRepositorySnapshot! snapshot) -> void
+static GitSnapshotter.GitRepository.Restore(string! pathToRepository, GitSnapshotter.GitRepositorySnapshot! snapshot, GitSnapshotter.RestoreOptions? options) -> void
+static GitSnapshotter.GitRepositorySnapshot.FromJson(string! json) -> GitSnapshotter.GitRepositorySnapshot!
+static GitSnapshotter.GitRepositorySnapshot.Load(string! path) -> GitSnapshotter.GitRepositorySnapshot!
+static GitSnapshotter.GitRepositorySnapshot.operator !=(GitSnapshotter.GitRepositorySnapshot? left, GitSnapshotter.GitRepositorySnapshot? right) -> bool
+static GitSnapshotter.GitRepositorySnapshot.operator ==(GitSnapshotter.GitRepositorySnapshot? left, GitSnapshotter.GitRepositorySnapshot? right) -> bool
+static GitSnapshotter.Remote.operator !=(GitSnapshotter.Remote? left, GitSnapshotter.Remote? right) -> bool
+static GitSnapshotter.Remote.operator ==(GitSnapshotter.Remote? left, GitSnapshotter.Remote? right) -> bool
+static GitSnapshotter.RestoreOptions.Default.get -> GitSnapshotter.RestoreOptions!
+static GitSnapshotter.RestoreOptions.operator !=(GitSnapshotter.RestoreOptions? left, GitSnapshotter.RestoreOptions? right) -> bool
+static GitSnapshotter.RestoreOptions.operator ==(GitSnapshotter.RestoreOptions? left, GitSnapshotter.RestoreOptions? right) -> bool
+static GitSnapshotter.SnapshotChange.operator !=(GitSnapshotter.SnapshotChange? left, GitSnapshotter.SnapshotChange? right) -> bool
+static GitSnapshotter.SnapshotChange.operator ==(GitSnapshotter.SnapshotChange? left, GitSnapshotter.SnapshotChange? right) -> bool
+static GitSnapshotter.SnapshotDiff.Compare(GitSnapshotter.GitRepositorySnapshot! before, GitSnapshotter.GitRepositorySnapshot! after) -> GitSnapshotter.SnapshotDiff!
+static GitSnapshotter.SnapshotDiff.operator !=(GitSnapshotter.SnapshotDiff? left, GitSnapshotter.SnapshotDiff? right) -> bool
+static GitSnapshotter.SnapshotDiff.operator ==(GitSnapshotter.SnapshotDiff? left, GitSnapshotter.SnapshotDiff? right) -> bool
+static GitSnapshotter.SnapshotOptions.Default.get -> GitSnapshotter.SnapshotOptions!
+static GitSnapshotter.SnapshotOptions.operator !=(GitSnapshotter.SnapshotOptions? left, GitSnapshotter.SnapshotOptions? right) -> bool
+static GitSnapshotter.SnapshotOptions.operator ==(GitSnapshotter.SnapshotOptions? left, GitSnapshotter.SnapshotOptions? right) -> bool
+static GitSnapshotter.Tag.operator !=(GitSnapshotter.Tag? left, GitSnapshotter.Tag? right) -> bool
+static GitSnapshotter.Tag.operator ==(GitSnapshotter.Tag? left, GitSnapshotter.Tag? right) -> bool
+static GitSnapshotter.WorkingTreeState.operator !=(GitSnapshotter.WorkingTreeState? left, GitSnapshotter.WorkingTreeState? right) -> bool
+static GitSnapshotter.WorkingTreeState.operator ==(GitSnapshotter.WorkingTreeState? left, GitSnapshotter.WorkingTreeState? right) -> bool

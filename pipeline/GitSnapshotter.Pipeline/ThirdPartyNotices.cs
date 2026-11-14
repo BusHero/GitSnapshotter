@@ -70,6 +70,7 @@ internal static class ThirdPartyNotices
     /// <param name="assetsFile">The project's <c>obj/project.assets.json</c>; the project must be restored.</param>
     /// <param name="shippedAssets">The asset kinds that count as shipped, e.g. <see cref="AppAssets"/>.</param>
     /// <param name="outputFile">Where to write the notices.</param>
+    /// <param name="cancellationToken">Cancels reading the restore graph and writing the file.</param>
     /// <returns>The IDs and versions of the packages listed.</returns>
     public static async Task<IReadOnlyList<string>> WriteAsync(
         string product,

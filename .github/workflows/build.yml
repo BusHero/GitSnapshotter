@@ -208,20 +208,24 @@ jobs:
           Build__NuGetApiKey: ${{ needs.verify.outputs.release != 'true' && secrets.GITHUB_TOKEN || '' }}
         run: dotnet run --project pipeline/GitSnapshotter.Pipeline --configuration Release
 
-      # PackModule and PublishConsoleModule share the publish directory; the packages (library and tool) get their own artifact.
+      # PackModule and PublishConsoleModule share the publish directory; the packages (library and tool) and their
+      # symbol packages get their own artifact.
       - uses: actions/upload-artifact@v7
         with:
           name: GitSnapshotter.Console_${{ steps.pipeline.outputs.version }}
           path: |
             publish
             !publish/*.nupkg
+            !publish/*.snupkg
 
       - uses: actions/upload-artifact@v7
         with:
           name: GitSnapshotter.NuGet_${{ steps.pipeline.outputs.version }}
-          path: publish/*.nupkg
+          path: |
+            publish/*.nupkg
+            publish/*.snupkg
           if-no-files-found: error
-          # A .nupkg is already a zip archive.
+          # A .nupkg (and .snupkg) is already a zip archive.
           compression-level: 0
 
       - name: 'Assemble release assets'
@@ -230,8 +234,8 @@ jobs:
           VERSION: ${{ needs.verify.outputs.version }}
         run: |
           mkdir release
-          cp publish/*.nupkg release/
-          (cd publish && zip -r -q "../release/GitSnapshotter.Console_${VERSION}.zip" . -x '*.nupkg')
+          cp publish/*.nupkg publish/*.snupkg release/
+          (cd publish && zip -r -q "../release/GitSnapshotter.Console_${VERSION}.zip" . -x '*.nupkg' '*.snupkg')
           (cd release && sha256sum * > SHA256SUMS.txt)
           ls -l release
 
@@ -296,6 +300,7 @@ jobs:
         with:
           user: bus1hero
 
+      # dotnet nuget push also pushes each package's .snupkg from the same folder to nuget.org's symbol server.
       - name: 'Push packages to nuget.org'
         env:
           NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}

@@ -7,6 +7,8 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net11.0</TargetFramework>
+    <!-- Not a library: no XML docs required on public members. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
     <RootNamespace>GitSnapshotter.Console</RootNamespace>
     <!-- Run on newer runtimes too, so a machine with only a later .NET can still use the tool. -->
     <RollForward>Major</RollForward>

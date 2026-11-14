@@ -15,8 +15,10 @@ not change the same repository at the same time.
 ## GetSnapshot
 
 ```csharp
-public static GitRepositorySnapshot GetSnapshot(string pathToRepository, SnapshotOptions? options = null);
-public static GitRepositorySnapshot GetSnapshot(IRepository repository, SnapshotOptions? options = null);
+public static GitRepositorySnapshot GetSnapshot(string pathToRepository);
+public static GitRepositorySnapshot GetSnapshot(string pathToRepository, SnapshotOptions? options);
+public static GitRepositorySnapshot GetSnapshot(IRepository repository);
+public static GitRepositorySnapshot GetSnapshot(IRepository repository, SnapshotOptions? options);
 ```
 
 Takes a snapshot of the repository at `pathToRepository`, or of an open LibGit2Sharp repository.
@@ -41,8 +43,10 @@ See [Taking snapshots](/GitSnapshotter/library/taking-snapshots/).
 ## Restore
 
 ```csharp
-public static void Restore(string pathToRepository, GitRepositorySnapshot snapshot, RestoreOptions? options = null);
-public static void Restore(IRepository repository, GitRepositorySnapshot snapshot, RestoreOptions? options = null);
+public static void Restore(string pathToRepository, GitRepositorySnapshot snapshot);
+public static void Restore(string pathToRepository, GitRepositorySnapshot snapshot, RestoreOptions? options);
+public static void Restore(IRepository repository, GitRepositorySnapshot snapshot);
+public static void Restore(IRepository repository, GitRepositorySnapshot snapshot, RestoreOptions? options);
 ```
 
 Restores the repository to `snapshot`.

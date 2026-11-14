@@ -8,9 +8,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <CodeAnalysisTreatWarningsAsErrors>true</CodeAnalysisTreatWarningsAsErrors>
     <MSBuildTreatWarningsAsErrors>true</MSBuildTreatWarningsAsErrors>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <!-- Needed for IDE0005 (unused usings) to run on build. Projects other than the library opt out of CS1591. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- Compiler strict mode: reports a few cases the compiler otherwise accepts. -->
+    <Features>strict</Features>
     <AnalysisLevel>latest-all</AnalysisLevel>
     <NuGetAudit>true</NuGetAudit>
     <NuGetAuditLevel>low</NuGetAuditLevel>

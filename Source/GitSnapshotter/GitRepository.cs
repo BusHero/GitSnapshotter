@@ -9,16 +9,26 @@ public static class GitRepository
     private const string TagsPrefix = "refs/tags/";
     private const string RemotesPrefix = "refs/remotes/";
 
+    /// <summary>Takes a snapshot of the repository at <paramref name="pathToRepository"/> with the default options.</summary>
+    public static GitRepositorySnapshot GetSnapshot(string pathToRepository) => GetSnapshot(pathToRepository, null);
+
     /// <summary>Takes a snapshot of the repository at <paramref name="pathToRepository"/>.</summary>
-    public static GitRepositorySnapshot GetSnapshot(string pathToRepository, SnapshotOptions? options = null)
+    /// <param name="pathToRepository">The repository's working directory or <c>.git</c> directory.</param>
+    /// <param name="options">What to capture; <c>null</c> means <see cref="SnapshotOptions.Default"/>.</param>
+    public static GitRepositorySnapshot GetSnapshot(string pathToRepository, SnapshotOptions? options)
     {
         using var repository = new Repository(pathToRepository);
 
         return GetSnapshot(repository, options);
     }
 
+    /// <summary>Takes a snapshot of an open repository with the default options.</summary>
+    public static GitRepositorySnapshot GetSnapshot(IRepository repository) => GetSnapshot(repository, null);
+
     /// <summary>Takes a snapshot of an open repository.</summary>
-    public static GitRepositorySnapshot GetSnapshot(IRepository repository, SnapshotOptions? options = null)
+    /// <param name="repository">The repository.</param>
+    /// <param name="options">What to capture; <c>null</c> means <see cref="SnapshotOptions.Default"/>.</param>
+    public static GitRepositorySnapshot GetSnapshot(IRepository repository, SnapshotOptions? options)
     {
         ArgumentNullException.ThrowIfNull(repository);
 
@@ -91,26 +101,46 @@ public static class GitRepository
         return new SnapshotScope(pathToRepository, snapshot, restoreOptions ?? RestoreOptions.Default);
     }
 
+    /// <summary>
+    /// Restores the repository at <paramref name="pathToRepository"/> to <paramref name="snapshot"/> with the default options.
+    /// </summary>
+    /// <exception cref="MissingObjectsException">The snapshot refers to objects the repository no longer has. Nothing was changed.</exception>
+    /// <exception cref="UncommittedChangesException">The restore would overwrite uncommitted changes. Nothing was changed.</exception>
+    public static void Restore(string pathToRepository, GitRepositorySnapshot snapshot) =>
+        Restore(pathToRepository, snapshot, null);
+
     /// <summary>Restores the repository at <paramref name="pathToRepository"/> to <paramref name="snapshot"/>.</summary>
+    /// <param name="pathToRepository">The repository's working directory or <c>.git</c> directory.</param>
+    /// <param name="snapshot">The snapshot to restore.</param>
+    /// <param name="options">What to restore; <c>null</c> means <see cref="RestoreOptions.Default"/>.</param>
     /// <exception cref="MissingObjectsException">The snapshot refers to objects the repository no longer has. Nothing was changed.</exception>
     /// <exception cref="UncommittedChangesException">The restore would overwrite uncommitted changes. Nothing was changed.</exception>
     public static void Restore(
         string pathToRepository,
         GitRepositorySnapshot snapshot,
-        RestoreOptions? options = null)
+        RestoreOptions? options)
     {
         using var repository = new Repository(pathToRepository);
 
         Restore(repository, snapshot, options);
     }
 
+    /// <summary>Restores an open repository to <paramref name="snapshot"/> with the default options.</summary>
+    /// <exception cref="MissingObjectsException">The snapshot refers to objects the repository no longer has. Nothing was changed.</exception>
+    /// <exception cref="UncommittedChangesException">The restore would overwrite uncommitted changes. Nothing was changed.</exception>
+    public static void Restore(IRepository repository, GitRepositorySnapshot snapshot) =>
+        Restore(repository, snapshot, null);
+
     /// <summary>Restores an open repository to <paramref name="snapshot"/>.</summary>
+    /// <param name="repository">The repository.</param>
+    /// <param name="snapshot">The snapshot to restore.</param>
+    /// <param name="options">What to restore; <c>null</c> means <see cref="RestoreOptions.Default"/>.</param>
     /// <exception cref="MissingObjectsException">The snapshot refers to objects the repository no longer has. Nothing was changed.</exception>
     /// <exception cref="UncommittedChangesException">The restore would overwrite uncommitted changes. Nothing was changed.</exception>
     public static void Restore(
         IRepository repository,
         GitRepositorySnapshot snapshot,
-        RestoreOptions? options = null)
+        RestoreOptions? options)
     {
         ArgumentNullException.ThrowIfNull(repository);
         ArgumentNullException.ThrowIfNull(snapshot);

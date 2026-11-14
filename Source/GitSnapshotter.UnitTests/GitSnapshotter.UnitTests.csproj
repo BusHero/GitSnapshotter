@@ -2,6 +2,8 @@
 
     <PropertyGroup>
         <TargetFrameworks>net8.0;net11.0;net472</TargetFrameworks>
+        <!-- Not a library: no XML docs required on public members. -->
+        <NoWarn>$(NoWarn);CS1591</NoWarn>
         <IsPackable>false</IsPackable>
     </PropertyGroup>
 

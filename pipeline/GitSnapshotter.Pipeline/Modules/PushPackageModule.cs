@@ -39,6 +39,8 @@ public sealed class PushPackageModule(IOptions<BuildSettings> settings) : Module
                 Source = settings.Value.NuGetSource,
                 ApiKey = settings.Value.NuGetApiKey,
                 SkipDuplicate = true,
+                // GitHub Packages has no symbol server; the .snupkg files go to nuget.org with releases.
+                NoSymbols = true,
             },
             cancellationToken: cancellationToken);
     }
