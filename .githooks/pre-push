@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
-# Runs the test suite before anything is pushed to trunk, because every push to
-# trunk publishes a prerelease NuGet package.
+# Checks formatting before every push, because the build fails on format
+# violations (.editorconfig). Also runs the test suite before anything is
+# pushed to trunk, because every push to trunk publishes a prerelease NuGet package.
 #
 # Enable once per clone:   git config core.hooksPath .githooks
 # Skip in an emergency:    git push --no-verify
 #
-# The commit being pushed is tested in a clean temporary worktree, so
+# The commit being pushed is checked in a clean temporary worktree, so
 # uncommitted local changes can't make a broken commit look green.
+# Fix formatting with:    dotnet format Source/GitSnapshotter.slnx
 
 set -euo pipefail
 
@@ -15,9 +17,15 @@ zero_sha="0000000000000000000000000000000000000000"
 repo_root="$(git rev-parse --show-toplevel)"
 
 shas=()
+trunk_shas=" "
 while read -r local_ref local_sha remote_ref remote_sha; do
-    if [[ "$remote_ref" == "$protected_ref" && "$local_sha" != "$zero_sha" ]]; then
-        shas+=("$local_sha")
+    # Deleting a remote branch pushes no commit, so there is nothing to check.
+    if [[ "$local_sha" == "$zero_sha" ]]; then
+        continue
+    fi
+    shas+=("$local_sha")
+    if [[ "$remote_ref" == "$protected_ref" ]]; then
+        trunk_shas+="$local_sha "
     fi
 done
 
@@ -29,8 +37,23 @@ for sha in "${shas[@]}"; do
     worktree="$(mktemp -d "${TMPDIR:-/tmp}/gitsnapshotter-pre-push.XXXXXX")"
     trap 'git -C "$repo_root" worktree remove --force "$worktree" >/dev/null 2>&1 || rm -rf "$worktree"' EXIT
 
-    echo "pre-push: testing $(git log -1 --format='%h %s' "$sha") before pushing to trunk..."
     git -C "$repo_root" worktree add --detach --quiet "$worktree" "$sha"
+
+    echo "pre-push: checking formatting of $(git log -1 --format='%h %s' "$sha")..."
+    if ! dotnet format "$worktree/Source/GitSnapshotter.slnx" --verify-no-changes; then
+        echo >&2
+        echo >&2 "pre-push: $sha is not formatted per .editorconfig; the push was stopped."
+        echo >&2 "pre-push: run 'dotnet format Source/GitSnapshotter.slnx', commit, and push again."
+        exit 1
+    fi
+
+    if [[ "$trunk_shas" != *" $sha "* ]]; then
+        git -C "$repo_root" worktree remove --force "$worktree"
+        trap - EXIT
+        continue
+    fi
+
+    echo "pre-push: testing $(git log -1 --format='%h %s' "$sha") before pushing to trunk..."
 
     # CI=true turns on locked restore (Directory.Build.props), so stale lock files fail here too.
     if ! CI=true dotnet test --solution "$worktree/Source/GitSnapshotter.slnx" \
@@ -47,4 +70,4 @@ for sha in "${shas[@]}"; do
     trap - EXIT
 done
 
-echo "pre-push: tests passed."
+echo "pre-push: checks passed."
