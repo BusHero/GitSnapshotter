@@ -33,7 +33,7 @@ jobs:
       - name: 'Run: Nuke'
         id: nuke
         run: |
-          ./build.cmd Publish-Package \
+          ./build.cmd Publish Publish-Package \
               -publish-directory publish \
               -configuration Release \
               -github-output "$GITHUB_OUTPUT" \
