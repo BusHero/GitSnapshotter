@@ -10,6 +10,11 @@ empty **Unreleased** section above it. A prerelease with no section of its own u
 
 ## [Unreleased]
 
+## [0.2.0-rc.2] - 2026-11-14
+
+Publishes the `GitSnapshotter` library alongside the tool, which 0.2.0-rc.1 left out. The code of both is the same as
+in 0.2.0-rc.1.
+
 ### Fixed
 
 - Releases pack the library and the tool at the release version. 0.2.0-rc.1 packed the library as 0.1.0, so only
@@ -34,5 +39,6 @@ no `GitSnapshotter` 0.2.0-rc.1 package.
   `restore` and `diff` commands.
 - Symbol packages (`.snupkg`) with SourceLink for the library.
 
-[Unreleased]: https://github.com/BusHero/GitSnapshotter/compare/v0.2.0-rc.1...HEAD
+[Unreleased]: https://github.com/BusHero/GitSnapshotter/compare/v0.2.0-rc.2...HEAD
+[0.2.0-rc.2]: https://github.com/BusHero/GitSnapshotter/compare/v0.2.0-rc.1...v0.2.0-rc.2
 [0.2.0-rc.1]: https://github.com/BusHero/GitSnapshotter/releases/tag/v0.2.0-rc.1
