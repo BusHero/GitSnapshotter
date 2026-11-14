@@ -11,6 +11,7 @@ var builder = Pipeline.CreateBuilder(args);
 builder.Services.Configure<BuildSettings>(builder.Configuration.GetSection(BuildSettings.Section));
 
 builder.Services
+    .AddModule<VerifyFormattingModule>()
     .AddModule<CompileModule>()
     .AddModule<RunUnitTestsModule>()
     .AddModule<ThirdPartyNoticesModule>()

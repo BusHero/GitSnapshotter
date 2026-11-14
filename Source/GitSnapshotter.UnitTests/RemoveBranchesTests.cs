@@ -1,4 +1,4 @@
-﻿namespace GitSnapshotter.UnitTests;
+namespace GitSnapshotter.UnitTests;
 
 public sealed class RemoveBranchesTests
 {
@@ -17,7 +17,7 @@ public sealed class RemoveBranchesTests
 
         await Assert.That(newSnapshot).IsEquivalentTo(originalSnapshot);
     }
-    
+
     [Test, AutoData]
     public async Task RemoveSeveralBranches(string branchName1, string branchName2)
     {

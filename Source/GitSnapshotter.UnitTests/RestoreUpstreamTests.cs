@@ -1,4 +1,4 @@
-﻿namespace GitSnapshotter.UnitTests;
+namespace GitSnapshotter.UnitTests;
 
 public sealed class RestoreUpstreamTests
 {

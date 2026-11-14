@@ -1,4 +1,4 @@
-﻿using GitSnapshotter.Console;
+using GitSnapshotter.Console;
 
 namespace GitSnapshotter.UnitTests;
 
