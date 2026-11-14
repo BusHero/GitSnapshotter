@@ -16,7 +16,8 @@ namespace GitSnapshotter.Pipeline.Modules;
 /// <summary>
 /// On a release build, puts everything the GitHub release gets into <see cref="BuildSettings.ReleaseDirectory"/>: the
 /// packages and their symbol packages, the console app as a zip, and SHA256SUMS.txt over all of them. Fails unless
-/// exactly the expected packages were built at the release version: pushing to nuget.org can't be undone.
+/// exactly the expected packages were built at the release version, and our assemblies in them and in the console app
+/// carry that version too (<see cref="ReleaseAssemblies"/>): pushing to nuget.org can't be undone.
 /// </summary>
 [DependsOn<PackModule>]
 [DependsOn<PublishConsoleModule>]
@@ -58,7 +59,8 @@ public sealed class ReleaseAssetsModule(IOptions<BuildSettings> settings) : Modu
     /// </summary>
     /// <returns>The files in <paramref name="release"/>, in order.</returns>
     /// <exception cref="InvalidOperationException">
-    /// <paramref name="publish"/> doesn't hold exactly the expected packages at <paramref name="version"/>.
+    /// <paramref name="publish"/> doesn't hold exactly the expected packages at <paramref name="version"/>, or an
+    /// assembly in it has another version.
     /// </exception>
     internal static async Task<IReadOnlyList<string>> CreateAsync(
         string publish, string release, string version, CancellationToken cancellationToken)
@@ -72,6 +74,14 @@ public sealed class ReleaseAssetsModule(IOptions<BuildSettings> settings) : Modu
         {
             throw new InvalidOperationException(
                 $"Expected exactly: {string.Join(' ', expected)}. The pipeline produced: {string.Join(' ', actual)}");
+        }
+
+        var problems = ReleaseAssemblies.Verify(publish, ReleaseVersion.Parse(version));
+        if (problems.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"The assemblies don't carry release version {version}:{Environment.NewLine}"
+                + string.Join(Environment.NewLine, problems));
         }
 
         if (Directory.Exists(release))
