@@ -1,0 +1,6 @@
+<Project>
+  <!-- See AutomaticallyUseReferenceAssemblyPackages in Directory.Build.props. -->
+  <ItemGroup Condition="'$(TargetFrameworkIdentifier)' == '.NETFramework'">
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" PrivateAssets="all" />
+  </ItemGroup>
+</Project>

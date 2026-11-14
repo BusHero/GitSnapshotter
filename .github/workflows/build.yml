@@ -8,6 +8,7 @@ on:
       - '.github/workflows/**'
       - 'global.json'
       - 'Directory.Build.props'
+      - 'Directory.Build.targets'
       - 'Directory.Packages.props'
       - 'build.sh'
       - 'build.cmd'

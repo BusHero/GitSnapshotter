@@ -6,6 +6,7 @@
 
   <ItemGroup Label="Library">
     <PackageVersion Include="LibGit2Sharp" Version="0.32.0" />
+    <PackageVersion Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" />
     <!-- Source-only polyfills for newer C# and BCL features on .NET Framework. -->
     <PackageVersion Include="Polyfill" Version="11.4.5" />
     <PackageVersion Include="System.Text.Json" Version="10.0.15" />

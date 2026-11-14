@@ -6,5 +6,11 @@
     <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
     <!-- Keep the lock files out of the IDE's project view; NuGet still reads and writes them. -->
     <DefaultItemExcludes>$(DefaultItemExcludes);packages.lock.json</DefaultItemExcludes>
+    <!--
+      .NET Framework reference assemblies come from an explicit package on every OS (Directory.Build.targets).
+      Otherwise the SDK adds the package only where no targeting pack is installed (Linux, macOS), and the lock
+      files differ between Windows and everywhere else.
+    -->
+    <AutomaticallyUseReferenceAssemblyPackages>false</AutomaticallyUseReferenceAssemblyPackages>
   </PropertyGroup>
 </Project>
