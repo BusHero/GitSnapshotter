@@ -192,12 +192,14 @@ internal static class WorkingTreeOperations
         Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
 
         using var content = blob.GetContentStream();
+#if NET
         if (mode == Mode.SymbolicLink && !OperatingSystem.IsWindows())
         {
             using var reader = new StreamReader(content, Encoding.UTF8);
             File.CreateSymbolicLink(fullPath, reader.ReadToEnd());
             return;
         }
+#endif
 
         using (var file = File.Create(fullPath))
         {
@@ -214,7 +216,7 @@ internal static class WorkingTreeOperations
     private static void DeletePath(string fullPath)
     {
         var info = new FileInfo(fullPath);
-        if (info.Exists || info.LinkTarget is not null)
+        if (info.Exists || LinkTarget(info) is not null)
         {
             info.Delete();
         }
@@ -222,7 +224,7 @@ internal static class WorkingTreeOperations
 
     private static Mode GetMode(IRepository repository, string relativePath, string fullPath)
     {
-        if (new FileInfo(fullPath).LinkTarget is not null)
+        if (LinkTarget(new FileInfo(fullPath)) is not null)
         {
             return Mode.SymbolicLink;
         }
@@ -239,7 +241,7 @@ internal static class WorkingTreeOperations
 
     private static byte[] ReadContent(string fullPath)
     {
-        var linkTarget = new FileInfo(fullPath).LinkTarget;
+        var linkTarget = LinkTarget(new FileInfo(fullPath));
         return linkTarget is not null
             ? Encoding.UTF8.GetBytes(linkTarget)
             : File.ReadAllBytes(fullPath);
@@ -256,6 +258,18 @@ internal static class WorkingTreeOperations
         return Convert.ToHexString(SHA1.HashData(buffer)).ToLowerInvariant();
 #pragma warning restore CA5350
     }
+
+    /// <summary>The target of a symbolic link, or <c>null</c> for anything else.</summary>
+    /// <remarks>
+    /// .NET Framework has no API for this. It only runs on Windows, where git checks symbolic links out as plain
+    /// files unless <c>core.symlinks</c> is set, so links are treated as plain files there.
+    /// </remarks>
+    private static string? LinkTarget(FileInfo file) =>
+#if NET
+        file.LinkTarget;
+#else
+        null;
+#endif
 
     private static string FullPath(IRepository repository, string relativePath) =>
         Path.Combine(repository.Info.WorkingDirectory, relativePath.Replace('/', Path.DirectorySeparatorChar));

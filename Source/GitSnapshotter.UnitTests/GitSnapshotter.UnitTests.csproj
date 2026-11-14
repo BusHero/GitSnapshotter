@@ -1,7 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+        <TargetFrameworks>net8.0;net10.0;net472</TargetFrameworks>
+        <LangVersion>latest</LangVersion>
+        <!-- No Polyfill here: the library's polyfills are internal and visible through InternalsVisibleTo. -->
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <IsPackable>false</IsPackable>
@@ -16,6 +18,19 @@
 
     <ItemGroup>
         <Using Include="TUnit.Assertions.Enums" />
+    </ItemGroup>
+
+    <!--
+      .NET Framework tests can only run on Windows. Elsewhere the net472 build still compiles (so the lock file is
+      the same on every OS), but dotnet test leaves it out.
+    -->
+    <PropertyGroup Condition="'$(TargetFramework)' == 'net472' and !$([MSBuild]::IsOSPlatform('Windows'))">
+        <IsTestProject>false</IsTestProject>
+        <IsTestingPlatformApplication>false</IsTestingPlatformApplication>
+        <OutputType>Library</OutputType>
+    </PropertyGroup>
+    <ItemGroup Condition="'$(TargetFramework)' == 'net472'">
+        <Using Remove="System.Net.Http" />
     </ItemGroup>
 
     <ItemGroup>

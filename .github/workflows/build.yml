@@ -13,8 +13,36 @@ on:
       - 'build.cmd'
 
 jobs:
+  # .NET Framework tests only run on Windows; this job runs every test framework there.
+  windows-latest:
+    name: windows-latest
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: 'Setup: .NET SDK from global.json'
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          dotnet-version: '8.0.x'
+
+      - name: 'Cache: ~/.nuget/packages'
+        uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-${{ hashFiles('**/global.json', '**/packages.lock.json') }}
+
+      - name: 'Configure git credentials'
+        run: |
+          git config --global user.email github-actions@github.com
+          git config --global user.name github-actions
+
+      - name: 'Test: net472, net8.0, net10.0'
+        run: dotnet test --solution Source/GitSnapshotter.slnx --configuration Release --treenode-filter "/*/*/*/*[Category!=Discovery]"
+
   ubuntu-latest:
     name: ubuntu-latest
+    needs: windows-latest
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

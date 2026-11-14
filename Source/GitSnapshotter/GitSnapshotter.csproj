@@ -1,7 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net8.0</TargetFramework>
+        <TargetFrameworks>net8.0;net472</TargetFrameworks>
+        <LangVersion>latest</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
@@ -21,6 +22,15 @@
 
     <ItemGroup>
       <PackageReference Include="LibGit2Sharp" />
+    </ItemGroup>
+    <!-- .NET Framework needs polyfills for newer C# and BCL features, and System.Text.Json as a package. -->
+    <ItemGroup Condition="'$(TargetFramework)' == 'net472'">
+      <PackageReference Include="Polyfill">
+        <PrivateAssets>all</PrivateAssets>
+        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      </PackageReference>
+      <PackageReference Include="System.Text.Json" />
+      <Using Remove="System.Net.Http" />
     </ItemGroup>
     <ItemGroup>
         <None Include="docs\README.md" Pack="true" PackagePath="\"/>

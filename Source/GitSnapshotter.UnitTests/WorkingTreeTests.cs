@@ -232,6 +232,7 @@ public sealed class WorkingTreeTests
         await Assert.That(repo.ReadFile("a.txt")).IsEqualTo("changed later");
     }
 
+#if NET // Unix file modes; .NET Framework only runs on Windows.
     [Test]
     public async Task ExecutableBitIsRestored()
     {
@@ -256,6 +257,7 @@ public sealed class WorkingTreeTests
             await Assert.That(repo.Reopen().SnapshotWithWorkingTree()).IsEquivalentTo(snapshot);
         }
     }
+#endif
 
     [Test]
     public async Task WorkingTreeOfUnbornRepositoryIsRestored()
