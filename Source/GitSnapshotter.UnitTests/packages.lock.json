@@ -302,7 +302,8 @@
       "GitSnapshotter.Tool": {
         "type": "Project",
         "dependencies": {
-          "GitSnapshotter": "[0.1.0, )"
+          "GitSnapshotter": "[0.1.0, )",
+          "System.CommandLine": "[2.0.14, )"
         }
       },
       "LibGit2Sharp": {
@@ -313,6 +314,12 @@
         "dependencies": {
           "LibGit2Sharp.NativeBinaries": "[2.0.324]"
         }
+      },
+      "System.CommandLine": {
+        "type": "CentralTransitive",
+        "requested": "[2.0.14, )",
+        "resolved": "2.0.14",
+        "contentHash": "15fyVO4aG6poR6IKmhM74zf7PUzaU6FZAGm2d3SQSO9yIyGAeo44e6t9qeKjjaqyMEqYdqcb2G1B0gpLoDU2cA=="
       }
     },
     "net11.0/win-x64": {

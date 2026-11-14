@@ -12,7 +12,8 @@ what changed. See [Installation](/GitSnapshotter/installation/#the-command-line-
 gitsnapshotter snapshot <repository> [--output <file>] [--include-working-tree]
 gitsnapshotter restore  <repository> <snapshot-file> [--force] [--dry-run]
 gitsnapshotter diff     <repository> <snapshot-file>
-gitsnapshotter help
+gitsnapshotter help     [<command>]
+gitsnapshotter --version
 ```
 
 | Command | Does |
@@ -20,7 +21,7 @@ gitsnapshotter help
 | [`snapshot`](/GitSnapshotter/cli/snapshot/) | Takes a snapshot and prints it as JSON, or writes it to a file |
 | [`restore`](/GitSnapshotter/cli/restore/) | Restores a snapshot file, or previews the restore with `--dry-run` |
 | [`diff`](/GitSnapshotter/cli/diff/) | Lists what changed in the repository since a snapshot was taken |
-| `help` | Prints usage. `--help` and `-h` do the same |
+| `help` | Prints usage, or a command's usage with `help <command>`. `--help`, `-h` and `-?` do the same, on their own or after a command |
 
 ## Arguments
 
@@ -33,7 +34,7 @@ gitsnapshotter help
 ## Output
 
 Results go to standard output; errors go to standard error, prefixed with `error:`. A usage error also prints the
-usage text.
+usage of the command it was for.
 
 ```console
 $ gitsnapshotter restore . before.json

@@ -21,8 +21,10 @@ gitsnapshotter restore <repository> <snapshot-file> [--force] [--dry-run]
     --dry-run only lists what would change.
 gitsnapshotter diff <repository> <snapshot-file>
     List what changed in the repository since the snapshot was taken.
-gitsnapshotter help
-    Show this message.
+gitsnapshotter help [<command>]
+    Show help for gitsnapshotter or one of its commands (or pass --help to any command).
+gitsnapshotter --version
+    Show the version.
 ```
 
 For example:
