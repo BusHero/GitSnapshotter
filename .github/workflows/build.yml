@@ -19,11 +19,13 @@ run-name: ${{ inputs.version && format('release {0}', inputs.version) || '' }}
 #            v<version> tag) with every artifact and pushes the packages to nuget.org; the only job that can write
 #            to the repository or get a nuget.org key. It stays in this file: it never checks out or runs the
 #            repository's code, so nothing built from the repository can reach its credentials.
-#   smoke-test  (Smoke test) on Linux, Windows and macOS, downloads the published packages from nuget.org as a user would: installs
-#            and runs the tool, runs an app that uses the library on each framework it supports, checks the packages'
-#            third-party notices and contents, what nuget.org shows about them, their symbols on nuget.org's symbol
-#            server, and that they, the symbols and the console app zip are the GitHub release's and were built from
-#            the released commit (SmokeTest target). Read-only: it gets no credentials beyond reading the repository.
+#   smoke-test  (Smoke test) on Linux (x64, ARM64, Alpine), Windows and macOS, uses the published packages from nuget.org as a user
+#            would: installs the tool, snapshots and restores a repository with it, upgrades it from the previous
+#            version; runs an app that uses the library on each framework it supports. Checks the packages' notices,
+#            contents, signatures and known vulnerabilities, what nuget.org shows about them, their symbols,
+#            deterministic builds and Source Link, the GitHub release, and that the packages, symbols and console app
+#            zip are the release's, built from the released commit (SmokeTest target). Read-only: it gets no
+#            credentials beyond reading the repository.
 on:
   push:
     branches: ['**']
@@ -298,23 +300,42 @@ jobs:
     name: Smoke test on ${{ matrix.name }}
     needs: [verify, publish]
     strategy:
-      # Every OS reports, even when one fails.
+      # Every platform reports, even when one fails.
       fail-fast: false
       matrix:
         include:
-          - { name: Linux, os: ubuntu-latest }
+          - { name: Linux x64, os: ubuntu-latest }
+          - { name: Linux ARM64, os: ubuntu-24.04-arm }
           - { name: Windows, os: windows-latest }
           - { name: macOS, os: macos-latest }
+          # musl: the tool's linux-musl libgit2, in the .NET SDK's Alpine image.
+          - { name: Alpine Linux, os: ubuntu-latest, container: 'mcr.microsoft.com/dotnet/sdk:11.0-alpine' }
     runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
     permissions:
       contents: read
     steps:
+      # Before the checkout, so it clones with git: the pipeline and the tool read the repository.
+      - name: 'Setup: Alpine packages'
+        if: matrix.container
+        run: apk add --no-cache bash curl git github-cli
+
       - name: 'Checkout: repository'
         uses: actions/checkout@v7
         with:
           persist-credentials: false
 
+      # The image comes with the SDK; the .NET 8 runtime is added next to it.
+      - name: 'Setup: .NET 8 runtime and git (Alpine)'
+        if: matrix.container
+        shell: bash
+        run: |
+          # The workspace belongs to another user than the container's; git and libgit2 refuse it otherwise.
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          curl -sSL https://dot.net/v1/dotnet-install.sh | bash -s -- --channel 8.0 --runtime dotnet --install-dir /usr/share/dotnet
+
       - name: 'Setup: .NET SDK from global.json'
+        if: '!matrix.container'
         uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
@@ -332,11 +353,14 @@ jobs:
         run: gh release download "$TAG" --dir "$RUNNER_TEMP/release"
 
       - name: 'Run: pipeline (SmokeTest)'
+        shell: bash
         env:
           Build__Target: SmokeTest
           Build__Version: ${{ needs.verify.outputs.version }}
           Build__SmokeTestReleaseDirectory: ${{ runner.temp }}/release
           Build__SmokeTestCommit: ${{ github.sha }}
+          # Reads the GitHub release.
+          GITHUB_TOKEN: ${{ github.token }}
         run: dotnet run --project pipeline/GitSnapshotter.Pipeline --configuration Release
 
   # Uploads the resolved package graph to GitHub's dependency graph (Dependabot alerts, Insights > Dependency graph).

@@ -329,8 +329,12 @@ public sealed class SmokeTestTests : IDisposable
         await Assert.That(SmokeTestChecks.PublicPackageReferences(LibraryCsproj)).IsEquivalentTo(["LibGit2Sharp", "System.Text.Json"]);
     }
 
-    private static readonly HashSet<string> ToolNoticed =
-        new(["LibGit2Sharp", "LibGit2Sharp.NativeBinaries", "System.CommandLine"], StringComparer.OrdinalIgnoreCase);
+    private static readonly Dictionary<string, string> ToolNoticed = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["LibGit2Sharp"] = "0.32.0",
+        ["LibGit2Sharp.NativeBinaries"] = "2.0.323",
+        ["System.CommandLine"] = "2.0.14",
+    };
 
     private static (string, string)[] ToolFiles() =>
     [
@@ -390,7 +394,7 @@ public sealed class SmokeTestTests : IDisposable
     {
         var noticed = SmokeTestChecks.CheckNotices(await GeneratedNoticesAsync(), "Product", "test");
 
-        await Assert.That(noticed).IsEquivalentTo(["Package"]);
+        await Assert.That(noticed).IsEquivalentTo(new Dictionary<string, string> { ["Package"] = "1.0.0" });
     }
 
     // ---- What nuget.org shows -------------------------------------------------------------------------------------
@@ -568,5 +572,187 @@ public sealed class SmokeTestTests : IDisposable
         await Assert.That(() => SmokeTestChecks.VerifyChecksums(release, "SHA256SUMS.txt"))
             .Throws<InvalidOperationException>()
             .WithMessageContaining("a.nupkg has another checksum", StringComparison.Ordinal);
+    }
+
+    // ---- Snapshot and restore ---------------------------------------------------------------------------------------
+
+    [Test]
+    public async Task SnapshotsAreComparedAsJson()
+    {
+        using (Assert.Multiple())
+        {
+            await Assert.That(SmokeTestChecks.SameSnapshot("""{ "Head": "main", "Tags": [] }""", """{"Head":"main","Tags":[]}""")).IsTrue();
+            await Assert.That(SmokeTestChecks.SameSnapshot("""{ "Head": "main" }""", """{ "Head": "extra" }""")).IsFalse();
+        }
+    }
+
+    // ---- Upgrading --------------------------------------------------------------------------------------------------
+
+    [Test]
+    [Arguments("0.3.0", "0.2.0")]
+    [Arguments("0.2.0", "0.1.0")]
+    [Arguments("0.3.0-rc.1", "0.2.0")]
+    [Arguments("0.10.0", "0.9.0")]
+    public async Task UpgradeIsFromTheNewestStableVersionBefore(string version, string previous)
+    {
+        string[] published = ["0.1.0", "0.2.0-rc.1", "0.2.0-rc.2", "0.2.0", "0.9.0", "0.10.0", "0.3.0-rc.1", "0.3.0"];
+
+        await Assert.That(SmokeTestChecks.PreviousStable(published, version)).IsEqualTo(previous);
+    }
+
+    [Test]
+    public async Task FirstVersionHasNothingToUpgradeFrom()
+    {
+        await Assert.That(SmokeTestChecks.PreviousStable(["0.1.0", "0.2.0"], "0.1.0")).IsNull();
+    }
+
+    [Test]
+    [Arguments("1.0.0-alpha", "1.0.0-alpha.1")]
+    [Arguments("1.0.0-alpha.1", "1.0.0-alpha.beta")]
+    [Arguments("1.0.0-beta.2", "1.0.0-beta.11")]
+    [Arguments("1.0.0-rc.1", "1.0.0")]
+    [Arguments("1.0.0", "1.0.1")]
+    [Arguments("1.9.0", "1.10.0")]
+    public async Task VersionsAreOrderedAsSemVer(string lower, string higher)
+    {
+        using (Assert.Multiple())
+        {
+            await Assert.That(SmokeTestChecks.CompareVersions(lower, higher)).IsLessThan(0);
+            await Assert.That(SmokeTestChecks.CompareVersions(higher, lower)).IsGreaterThan(0);
+            await Assert.That(SmokeTestChecks.CompareVersions(higher, higher)).IsEqualTo(0);
+        }
+    }
+
+    // ---- Known vulnerabilities --------------------------------------------------------------------------------------
+
+    [Test]
+    public async Task AuditProjectFailsOnAnyKnownVulnerability()
+    {
+        var project = XDocument.Parse(SmokeTestChecks.AuditProject(ToolNoticed, "net11.0")).Root!;
+        string Property(string name) => project.Descendants(name).Single().Value;
+
+        using (Assert.Multiple())
+        {
+            await Assert.That(Property("NuGetAudit")).IsEqualTo("true");
+            await Assert.That(Property("NuGetAuditMode")).IsEqualTo("all");
+            await Assert.That(Property("NuGetAuditLevel")).IsEqualTo("low");
+            await Assert.That(Property("WarningsAsErrors").Split(';')).IsEquivalentTo(["NU1900", "NU1901", "NU1902", "NU1903", "NU1904"]);
+            await Assert.That(project.Descendants("PackageReference").Select(r => $"{r.Attribute("Include")!.Value} {r.Attribute("Version")!.Value}"))
+                .IsEquivalentTo(["LibGit2Sharp [0.32.0]", "LibGit2Sharp.NativeBinaries [2.0.323]", "System.CommandLine [2.0.14]"]);
+        }
+    }
+
+    // ---- Deterministic builds and Source Link -------------------------------------------------------------------------
+
+    [Test]
+    public async Task ThisAssemblyIsDeterministic()
+    {
+        // Deterministic is the SDK's default; the build-machine path rule depends on where the test runs.
+        var assembly = await File.ReadAllBytesAsync(ThisAssembly);
+
+        await Assert.That(SmokeTestChecks.CheckDeterministic(assembly, "test assembly"))
+            .DoesNotContain(problem => problem.Contains("deterministically", StringComparison.Ordinal));
+    }
+
+    private const string Raw = "https://raw.githubusercontent.com/BusHero/GitSnapshotter/5be46049fd0c92b3fae46587a7374e43d68e8a81/";
+
+    private static readonly (string, string)[] SourceLinkMap = [("/_/*", Raw + "*"), ("/_/docs/notes.md", "https://example.test/notes.md")];
+
+    [Test]
+    [Arguments("/_/Source/GitSnapshotter/GitRepository.cs", Raw + "Source/GitSnapshotter/GitRepository.cs")]
+    [Arguments("/_/docs/notes.md", "https://example.test/notes.md")]
+    public async Task SourcePathsAreMappedToTheirUrl(string path, string expected)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+
+        await Assert.That(SmokeTestChecks.MapSource(SourceLinkMap, path)).IsEqualTo(expected);
+    }
+
+    [Test]
+    public async Task SourceOutsideTheMapIsNotMapped()
+    {
+        await Assert.That(SmokeTestChecks.MapSource(SourceLinkMap, "/home/runner/.nuget/packages/polyfill/Polyfill.cs")).IsNull();
+    }
+
+    [Test]
+    public async Task SourceLinkMapIsRead()
+    {
+        var json = System.Text.Encoding.UTF8.GetBytes($$$"""{"documents":{"/_/*":"{{{Raw}}}*"}}""");
+
+        await Assert.That(SmokeTestChecks.ReadSourceLinkMap(json)).IsEquivalentTo([("/_/*", Raw + "*")]);
+    }
+
+    [Test]
+    public async Task DownloadedSourceIsCheckedAgainstThePdbsHash()
+    {
+        byte[] content = [1, 2, 3];
+        var file = new SmokeTestChecks.SourceFile("/_/a.cs", Raw + "a.cs", System.Security.Cryptography.SHA256.HashData(content));
+
+        using (Assert.Multiple())
+        {
+            await Assert.That(SmokeTestChecks.SourceMatches(content, file)).IsTrue();
+            await Assert.That(SmokeTestChecks.SourceMatches([1, 2, 4], file)).IsFalse();
+        }
+    }
+
+    // ---- The GitHub release -----------------------------------------------------------------------------------------
+
+    private static readonly ReleaseVersion Stable = ReleaseVersion.Parse("0.3.0");
+
+    private static SmokeTestChecks.GitHubRelease PublishedRelease(string version = "0.3.0", string latest = "v0.3.0") =>
+        new(false, version.Contains('-', StringComparison.Ordinal), "Notes\r\n", SmokeTestChecks.ReleaseAssets(version), Commit, latest);
+
+    [Test]
+    public async Task PublishedReleasePasses()
+    {
+        await Assert.That(SmokeTestChecks.CheckGitHubRelease(PublishedRelease(), Stable, Commit, "Notes")).IsEmpty();
+    }
+
+    [Test]
+    public async Task ReleaseReplacedByANewerOnePasses()
+    {
+        await Assert.That(SmokeTestChecks.CheckGitHubRelease(PublishedRelease(latest: "v0.4.0"), Stable, Commit, "Notes")).IsEmpty();
+    }
+
+    [Test]
+    public async Task PrereleaseThatIsNotLatestPasses()
+    {
+        var rc = ReleaseVersion.Parse("0.4.0-rc.1");
+
+        await Assert.That(SmokeTestChecks.CheckGitHubRelease(PublishedRelease("0.4.0-rc.1"), rc, Commit, "Notes")).IsEmpty();
+    }
+
+    [Test]
+    public async Task WrongReleaseReportsEveryProblem()
+    {
+        var release = PublishedRelease() with
+        {
+            Draft = true,
+            Prerelease = true,
+            Body = "Other notes",
+            Assets = [.. SmokeTestChecks.ReleaseAssets("0.3.0").Skip(1), "extra.txt"],
+            TagCommit = "abc123",
+            LatestTag = "v0.2.0",
+        };
+
+        await Assert.That(SmokeTestChecks.CheckGitHubRelease(release, Stable, Commit, "Notes")).IsEquivalentTo(
+        [
+            "it is still a draft",
+            "it is marked as a prerelease",
+            "it is not the latest release; the older v0.2.0 is",
+            $"v0.3.0 points at abc123, not {Commit}",
+            "its description is not the version's CHANGELOG.md section",
+            "GitSnapshotter.0.3.0.nupkg is not attached",
+            "extra.txt is attached, but not expected",
+        ]);
+    }
+
+    [Test]
+    public async Task PrereleaseMarkedLatestFails()
+    {
+        var rc = ReleaseVersion.Parse("0.4.0-rc.1");
+
+        await Assert.That(SmokeTestChecks.CheckGitHubRelease(PublishedRelease("0.4.0-rc.1", "v0.4.0-rc.1"), rc, Commit, "Notes"))
+            .IsEquivalentTo(["it is marked as the latest release, though it is a prerelease"]);
     }
 }

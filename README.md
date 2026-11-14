@@ -50,7 +50,9 @@ the `Build` configuration section, as environment variables (`Build__PublishDire
 | `SmokeTestWaitMinutes` | `30` | How long `SmokeTest` waits for the feed to list the packages |
 | `SmokeTestReleaseDirectory` | none | The GitHub release's assets; when set, `SmokeTest` checks them against `SHA256SUMS.txt`, that the feed's packages and symbols are the release's, and that the console app zip runs |
 | `SmokeTestSymbolServer` | nuget.org's | Where `SmokeTest` downloads the PDBs from; empty skips the symbols |
-| `SmokeTestCommit` | none | When set, `SmokeTest` checks the packages were built from this commit |
+| `SmokeTestCommit` | none | The commit the release was made from; `SmokeTest` checks the packages, Source Link and the release tag against it (otherwise the commit the library package names) |
+| `SmokeTestVerifySignatures` | `true` | Whether `SmokeTest` verifies the packages' signatures; off for a feed that doesn't sign, like GitHub Packages |
+| `SmokeTestGitHubRelease` | `true` | Whether `SmokeTest` checks the GitHub release; reads it with `GITHUB_TOKEN` |
 
 The CI workflows run the pipeline too, one target per job, so a job only sets up the machine and hands files to
 the next. Each target runs on a developer machine as well (`./build.sh --Build:Target=Test`):
@@ -59,7 +61,7 @@ the next. Each target runs on a developer machine as well (`./build.sh --Build:T
 |---|---|---|
 | `All` | Format check, compile, tests, third-party notices, console app, packages, push; on a release, the release assets (packages, console app zip, `SHA256SUMS.txt`) | Build and release > Build and package |
 | `VerifyRelease` | Checks the release may go ahead and writes its description from `CHANGELOG.md`; needs `GITHUB_TOKEN` | Build and release > Check release |
-| `SmokeTest` | Checks `Version` was published and works, building nothing: from the feed, installs and runs the tool, and runs an app using the library on each framework it is built for (.NET Framework on Windows only) and the newest runtime; checks both packages' third-party notices, that they hold nothing unexpected (an assembly must be ours or covered by the notices; the library may depend only on packages its project passes on), the metadata, readme and icon the feed shows, and our PDBs on the symbol server; with the `SmokeTest...` settings above, compares all of it with the GitHub release and the commit | Build and release > Smoke test (Linux, Windows, macOS) |
+| `SmokeTest` | Checks `Version` was published and works, building nothing. From the feed: installs the tool, snapshots and restores a repository with it, upgrades it from the previous stable version and uninstalls it; runs an app using the library on each framework it is built for (.NET Framework on Windows only) and the newest runtime. Checks both packages' third-party notices and contents (an assembly must be ours or covered by the notices; the library may depend only on packages its project passes on), signatures, and known vulnerabilities in them and everything they ship; what the feed shows about them; our PDBs on the symbol server; that our assemblies are deterministic and Source Link maps every source file to the commit; and the GitHub release (published, flagged right, tagged on the commit, described by `CHANGELOG.md`, with the release assets). With `SmokeTestReleaseDirectory`, also compares the packages, PDBs and console app zip with the release's | Build and release > Smoke test (Linux x64, ARM64 and Alpine, Windows, macOS) |
 | `Test` | Compile and tests | Build and release > Test on Windows |
 | `Compile` | Compile | CodeQL |
 | `Restore` | Restore the solution | Build and release > Submit dependency graph |

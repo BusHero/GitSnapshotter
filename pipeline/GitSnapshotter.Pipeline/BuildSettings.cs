@@ -75,6 +75,18 @@ public sealed class BuildSettings
     public string? SmokeTestCommit { get; set; }
 
     /// <summary>
+    /// Whether <see cref="BuildTarget.SmokeTest"/> verifies the packages' signatures (<c>dotnet nuget verify</c>).
+    /// nuget.org signs every package; a feed that doesn't, like GitHub Packages, needs this off.
+    /// </summary>
+    public bool SmokeTestVerifySignatures { get; set; } = true;
+
+    /// <summary>
+    /// Whether <see cref="BuildTarget.SmokeTest"/> checks the GitHub release: published, flagged right, tagged on the
+    /// commit, described by CHANGELOG.md and with the release assets. Reads the repository with <c>GITHUB_TOKEN</c>.
+    /// </summary>
+    public bool SmokeTestGitHubRelease { get; set; } = true;
+
+    /// <summary>
     /// The release version, like <c>1.2.0</c> or <c>1.2.0-rc.1</c>. When set, the assemblies, the package and the
     /// console app get exactly this version; otherwise the package is a prerelease named after the branch. A leading
     /// <c>v</c>, as in a tag name, is dropped.

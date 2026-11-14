@@ -9,9 +9,12 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 using ModularPipelines.Context;
+using ModularPipelines.GitHub.Extensions;
 using ModularPipelines.Models;
 using ModularPipelines.Modules;
 using ModularPipelines.Options;
+
+using Octokit;
 
 using static GitSnapshotter.Pipeline.SmokeTestChecks;
 
@@ -22,14 +25,20 @@ namespace GitSnapshotter.Pipeline.Modules;
 /// with its own NuGet packages folder and only <see cref="BuildSettings.SmokeTestSource"/> as a feed, so nothing comes
 /// from this build or from the machine's NuGet cache. It:
 /// <list type="bullet">
-/// <item>installs the .NET tool, checks its <c>--version</c> and takes a snapshot with it;</item>
+/// <item>installs the .NET tool, checks its <c>--version</c>, takes a snapshot with it, and has it put a changed
+/// repository back the way the snapshot found it;</item>
+/// <item>upgrades the tool from the previous stable version, then uninstalls it;</item>
 /// <item>builds an app that references the library, and runs it on every framework the library is built for (.NET
 /// Framework on Windows only) and on the newest runtime;</item>
-/// <item>checks that both packages carry their third-party notices, and hold nothing but what they should;</item>
+/// <item>checks that both packages carry their third-party notices, hold nothing but what they should, are signed,
+/// and that neither the library nor anything the tool ships has a known vulnerability;</item>
 /// <item>checks that the feed shows the packages' metadata (license, readme, icon, repository and commit) and serves
 /// their readme and icon;</item>
 /// <item>checks that the symbol server (<see cref="BuildSettings.SmokeTestSymbolServer"/>) has the PDB of each of our
-/// assemblies;</item>
+/// assemblies; that our assemblies were built deterministically; and that Source Link maps every source file to the
+/// released commit, where it can be downloaded as it was built;</item>
+/// <item>checks the GitHub release: published, flagged as a prerelease or the latest release, tagged on the commit,
+/// described by CHANGELOG.md and with the release assets;</item>
 /// <item>with <see cref="BuildSettings.SmokeTestReleaseDirectory"/>: checks the release assets against
 /// SHA256SUMS.txt, that the feed's packages and the symbol server's PDBs are the release's, and that the console app
 /// zip has its notices and runs.</item>
@@ -98,6 +107,10 @@ public sealed class SmokeTestModule(IOptions<BuildSettings> settings) : Module<s
             var tool = Path.Combine(tools, OperatingSystem.IsWindows() ? ToolCommand + ".exe" : ToolCommand);
             CheckToolVersion((await Run(tool, ["--version"])).StandardOutput, version);
             await Run(tool, ["snapshot", repository]);
+            await RoundTripAsync(tool);
+
+            using var serviceIndex = JsonDocument.Parse(await http.GetStringAsync(new Uri(source), cancellationToken));
+            await UpgradeAsync(serviceIndex.RootElement);
 
             // The library: restore an app that references it (the nuget.config above is picked up from the parent
             // directory), then build and run it on every framework the package has assemblies for.
@@ -135,28 +148,53 @@ public sealed class SmokeTestModule(IOptions<BuildSettings> settings) : Module<s
                 await CheckConsoleZipAsync(Path.Combine(release, $"GitSnapshotter.Console_{version}.zip"));
             }
 
+            if (settings.Value.SmokeTestVerifySignatures)
+            {
+                await Dotnet(0, ["nuget", "verify", "--all", toolPackage, libraryPackage]);
+                context.Logger.LogInformation("Both packages are signed");
+            }
+
+            // Known vulnerabilities in the library and its dependencies, and in every package the tool ships.
+            await AuditAsync("audit-library", new Dictionary<string, string> { [LibraryId] = version });
+            await AuditAsync("audit-tool", toolNoticed);
+            context.Logger.LogInformation("Neither package, nor anything they ship or depend on, has a known vulnerability");
+
             // What the feed shows about them.
-            using var serviceIndex = JsonDocument.Parse(await http.GetStringAsync(new Uri(source), cancellationToken));
             foreach (var (id, entries) in new[] { (ToolId, toolEntries), (LibraryId, libraryEntries) })
             {
                 await RetryAsync($"read the metadata of {id}", _ => CheckFeedMetadataAsync(serviceIndex.RootElement, id, entries));
             }
 
-            // The symbols.
-            if (!string.IsNullOrEmpty(settings.Value.SmokeTestSymbolServer))
+            // The symbols: each of our assemblies' PDB, from the symbol server, the release's symbol package or the
+            // package itself (the tool carries its PDBs).
+            var expectedCommit = commit ?? RepositoryCommit(Nuspec(libraryEntries))
+                ?? throw new InvalidOperationException($"{LibraryId} {version} doesn't say which commit it was built from.");
+            var assemblies = new List<(string Name, byte[] Assembly, byte[]? Pdb)>();
+            foreach (var (id, entries) in new[] { (ToolId, toolEntries), (LibraryId, libraryEntries) })
             {
-                foreach (var (id, entries) in new[] { (ToolId, toolEntries), (LibraryId, libraryEntries) })
+                var symbols = release is null ? null : Path.Combine(release, $"{id}.{version}.snupkg");
+                var symbolEntries = symbols is not null && File.Exists(symbols) ? ReadEntries(symbols) : null;
+                foreach (var assembly in OwnAssemblies(entries.Keys))
                 {
-                    var symbols = release is null ? null : Path.Combine(release, $"{id}.{version}.snupkg");
-                    var symbolEntries = symbols is not null && File.Exists(symbols) ? ReadEntries(symbols) : null;
-                    foreach (var assembly in OwnAssemblies(entries.Keys))
+                    var name = $"{id} {assembly}";
+                    var pdb = (symbolEntries is null ? null : ReleasedPdb(symbolEntries, assembly)) ?? ReleasedPdb(entries, assembly);
+                    if (!string.IsNullOrEmpty(settings.Value.SmokeTestSymbolServer))
                     {
-                        var released = symbolEntries is null ? null : ReleasedPdb(symbolEntries, assembly);
+                        var released = pdb;
                         await RetryAsync(
-                            $"download the symbols of {id} {assembly}",
-                            _ => CheckSymbolsAsync(entries[assembly], $"{id} {assembly}", released));
+                            $"download the symbols of {name}",
+                            async _ => pdb = await CheckSymbolsAsync(entries[assembly], name, released));
                     }
+
+                    assemblies.Add((name, entries[assembly], pdb));
                 }
+            }
+
+            await CheckSourcesAsync(assemblies, expectedCommit);
+
+            if (settings.Value.SmokeTestGitHubRelease)
+            {
+                await CheckGitHubReleaseAsync(expectedCommit);
             }
 
             context.Logger.LogInformation("{Tool} and {Library} {Version} are published and work", ToolId, LibraryId, version);
@@ -257,7 +295,7 @@ public sealed class SmokeTestModule(IOptions<BuildSettings> settings) : Module<s
             context.Logger.LogInformation("{Source} shows the metadata, readme and icon of {Id} {Version}", source, id, version);
         }
 
-        async Task CheckSymbolsAsync(byte[] assembly, string name, byte[]? released)
+        async Task<byte[]> CheckSymbolsAsync(byte[] assembly, string name, byte[]? released)
         {
             var query = SymbolQueryFor(assembly, name);
             using var request = new HttpRequestMessage(
@@ -275,6 +313,203 @@ public sealed class SmokeTestModule(IOptions<BuildSettings> settings) : Module<s
             }
 
             context.Logger.LogInformation("The symbol server has {Pdb} for {Name}", query.PdbName, name);
+            return pdb;
+        }
+
+        async Task RoundTripAsync(string tool)
+        {
+            // A repository of its own, so the round trip can change it freely.
+            var repo = Path.Combine(work, "repository");
+            var file = Path.Combine(repo, "file.txt");
+            Directory.CreateDirectory(repo);
+            await File.WriteAllTextAsync(Path.Combine(work, "gitconfig"), "", cancellationToken);
+
+            await Git(repo, "init", "--initial-branch=main");
+            await File.WriteAllTextAsync(file, "one\n", cancellationToken);
+            await Git(repo, "add", "file.txt");
+            await Git(repo, "commit", "--message", "one");
+            await Git(repo, "tag", "v1");
+            await Git(repo, "branch", "feature");
+            var before = await Snapshot("before");
+
+            // A new branch checked out, a commit on it, a moved tag and a deleted branch.
+            await Git(repo, "checkout", "--quiet", "-b", "extra");
+            await File.WriteAllTextAsync(file, "two\n", cancellationToken);
+            await Git(repo, "commit", "--all", "--message", "two");
+            await Git(repo, "tag", "--force", "v1");
+            await Git(repo, "branch", "--delete", "--force", "feature");
+            if (SameSnapshot(before.Json, (await Snapshot("changed")).Json))
+            {
+                throw new InvalidOperationException($"{ToolCommand} snapshot didn't see the repository change.");
+            }
+
+            await Run(tool, ["restore", repo, before.Path]);
+            if (!SameSnapshot(before.Json, (await Snapshot("after")).Json))
+            {
+                throw new InvalidOperationException($"{ToolCommand} restore didn't put the repository back as the snapshot found it.");
+            }
+
+            if (await File.ReadAllTextAsync(file, cancellationToken) != "one\n")
+            {
+                throw new InvalidOperationException($"{ToolCommand} restore didn't put the working tree back.");
+            }
+
+            context.Logger.LogInformation("{Tool} restores a changed repository to its snapshot", ToolCommand);
+
+            async Task<(string Path, string Json)> Snapshot(string name)
+            {
+                var path = Path.Combine(work, $"{name}.json");
+                await Run(tool, ["snapshot", repo, "--output", path]);
+                return (path, await File.ReadAllTextAsync(path, cancellationToken));
+            }
+
+            Task<CommandResult> Git(string directory, params string[] arguments) =>
+                context.Shell.Command.ExecuteCommandLineTool(
+                    new GenericCommandLineToolOptions("git") { Arguments = arguments },
+                    new CommandExecutionOptions
+                    {
+                        WorkingDirectory = directory,
+                        EnvironmentVariables = new Dictionary<string, string?>
+                        {
+                            // Left alone by the machine's and the user's git configuration (signing, hooks, defaults).
+                            ["GIT_CONFIG_NOSYSTEM"] = "1",
+                            ["GIT_CONFIG_GLOBAL"] = Path.Combine(work, "gitconfig"),
+                            ["GIT_AUTHOR_NAME"] = "Smoke Test",
+                            ["GIT_AUTHOR_EMAIL"] = "smoke-test@example.invalid",
+                            ["GIT_COMMITTER_NAME"] = "Smoke Test",
+                            ["GIT_COMMITTER_EMAIL"] = "smoke-test@example.invalid",
+                        },
+                    },
+                    cancellationToken);
+        }
+
+        async Task UpgradeAsync(JsonElement serviceIndex)
+        {
+            var flat = ServiceResource(serviceIndex, "PackageBaseAddress/3.0.0").TrimEnd('/');
+            using var index = JsonDocument.Parse(await http.GetStringAsync(new Uri($"{flat}/{Lower(ToolId)}/index.json"), cancellationToken));
+            var previous = PreviousStable(index.RootElement.GetProperty("versions").EnumerateArray().Select(v => v.GetString()!), version);
+            if (previous is null)
+            {
+                context.Logger.LogInformation("No stable version before {Version} to upgrade from", version);
+                return;
+            }
+
+            var upgrade = Path.Combine(work, "upgrade");
+            var tool = Path.Combine(upgrade, OperatingSystem.IsWindows() ? ToolCommand + ".exe" : ToolCommand);
+            await Dotnet(0, ["tool", "install", ToolId, "--version", previous, "--tool-path", upgrade, "--configfile", Path.Combine(work, "nuget.config")]);
+            await Dotnet(0, ["tool", "update", ToolId, "--version", version, "--tool-path", upgrade, "--configfile", Path.Combine(work, "nuget.config")]);
+            CheckToolVersion((await Run(tool, ["--version"])).StandardOutput, version);
+
+            await Dotnet(0, ["tool", "uninstall", ToolId, "--tool-path", upgrade]);
+            if (File.Exists(tool))
+            {
+                throw new InvalidOperationException($"dotnet tool uninstall left {tool} behind.");
+            }
+
+            context.Logger.LogInformation("{Tool} upgrades from {Previous} to {Version} and uninstalls", ToolId, previous, version);
+        }
+
+        async Task AuditAsync(string name, IEnumerable<KeyValuePair<string, string>> audited)
+        {
+            var directory = Path.Combine(work, name);
+            Directory.CreateDirectory(directory);
+            await Write(Path.Combine(directory, $"{name}.csproj"), AuditProject(audited, $"net{Environment.Version.Major}.0"));
+            await Dotnet(0, ["restore", directory]);
+        }
+
+        async Task CheckSourcesAsync(List<(string Name, byte[] Assembly, byte[]? Pdb)> assemblies, string expectedCommit)
+        {
+            var problems = new List<string>();
+            var files = new Dictionary<string, SourceFile>(StringComparer.Ordinal);
+            foreach (var (name, assembly, pdb) in assemblies)
+            {
+                problems.AddRange(CheckDeterministic(assembly, name));
+                if (pdb is null)
+                {
+                    context.Logger.LogWarning("No PDB for {Name} to check its Source Link with", name);
+                    continue;
+                }
+
+                var (sourceProblems, sources) = CheckSourceLink(pdb, name, expectedCommit);
+                problems.AddRange(sourceProblems);
+                foreach (var file in sources)
+                {
+                    files.TryAdd(file.Url, file);
+                }
+            }
+
+            if (problems.Count > 0)
+            {
+                throw new InvalidOperationException($"The assemblies' builds can't be traced to their sources: {string.Join("; ", problems)}");
+            }
+
+            await RetryAsync($"download the {files.Count} source files Source Link names for", async _ =>
+            {
+                var mismatched = new List<string>();
+                foreach (var file in files.Values)
+                {
+                    using var response = await http.GetAsync(new Uri(file.Url), cancellationToken);
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        mismatched.Add($"{file.Url} returns {(int)response.StatusCode}");
+                    }
+                    else if (!SourceMatches(await response.Content.ReadAsByteArrayAsync(cancellationToken), file))
+                    {
+                        mismatched.Add($"{file.Url} is not the {file.Document} the assemblies were built from");
+                    }
+                }
+
+                if (mismatched.Count > 0)
+                {
+                    throw new InvalidOperationException(string.Join("; ", mismatched));
+                }
+            });
+
+            context.Logger.LogInformation(
+                "Our assemblies are deterministic, and Source Link maps their {Count} source files to {Commit}", files.Count, expectedCommit);
+        }
+
+        async Task CheckGitHubReleaseAsync(string expectedCommit)
+        {
+            var releaseVersion = ReleaseVersion.Parse(version);
+            var github = context.GitHub();
+            var owner = github.RepositoryInfo.Owner
+                ?? throw new InvalidOperationException("The repository has no GitHub remote to find the release on.");
+            var name = github.RepositoryInfo.RepositoryName!;
+            var client = github.Client;
+
+            var published = await client.Repository.Release.Get(owner, name, releaseVersion.Tag);
+            var latest = await client.Repository.Release.GetLatest(owner, name);
+            string? tagCommit;
+            try
+            {
+                tagCommit = (await client.Repository.Commit.Get(owner, name, $"refs/tags/{releaseVersion.Tag}")).Sha;
+            }
+            catch (Exception exception) when (exception is NotFoundException or ApiValidationException)
+            {
+                tagCommit = null;
+            }
+
+            var (_, notes) = Changelog.ReleaseNotes(
+                await File.ReadAllLinesAsync(Paths.Changelog(context), cancellationToken), releaseVersion);
+            var problems = SmokeTestChecks.CheckGitHubRelease(
+                new GitHubRelease(
+                    published.Draft,
+                    published.Prerelease,
+                    published.Body,
+                    [.. published.Assets.Select(asset => asset.Name)],
+                    tagCommit,
+                    latest.TagName),
+                releaseVersion,
+                expectedCommit,
+                notes);
+
+            if (problems.Count > 0)
+            {
+                throw new InvalidOperationException($"The GitHub release {releaseVersion.Tag} is wrong: {string.Join("; ", problems)}");
+            }
+
+            context.Logger.LogInformation("The GitHub release {Tag} is published and complete", releaseVersion.Tag);
         }
 
         async Task RetryAsync(string what, Func<int, Task> action)

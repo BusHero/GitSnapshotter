@@ -4,6 +4,7 @@ using System.Reflection.PortableExecutable;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Xml.Linq;
 
 namespace GitSnapshotter.Pipeline;
@@ -183,6 +184,9 @@ internal static class SmokeTestChecks
     private static string? Attribute(XElement metadata, string element, string attribute) =>
         metadata.Elements().FirstOrDefault(e => e.Name.LocalName == element)?.Attribute(attribute)?.Value;
 
+    /// <summary>The commit the package says it was built from (its nuspec's repository element).</summary>
+    public static string? RepositoryCommit(XElement metadata) => Attribute(metadata, "repository", "commit");
+
     /// <summary>The IDs of the packages the nuspec depends on, in any framework's group.</summary>
     public static IReadOnlySet<string> Dependencies(XElement metadata) =>
         metadata.Descendants()
@@ -238,9 +242,9 @@ internal static class SmokeTestChecks
     /// Checks that <paramref name="package"/> has <see cref="ThirdPartyNotices.FileName"/> at its root, written for
     /// <paramref name="product"/> and listing at least one package.
     /// </summary>
-    /// <returns>The IDs of the packages the notices cover.</returns>
+    /// <returns>The packages the notices cover: their IDs and versions.</returns>
     /// <exception cref="InvalidOperationException">The notices are missing or don't look like the generated file.</exception>
-    public static IReadOnlySet<string> CheckNotices(string package, string product)
+    public static IReadOnlyDictionary<string, string> CheckNotices(string package, string product)
     {
         var entries = ReadEntries(package);
         return entries.TryGetValue(ThirdPartyNotices.FileName, out var notices)
@@ -252,7 +256,7 @@ internal static class SmokeTestChecks
     /// <param name="notices">The text of the notices.</param>
     /// <param name="product">The product the notices must be written for.</param>
     /// <param name="where">Where the notices are, for the error message.</param>
-    public static IReadOnlySet<string> CheckNotices(string notices, string product, string where)
+    public static IReadOnlyDictionary<string, string> CheckNotices(string notices, string product, string where)
     {
         if (!notices.TrimStart('﻿').StartsWith(ThirdPartyNotices.Heading(product), StringComparison.Ordinal))
         {
@@ -262,8 +266,8 @@ internal static class SmokeTestChecks
         var packages = notices.Split('\n')
             .TakeWhile(line => !line.StartsWith('=', StringComparison.Ordinal)) // The list comes before the first package's section.
             .Where(line => line.StartsWith(ThirdPartyNotices.ListItem, StringComparison.Ordinal))
-            .Select(line => line[ThirdPartyNotices.ListItem.Length..].Split(' ')[0])
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            .Select(line => line[ThirdPartyNotices.ListItem.Length..].Split(' '))
+            .ToDictionary(parts => parts[0], parts => parts.Length > 1 ? parts[1] : "", StringComparer.OrdinalIgnoreCase);
 
         return packages.Count > 0
             ? packages
@@ -316,7 +320,7 @@ internal static class SmokeTestChecks
     /// <param name="entries">The package's files.</param>
     /// <param name="noticed">The packages the tool's third-party notices cover.</param>
     /// <exception cref="InvalidOperationException">Something is in the package that shouldn't be.</exception>
-    public static void CheckToolContents(IReadOnlyDictionary<string, byte[]> entries, IReadOnlySet<string> noticed)
+    public static void CheckToolContents(IReadOnlyDictionary<string, byte[]> entries, IReadOnlyDictionary<string, string> noticed)
     {
         var problems = entries.Keys
             .Where(entry => !IsPackagingFile(entry)
@@ -338,7 +342,7 @@ internal static class SmokeTestChecks
         Fail(ToolId, problems);
     }
 
-    private static bool IsToolFile(string entry, IReadOnlySet<string> noticed)
+    private static bool IsToolFile(string entry, IReadOnlyDictionary<string, string> noticed)
     {
         var parts = entry.Split('/');
         if (parts.Length < 4 || parts[0] != "tools" || parts[2] != "any")
@@ -349,7 +353,7 @@ internal static class SmokeTestChecks
         var path = parts[3..];
         var file = path[^1];
         bool Ours(string name) => name.StartsWith("GitSnapshotter.", StringComparison.Ordinal);
-        bool Noticed(string assemblyName) => noticed.Contains(assemblyName);
+        bool Noticed(string assemblyName) => noticed.ContainsKey(assemblyName);
 
         return path switch
         {
@@ -595,5 +599,331 @@ internal static class SmokeTestChecks
         {
             throw new InvalidOperationException($"The release assets don't match {checksumsFile}: {string.Join("; ", problems)}");
         }
+    }
+
+    // ---- Snapshot and restore ---------------------------------------------------------------------------------------
+
+    /// <summary>Whether two snapshots (the tool's JSON) describe the same repository state.</summary>
+    public static bool SameSnapshot(string first, string second) =>
+        JsonNode.DeepEquals(JsonNode.Parse(first), JsonNode.Parse(second));
+
+    // ---- Upgrading --------------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// The newest stable version in <paramref name="versions"/> (a flat container's version list) before
+    /// <paramref name="version"/>: the one most users upgrade from. None when <paramref name="version"/> is the first.
+    /// </summary>
+    public static string? PreviousStable(IEnumerable<string> versions, string version) =>
+        versions
+            .Where(v => !v.Contains('-', StringComparison.Ordinal) && CompareVersions(v, version) < 0)
+            .OrderBy(v => v, Comparer<string>.Create(CompareVersions))
+            .LastOrDefault();
+
+    /// <summary>Orders SemVer versions, as NuGet does: by number, a prerelease before its release.</summary>
+    public static int CompareVersions(string? left, string? right)
+    {
+        static (int[] Numbers, string[]? Labels) Split(string? version)
+        {
+            var parts = (version ?? "").Split('+')[0].Split('-', 2);
+            var numbers = parts[0].Split('.').Select(n => int.Parse(n, System.Globalization.CultureInfo.InvariantCulture)).ToArray();
+            return (numbers, parts.Length > 1 ? parts[1].Split('.') : null);
+        }
+
+        var (a, aLabels) = Split(left);
+        var (b, bLabels) = Split(right);
+        for (var i = 0; i < Math.Max(a.Length, b.Length); i++)
+        {
+            var order = (i < a.Length ? a[i] : 0).CompareTo(i < b.Length ? b[i] : 0);
+            if (order != 0)
+            {
+                return order;
+            }
+        }
+
+        if (aLabels is null || bLabels is null)
+        {
+            return (aLabels is null ? 1 : 0) - (bLabels is null ? 1 : 0);
+        }
+
+        for (var i = 0; i < Math.Min(aLabels.Length, bLabels.Length); i++)
+        {
+            var aNumeric = int.TryParse(aLabels[i], out var aNumber);
+            var bNumeric = int.TryParse(bLabels[i], out var bNumber);
+            var order = (aNumeric, bNumeric) switch
+            {
+                (true, true) => aNumber.CompareTo(bNumber),
+                (true, false) => -1,
+                (false, true) => 1,
+                _ => string.CompareOrdinal(aLabels[i], bLabels[i]),
+            };
+            if (order != 0)
+            {
+                return order;
+            }
+        }
+
+        return aLabels.Length.CompareTo(bLabels.Length);
+    }
+
+    // ---- Known vulnerabilities --------------------------------------------------------------------------------------
+
+    /// <summary>NuGet Audit's warnings: one per severity, and NU1900 when it couldn't read the vulnerability data.</summary>
+    public const string AuditWarnings = "NU1900;NU1901;NU1902;NU1903;NU1904";
+
+    /// <summary>
+    /// A project whose restore fails when any of <paramref name="packages"/> (ID and exact version), or anything they
+    /// depend on, has a known vulnerability of any severity, or when the vulnerability data can't be read.
+    /// </summary>
+    public static string AuditProject(IEnumerable<KeyValuePair<string, string>> packages, string targetFramework) =>
+        new XDocument(
+            new XElement(
+                "Project",
+                new XAttribute("Sdk", "Microsoft.NET.Sdk"),
+                new XElement(
+                    "PropertyGroup",
+                    new XElement("TargetFramework", targetFramework),
+                    new XElement("NuGetAudit", "true"),
+                    new XElement("NuGetAuditMode", "all"),
+                    new XElement("NuGetAuditLevel", "low"),
+                    new XElement("WarningsAsErrors", AuditWarnings)),
+                new XElement(
+                    "ItemGroup",
+                    packages.OrderBy(p => p.Key, StringComparer.OrdinalIgnoreCase).Select(p => new XElement(
+                        "PackageReference", new XAttribute("Include", p.Key), new XAttribute("Version", $"[{p.Value}]"))))))
+            .ToString();
+
+    // ---- Deterministic builds and Source Link -----------------------------------------------------------------------
+
+    private static readonly Guid SourceLinkKind = new("CC110556-A091-4D38-9FEC-25AB9A351A6A");
+
+    private static readonly Guid EmbeddedSourceKind = new("0E8A571B-6926-466E-B4AD-8AB04611F5FE");
+
+    private static readonly Guid CompilationOptionsKind = new("B5FEEC05-8CD0-4A83-96DA-466284BB4BD8");
+
+    private static readonly Guid Sha256Algorithm = new("8829d00f-11b8-4213-878b-770e8597ac16");
+
+    /// <summary>
+    /// Where the build's sources are mapped to, so no build machine path ends up in the assemblies
+    /// (<c>ContinuousIntegrationBuild</c>).
+    /// </summary>
+    public const string MappedSourceRoot = "/_/";
+
+    /// <summary>
+    /// Checks that an assembly was built deterministically on a build server: it has a Reproducible debug directory
+    /// entry, and its PDB path is under <see cref="MappedSourceRoot"/>.
+    /// </summary>
+    /// <returns>What is wrong; empty when nothing is.</returns>
+    public static IReadOnlyList<string> CheckDeterministic(byte[] assembly, string name)
+    {
+        using var reader = new PEReader(new MemoryStream(assembly));
+        var entries = reader.ReadDebugDirectory();
+        var problems = new List<string>();
+
+        if (!entries.Any(e => e.Type == DebugDirectoryEntryType.Reproducible))
+        {
+            problems.Add($"{name} was not built deterministically");
+        }
+
+        var codeView = entries.FirstOrDefault(e => e.Type == DebugDirectoryEntryType.CodeView);
+        var path = codeView.Type == DebugDirectoryEntryType.CodeView ? reader.ReadCodeViewDebugDirectoryData(codeView).Path : null;
+        if (path is null || !path.StartsWith(MappedSourceRoot, StringComparison.Ordinal))
+        {
+            problems.Add($"{name} records its PDB as '{path}', a build machine path, not one under {MappedSourceRoot}");
+        }
+
+        return problems;
+    }
+
+    /// <summary>A source file a PDB names, where Source Link says to download it from, and its hash.</summary>
+    public sealed record SourceFile(string Document, string Url, byte[] Sha256);
+
+    /// <summary>
+    /// Checks a PDB's Source Link: it has a map; it was compiled with optimizations; every source file it names is
+    /// either embedded in it or mapped to a URL at <paramref name="commit"/>, with a SHA-256 hash to check what that
+    /// URL returns against.
+    /// </summary>
+    /// <returns>What is wrong, and the files to download and check.</returns>
+    public static (IReadOnlyList<string> Problems, IReadOnlyList<SourceFile> Files) CheckSourceLink(byte[] pdb, string name, string commit)
+    {
+        using var provider = MetadataReaderProvider.FromPortablePdbImage(System.Collections.Immutable.ImmutableArray.Create(pdb));
+        var reader = provider.GetMetadataReader();
+        var problems = new List<string>();
+        var files = new List<SourceFile>();
+
+        byte[]? Information(EntityHandle parent, Guid kind) =>
+            reader.GetCustomDebugInformation(parent)
+                .Select(reader.GetCustomDebugInformation)
+                .Where(information => reader.GetGuid(information.Kind) == kind)
+                .Select(information => reader.GetBlobBytes(information.Value))
+                .FirstOrDefault();
+
+        var options = Information(EntityHandle.ModuleDefinition, CompilationOptionsKind) is { } blob
+            ? Encoding.UTF8.GetString(blob).Split('\0')
+            : [];
+        var optimization = Enumerable.Range(0, options.Length / 2)
+            .Where(i => options[2 * i] == "optimization")
+            .Select(i => options[(2 * i) + 1])
+            .FirstOrDefault();
+        if (optimization is null || !optimization.StartsWith("release", StringComparison.Ordinal))
+        {
+            problems.Add($"{name} was compiled with optimization '{optimization}', not as a release build");
+        }
+
+        var map = Information(EntityHandle.ModuleDefinition, SourceLinkKind) is { } json
+            ? ReadSourceLinkMap(json)
+            : null;
+        if (map is null)
+        {
+            problems.Add($"{name} has no Source Link map");
+            return (problems, files);
+        }
+
+        foreach (var (pattern, url) in map)
+        {
+            if (!url.Contains(commit, StringComparison.OrdinalIgnoreCase))
+            {
+                problems.Add($"{name} maps {pattern} to {url}, not to commit {commit}");
+            }
+        }
+
+        foreach (var handle in reader.Documents)
+        {
+            var document = reader.GetDocument(handle);
+            var path = reader.GetString(document.Name);
+            if (Information(handle, EmbeddedSourceKind) is not null)
+            {
+                continue; // The debugger takes it from the PDB.
+            }
+
+            var mapped = MapSource(map, path);
+            if (mapped is null)
+            {
+                problems.Add($"{name} names {path}, which is neither embedded nor mapped to a URL");
+            }
+            else if (reader.GetGuid(document.HashAlgorithm) != Sha256Algorithm)
+            {
+                problems.Add($"{name} hashes {path} with another algorithm than SHA-256");
+            }
+            else
+            {
+                files.Add(new SourceFile(path, mapped, reader.GetBlobBytes(document.Hash)));
+            }
+        }
+
+        return (problems, files);
+    }
+
+    /// <summary>The <c>documents</c> map of a Source Link JSON file: path patterns to URL patterns.</summary>
+    public static IReadOnlyList<(string Pattern, string Url)> ReadSourceLinkMap(byte[] json)
+    {
+        using var document = JsonDocument.Parse(json);
+        return
+        [
+            .. document.RootElement.GetProperty("documents").EnumerateObject()
+                .Select(entry => (entry.Name, entry.Value.GetString()!)),
+        ];
+    }
+
+    /// <summary>
+    /// Maps a source path with a Source Link map: an exact path, or a pattern ending in <c>*</c> whose rest replaces
+    /// the URL's <c>*</c>, with forward slashes. The longest matching pattern wins.
+    /// </summary>
+    public static string? MapSource(IReadOnlyList<(string Pattern, string Url)> map, string path)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+        ArgumentNullException.ThrowIfNull(path);
+
+        foreach (var (pattern, url) in map.OrderByDescending(entry => entry.Pattern.Length))
+        {
+            if (pattern.EndsWith('*', StringComparison.Ordinal))
+            {
+                var prefix = pattern[..^1];
+                if (path.StartsWith(prefix, StringComparison.Ordinal))
+                {
+                    return url.Replace("*", path[prefix.Length..].Replace('\\', '/'), StringComparison.Ordinal);
+                }
+            }
+            else if (path == pattern)
+            {
+                return url;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>Checks that a downloaded source file is the one the PDB was built from.</summary>
+    public static bool SourceMatches(byte[] content, SourceFile file) => SHA256.HashData(content).AsSpan().SequenceEqual(file.Sha256);
+
+    // ---- The GitHub release -----------------------------------------------------------------------------------------
+
+    /// <summary>What GitHub shows about a release.</summary>
+    /// <param name="Draft">Whether it is still a draft.</param>
+    /// <param name="Prerelease">Whether it is marked as a prerelease.</param>
+    /// <param name="Body">Its description.</param>
+    /// <param name="Assets">The names of the files attached to it.</param>
+    /// <param name="TagCommit">The commit its tag points at; none when the tag doesn't exist.</param>
+    /// <param name="LatestTag">The tag of the repository's latest release.</param>
+    public sealed record GitHubRelease(
+        bool Draft, bool Prerelease, string? Body, IReadOnlyCollection<string> Assets, string? TagCommit, string? LatestTag);
+
+    /// <summary>The files the release workflow attaches to the release of <paramref name="version"/>.</summary>
+    public static IReadOnlyList<string> ReleaseAssets(string version) =>
+    [
+        $"{LibraryId}.{version}.nupkg", $"{LibraryId}.{version}.snupkg",
+        $"{ToolId}.{version}.nupkg", $"{ToolId}.{version}.snupkg",
+        $"GitSnapshotter.Console_{version}.zip", Modules.ReleaseAssetsModule.ChecksumsFile,
+    ];
+
+    /// <summary>
+    /// Checks that the GitHub release of <paramref name="release"/> is published, flagged as what it is (a prerelease,
+    /// or the latest release unless a newer one is), tagged on <paramref name="commit"/>, described by <paramref name="notes"/> (its
+    /// CHANGELOG.md section) and has exactly the release assets.
+    /// </summary>
+    /// <returns>What is wrong; empty when nothing is.</returns>
+    public static IReadOnlyList<string> CheckGitHubRelease(GitHubRelease actual, ReleaseVersion release, string commit, string notes)
+    {
+        ArgumentNullException.ThrowIfNull(actual);
+        ArgumentNullException.ThrowIfNull(release);
+
+        var problems = new List<string>();
+        if (actual.Draft)
+        {
+            problems.Add("it is still a draft");
+        }
+
+        if (actual.Prerelease != release.IsPrerelease)
+        {
+            problems.Add(release.IsPrerelease ? "it is not marked as a prerelease" : "it is marked as a prerelease");
+        }
+
+        // A stable release becomes the latest one, until a newer one replaces it.
+        if (!release.IsPrerelease && actual.LatestTag != release.Tag
+            && (actual.LatestTag is null || CompareVersions(ReleaseVersion.Normalize(actual.LatestTag), release.Version) < 0))
+        {
+            problems.Add($"it is not the latest release; the older {actual.LatestTag ?? "(none)"} is");
+        }
+        else if (release.IsPrerelease && actual.LatestTag == release.Tag)
+        {
+            problems.Add("it is marked as the latest release, though it is a prerelease");
+        }
+
+        if (!string.Equals(actual.TagCommit, commit, StringComparison.OrdinalIgnoreCase))
+        {
+            problems.Add($"{release.Tag} points at {actual.TagCommit ?? "nothing"}, not {commit}");
+        }
+
+        static string Normalize(string? text) => (text ?? "").ReplaceLineEndings("\n").Trim();
+        if (Normalize(actual.Body) != Normalize(notes))
+        {
+            problems.Add("its description is not the version's CHANGELOG.md section");
+        }
+
+        var expected = ReleaseAssets(release.Version);
+        problems.AddRange(expected.Except(actual.Assets, StringComparer.Ordinal).Select(asset => $"{asset} is not attached"));
+        problems.AddRange(actual.Assets.Except(expected, StringComparer.Ordinal).Order(StringComparer.Ordinal)
+            .Select(asset => $"{asset} is attached, but not expected"));
+
+        return problems;
     }
 }
