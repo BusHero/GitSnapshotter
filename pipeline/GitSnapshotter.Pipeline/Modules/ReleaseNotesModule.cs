@@ -33,31 +33,28 @@ public sealed class ReleaseNotesModule(IOptions<BuildSettings> settings) : Modul
         ArgumentNullException.ThrowIfNull(context);
 
         var release = (await context.GetModule<ReleaseVersionModule>()).ValueOrDefault!;
-        var lines = await File.ReadAllLinesAsync(Paths.Changelog(context), cancellationToken);
+        var (section, notes, file) = await WriteAsync(
+            Paths.Changelog(context), release, Paths.ReleaseNotesDirectory(context, settings.Value), cancellationToken);
 
-        var from = release.Version;
-        var notes = Changelog.Section(lines, release.Version);
-        if (notes.Length == 0 && release.IsPrerelease)
-        {
-            from = Changelog.Unreleased;
-            notes = Changelog.Section(lines, Changelog.Unreleased);
-        }
+        context.Logger.LogInformation(
+            "Release description, from the '{Section}' section of CHANGELOG.md:\n{Notes}", section, notes);
 
-        if (notes.Length == 0)
-        {
-            throw new InvalidOperationException(release.IsPrerelease
-                ? $"CHANGELOG.md has nothing under '## [{release.Version}]' or '## [{Changelog.Unreleased}]' to describe this release"
-                : $"CHANGELOG.md has no '## [{release.Version}]' section. Rename {Changelog.Unreleased} to it before releasing.");
-        }
+        return file;
+    }
 
-        var directory = Paths.ReleaseNotesDirectory(context, settings.Value);
+    /// <summary>Writes the release description for <paramref name="release"/> to <paramref name="directory"/>.</summary>
+    /// <returns>The CHANGELOG.md section the notes come from, the notes, and the file they were written to.</returns>
+    /// <exception cref="InvalidOperationException">CHANGELOG.md has nothing to describe the release with.</exception>
+    internal static async Task<(string Section, string Notes, string File)> WriteAsync(
+        string changelog, ReleaseVersion release, string directory, CancellationToken cancellationToken)
+    {
+        var lines = await File.ReadAllLinesAsync(changelog, cancellationToken);
+        var (section, notes) = Changelog.ReleaseNotes(lines, release);
+
         Directory.CreateDirectory(directory);
         var file = Path.Combine(directory, FileName);
         await File.WriteAllTextAsync(file, notes + "\n", new UTF8Encoding(false), cancellationToken);
 
-        context.Logger.LogInformation(
-            "Release description, from the '{Section}' section of CHANGELOG.md:\n{Notes}", from, notes);
-
-        return file;
+        return (section, notes, file);
     }
 }

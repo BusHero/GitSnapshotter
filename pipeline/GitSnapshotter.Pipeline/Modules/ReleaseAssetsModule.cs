@@ -38,10 +38,31 @@ public sealed class ReleaseAssetsModule(IOptions<BuildSettings> settings) : Modu
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        var version = settings.Value.Version!;
-        var publish = (await context.GetModule<PackModule>()).ValueOrDefault!;
-        var release = Paths.ReleaseDirectory(context, settings.Value);
+        var files = await CreateAsync(
+            (await context.GetModule<PackModule>()).ValueOrDefault!,
+            Paths.ReleaseDirectory(context, settings.Value),
+            settings.Value.Version!,
+            cancellationToken);
 
+        foreach (var file in files)
+        {
+            context.Logger.LogInformation("{File} ({Bytes} bytes)", Path.GetFileName(file), new FileInfo(file).Length);
+        }
+
+        return Paths.ReleaseDirectory(context, settings.Value);
+    }
+
+    /// <summary>
+    /// Replaces <paramref name="release"/> with the release assets made from <paramref name="publish"/>, the publish
+    /// directory: the packages, the console app zip and the checksums.
+    /// </summary>
+    /// <returns>The files in <paramref name="release"/>, in order.</returns>
+    /// <exception cref="InvalidOperationException">
+    /// <paramref name="publish"/> doesn't hold exactly the expected packages at <paramref name="version"/>.
+    /// </exception>
+    internal static async Task<IReadOnlyList<string>> CreateAsync(
+        string publish, string release, string version, CancellationToken cancellationToken)
+    {
         var expected = PackageIds.Select(id => $"{id}.{version}.nupkg").Order(StringComparer.Ordinal).ToList();
         var actual = Directory.EnumerateFiles(publish, "*.nupkg")
             .Select(file => Path.GetFileName(file))
@@ -68,12 +89,7 @@ public sealed class ReleaseAssetsModule(IOptions<BuildSettings> settings) : Modu
         ZipConsoleApp(publish, Path.Combine(release, $"GitSnapshotter.Console_{version}.zip"));
         await WriteChecksumsAsync(release, cancellationToken);
 
-        foreach (var file in Directory.EnumerateFiles(release).Order(StringComparer.Ordinal))
-        {
-            context.Logger.LogInformation("{File} ({Bytes} bytes)", Path.GetFileName(file), new FileInfo(file).Length);
-        }
-
-        return release;
+        return [.. Directory.EnumerateFiles(release).Order(StringComparer.Ordinal)];
     }
 
     private static bool IsPackage(string file) =>

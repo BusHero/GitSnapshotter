@@ -1,9 +1,11 @@
+using System.Globalization;
+
 using ModularPipelines.Context;
 using ModularPipelines.Git.Extensions;
 
 namespace GitSnapshotter.Pipeline;
 
-/// <summary>The version both packages (the library and the .NET tool) get from one pipeline run.</summary>
+/// <summary>The versions one pipeline run gives the packages (the library and the .NET tool) and the console app.</summary>
 internal static class PackageVersion
 {
     // Taken once, so both packages of a prerelease build share the same timestamp.
@@ -13,14 +15,53 @@ internal static class PackageVersion
     /// The prerelease suffix for <c>VersionPrefix</c>: none on a release build (the version comes from
     /// <see cref="BuildSettings.VersionProperties"/>), otherwise the branch and the build time.
     /// </summary>
-    public static string? Suffix(IPipelineContext context, BuildSettings settings)
+    public static string? Suffix(IPipelineContext context, BuildSettings settings) =>
+        Suffix(settings, context.Git().Information.BranchName, BuildTime);
+
+    /// <inheritdoc cref="Suffix(IPipelineContext, BuildSettings)"/>
+    /// <param name="settings">The pipeline settings.</param>
+    /// <param name="branch">The branch being built; none on a detached HEAD.</param>
+    /// <param name="buildTime">When the build started, in UTC.</param>
+    public static string? Suffix(BuildSettings settings, string? branch, DateTime buildTime)
     {
+        ArgumentNullException.ThrowIfNull(settings);
+
         if (settings.IsRelease)
         {
             return null;
         }
 
-        var branch = (context.Git().Information.BranchName ?? "local").Replace('/', '-');
-        return $"{branch}-{BuildTime:yyyyMMddHHmmss}";
+        // A suffix is a single prerelease label part: "feature/x" would not be a valid version.
+        branch = string.IsNullOrEmpty(branch) ? "local" : branch.Replace('/', '-');
+        return string.Create(CultureInfo.InvariantCulture, $"{branch}-{buildTime:yyyyMMddHHmmss}");
+    }
+
+    /// <summary>
+    /// The console app's version: the release version on a release build, otherwise <c>yyyyMMddHHmmss+trunk</c>, or
+    /// <c>+merge</c> off the default branch.
+    /// </summary>
+    /// <param name="settings">The pipeline settings.</param>
+    /// <param name="branch">The branch being built; none on a detached HEAD.</param>
+    /// <param name="defaultBranch">The repository's default branch, when <see cref="BuildSettings.DefaultBranch"/> isn't set.</param>
+    /// <param name="buildTime">When the build started, in UTC.</param>
+    public static string Console(BuildSettings settings, string? branch, string? defaultBranch, DateTime buildTime)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+
+        if (settings.IsRelease)
+        {
+            return settings.Version!;
+        }
+
+        var onDefaultBranch = branch == (settings.DefaultBranch ?? defaultBranch);
+        return string.Create(
+            CultureInfo.InvariantCulture, $"{buildTime:yyyyMMddHHmmss}+{(onDefaultBranch ? "trunk" : "merge")}");
+    }
+
+    /// <inheritdoc cref="Console(BuildSettings, string, string, DateTime)"/>
+    public static string Console(IPipelineContext context, BuildSettings settings)
+    {
+        var git = context.Git().Information;
+        return Console(settings, git.BranchName, git.DefaultBranchName, DateTime.UtcNow);
     }
 }

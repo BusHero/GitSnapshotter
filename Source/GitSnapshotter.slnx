@@ -16,6 +16,7 @@
   <Project Path="../pipeline/GitSnapshotter.Pipeline/GitSnapshotter.Pipeline.csproj">
     <Build Project="false" />
   </Project>
+  <Project Path="../pipeline/GitSnapshotter.Pipeline.Tests/GitSnapshotter.Pipeline.Tests.csproj" />
   <Project Path="Constants/Constants.csproj" />
   <Project Path="GitSnapshotter.Console/GitSnapshotter.Console.csproj" />
   <Project Path="GitSnapshotter.UnitTests/GitSnapshotter.UnitTests.csproj" />

@@ -27,9 +27,7 @@ public sealed class ReleaseVersionModule(IOptions<BuildSettings> settings) : Mod
 
         var release = ReleaseVersion.Parse(settings.Value.Version!);
 
-        await GitHubActions.SetOutputAsync("version", release.Version, cancellationToken);
-        await GitHubActions.SetOutputAsync("tag", release.Tag, cancellationToken);
-        await GitHubActions.SetOutputAsync("prerelease", release.IsPrerelease ? "true" : "false", cancellationToken);
+        await SetOutputsAsync(release, cancellationToken);
 
         context.Logger.LogInformation(
             "Releasing {Version} as {Tag} ({Kind})",
@@ -38,5 +36,13 @@ public sealed class ReleaseVersionModule(IOptions<BuildSettings> settings) : Mod
             release.IsPrerelease ? "prerelease" : "stable");
 
         return release;
+    }
+
+    /// <summary>Sets the step's <c>version</c>, <c>tag</c> and <c>prerelease</c> outputs, on GitHub Actions.</summary>
+    internal static async Task SetOutputsAsync(ReleaseVersion release, CancellationToken cancellationToken)
+    {
+        await GitHubActions.SetOutputAsync("version", release.Version, cancellationToken);
+        await GitHubActions.SetOutputAsync("tag", release.Tag, cancellationToken);
+        await GitHubActions.SetOutputAsync("prerelease", release.IsPrerelease ? "true" : "false", cancellationToken);
     }
 }

@@ -29,8 +29,10 @@ dotnet test --solution Source/GitSnapshotter.slnx
 
 The pipeline is written with [ModularPipelines](https://github.com/thomhurst/ModularPipelines) in
 `pipeline/GitSnapshotter.Pipeline`. Each step is a module in `Modules/`; modules run in parallel as far as their
-`[DependsOn]` attributes allow. Settings come from the `Build` configuration section, as environment variables
-(`Build__PublishDirectory=out`) or arguments (`./build.sh --Build:PublishDirectory=out`):
+`[DependsOn]` attributes allow. Its tests are in `pipeline/GitSnapshotter.Pipeline.Tests`, which compiles the
+pipeline's sources and is part of the solution, so `dotnet test` and the `Test` target run them. Settings come from
+the `Build` configuration section, as environment variables (`Build__PublishDirectory=out`) or arguments
+(`./build.sh --Build:PublishDirectory=out`):
 
 | Setting | Default | Purpose |
 |---|---|---|

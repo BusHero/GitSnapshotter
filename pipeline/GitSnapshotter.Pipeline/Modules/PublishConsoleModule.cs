@@ -4,7 +4,6 @@ using ModularPipelines.Attributes;
 using ModularPipelines.Context;
 using ModularPipelines.DotNet.Extensions;
 using ModularPipelines.DotNet.Options;
-using ModularPipelines.Git.Extensions;
 using ModularPipelines.Modules;
 
 namespace GitSnapshotter.Pipeline.Modules;
@@ -32,17 +31,10 @@ public sealed class PublishConsoleModule(IOptions<BuildSettings> settings) : Mod
             },
             cancellationToken: cancellationToken);
 
-        var version = settings.Value.IsRelease ? settings.Value.Version! : BuildVersion(context);
+        var version = PackageVersion.Console(context, settings.Value);
 
         await GitHubActions.SetOutputAsync("version", version, cancellationToken);
 
         return version;
-    }
-
-    private string BuildVersion(IModuleContext context)
-    {
-        var git = context.Git().Information;
-        var defaultBranch = settings.Value.DefaultBranch ?? git.DefaultBranchName;
-        return $"{DateTime.UtcNow:yyyyMMddHHmmss}+{(git.BranchName == defaultBranch ? "trunk" : "merge")}";
     }
 }

@@ -56,21 +56,41 @@ public sealed class VerifyReleaseModule(IOptions<BuildSettings> settings) : Modu
         return true;
     }
 
-    // A run started on a feature branch must not become a release.
+    /// <summary>Whether <see cref="VerifyNotReleased"/> found the release's tag.</summary>
+    internal enum TagState
+    {
+        /// <summary>The tag doesn't exist: this is the first attempt at the release.</summary>
+        Missing,
+
+        /// <summary>The tag is on the commit being released: an earlier attempt created it.</summary>
+        OnThisCommit,
+    }
+
     private Task VerifyBranch(IModuleContext context)
     {
         var git = context.Git().Information;
-        var defaultBranch = settings.Value.DefaultBranch ?? git.DefaultBranchName;
-        var reference = Environment.GetEnvironmentVariable("GITHUB_REF") is { Length: > 0 } githubRef
-            ? githubRef
-            : $"refs/heads/{git.BranchName}";
-
-        return reference == $"refs/heads/{defaultBranch}"
-            ? Task.CompletedTask
-            : throw new InvalidOperationException($"Started on {reference}; run the release workflow on {defaultBranch}");
+        VerifyBranch(
+            Environment.GetEnvironmentVariable("GITHUB_REF"),
+            git.BranchName,
+            settings.Value.DefaultBranch ?? git.DefaultBranchName);
+        return Task.CompletedTask;
     }
 
-    // Each version is released once. A re-run finds its own tag on the same commit and goes on.
+    /// <summary>A run started on a feature branch must not become a release.</summary>
+    /// <param name="githubRef">The ref GitHub Actions started the run on (<c>GITHUB_REF</c>), if any.</param>
+    /// <param name="branch">The branch checked out, used when there is no <paramref name="githubRef"/>.</param>
+    /// <param name="defaultBranch">The repository's default branch.</param>
+    /// <exception cref="InvalidOperationException">The run is not on the default branch.</exception>
+    internal static void VerifyBranch(string? githubRef, string? branch, string? defaultBranch)
+    {
+        var reference = string.IsNullOrEmpty(githubRef) ? $"refs/heads/{branch}" : githubRef;
+
+        if (string.IsNullOrEmpty(defaultBranch) || reference != $"refs/heads/{defaultBranch}")
+        {
+            throw new InvalidOperationException($"Started on {reference}; run the release workflow on {defaultBranch}");
+        }
+    }
+
     private static async Task VerifyNotReleased(
         IModuleContext context, IGitHubClient client, string owner, string repository, string tag, string commit)
     {
@@ -85,56 +105,92 @@ public sealed class VerifyReleaseModule(IOptions<BuildSettings> settings) : Modu
             tagged = null;
         }
 
-        if (string.IsNullOrEmpty(tagged))
+        if (CheckTag(tag, tagged, commit) == TagState.Missing)
         {
             context.Logger.LogInformation("{Tag} does not exist yet", tag);
-            return;
         }
-
-        if (!string.Equals(tagged, commit, StringComparison.OrdinalIgnoreCase))
+        else
         {
-            throw new InvalidOperationException($"{tag} already exists on {tagged}; pick a new version");
+            context.Logger.LogInformation("{Tag} already points at {Commit}: continuing an earlier attempt", tag, commit);
+        }
+    }
+
+    /// <summary>Each version is released once. A re-run finds its own tag on the same commit and goes on.</summary>
+    /// <param name="tag">The release's tag.</param>
+    /// <param name="tagged">The commit the tag points at; none when there is no such tag.</param>
+    /// <param name="commit">The commit being released.</param>
+    /// <exception cref="InvalidOperationException">The tag is on another commit: the version is released already.</exception>
+    internal static TagState CheckTag(string tag, string? tagged, string commit)
+    {
+        if (string.IsNullOrEmpty(tagged))
+        {
+            return TagState.Missing;
         }
 
-        context.Logger.LogInformation("{Tag} already points at {Commit}: continuing an earlier attempt", tag, commit);
+        return string.Equals(tagged, commit, StringComparison.OrdinalIgnoreCase)
+            ? TagState.OnThisCommit
+            : throw new InvalidOperationException($"{tag} already exists on {tagged}; pick a new version");
     }
 
     // The publish job's approval gate lives in the repository settings, so check here that it is still there.
-    // Octokit has no model for an environment's protection rules, so this reads the REST API directly.
     private async Task VerifyEnvironment(
         IModuleContext context, IGitHubClient client, string owner, string repository, CancellationToken cancellationToken)
     {
         var environment = settings.Value.ReleaseEnvironment;
-        var unreadable = $"Could not read the '{environment}' environment. Create it in Settings > Environments and "
-            + "add a required reviewer.";
 
         using var http = new HttpClient { BaseAddress = client.Connection.BaseAddress };
-        using var request = new HttpRequestMessage(
-            HttpMethod.Get,
-            new Uri($"repos/{owner}/{repository}/environments/{Uri.EscapeDataString(environment)}", UriKind.Relative));
-        request.Headers.Accept.ParseAdd("application/vnd.github+json");
-        request.Headers.UserAgent.ParseAdd("GitSnapshotter.Pipeline");
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", client.Connection.Credentials.Password);
-
+        using var request = EnvironmentRequest(owner, repository, environment, client.Connection.Credentials.Password);
         using var response = await http.SendAsync(request, cancellationToken);
-        if (response.StatusCode != HttpStatusCode.OK)
-        {
-            throw new InvalidOperationException($"{unreadable} ({(int)response.StatusCode} {response.ReasonPhrase})");
-        }
-
-        var reviewers = CountRequiredReviewers(await response.Content.ReadAsByteArrayAsync(cancellationToken));
-        if (reviewers < 1)
-        {
-            throw new InvalidOperationException(
-                $"The '{environment}' environment has no required reviewers. Add one in Settings > Environments so "
-                + "every release is approved by hand.");
-        }
+        var reviewers = await RequiredReviewersAsync(response, environment, cancellationToken);
 
         context.Logger.LogInformation(
             "'{Environment}' requires approval from {Reviewers} reviewer(s)", environment, reviewers);
     }
 
-    private static int CountRequiredReviewers(byte[] body)
+    /// <summary>
+    /// The REST API request for an environment, relative to the API's base address. Octokit has no model for an
+    /// environment's protection rules, so the module reads the API directly.
+    /// </summary>
+    internal static HttpRequestMessage EnvironmentRequest(string owner, string repository, string environment, string token)
+    {
+        var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            new Uri($"repos/{owner}/{repository}/environments/{Uri.EscapeDataString(environment)}", UriKind.Relative));
+        request.Headers.Accept.ParseAdd("application/vnd.github+json");
+        request.Headers.UserAgent.ParseAdd("GitSnapshotter.Pipeline");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        return request;
+    }
+
+    /// <summary>The number of required reviewers in a response to <see cref="EnvironmentRequest"/>.</summary>
+    /// <exception cref="InvalidOperationException">
+    /// The environment couldn't be read, or it has no required reviewers. The release fails closed either way.
+    /// </exception>
+    internal static async Task<int> RequiredReviewersAsync(
+        HttpResponseMessage response, string environment, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+
+        if (response.StatusCode != HttpStatusCode.OK)
+        {
+            throw new InvalidOperationException(
+                $"Could not read the '{environment}' environment. Create it in Settings > Environments and add a "
+                + $"required reviewer. ({(int)response.StatusCode} {response.ReasonPhrase})");
+        }
+
+        var reviewers = CountRequiredReviewers(await response.Content.ReadAsByteArrayAsync(cancellationToken));
+        return reviewers >= 1
+            ? reviewers
+            : throw new InvalidOperationException(
+                $"The '{environment}' environment has no required reviewers. Add one in Settings > Environments so "
+                + "every release is approved by hand.");
+    }
+
+    /// <summary>
+    /// The number of reviewers an environment's <c>required_reviewers</c> rules name, from the REST API's environment
+    /// response; 0 when it has no such rule.
+    /// </summary>
+    internal static int CountRequiredReviewers(byte[] body)
     {
         using var json = JsonDocument.Parse(body);
         if (!json.RootElement.TryGetProperty("protection_rules", out var rules) || rules.ValueKind != JsonValueKind.Array)
