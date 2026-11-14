@@ -6,6 +6,7 @@
     <File Path="../.gitignore" />
     <File Path="../build.cmd" />
     <File Path="../build.sh" />
+    <File Path="../CHANGELOG.md" />
     <File Path="../Directory.Build.props" />
     <File Path="../Directory.Build.targets" />
     <File Path="../Directory.Packages.props" />
@@ -13,10 +14,10 @@
     <File Path="../LICENSE" />
     <File Path="../README.md" />
   </Folder>
+  <Project Path="../pipeline/GitSnapshotter.Pipeline.Tests/GitSnapshotter.Pipeline.Tests.csproj" />
   <Project Path="../pipeline/GitSnapshotter.Pipeline/GitSnapshotter.Pipeline.csproj">
     <Build Project="false" />
   </Project>
-  <Project Path="../pipeline/GitSnapshotter.Pipeline.Tests/GitSnapshotter.Pipeline.Tests.csproj" />
   <Project Path="Constants/Constants.csproj" />
   <Project Path="GitSnapshotter.Console/GitSnapshotter.Console.csproj" />
   <Project Path="GitSnapshotter.UnitTests/GitSnapshotter.UnitTests.csproj" />

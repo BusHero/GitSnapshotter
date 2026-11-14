@@ -314,6 +314,8 @@ jobs:
     container: ${{ matrix.container }}
     permissions:
       contents: read
+    environment:
+      name: smoke tests
     steps:
       # Before the checkout, so it clones with git: the pipeline and the tool read the repository.
       - name: 'Setup: Alpine packages'
