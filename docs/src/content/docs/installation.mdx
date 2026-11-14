@@ -24,18 +24,19 @@ Releases are published to [nuget.org](https://www.nuget.org/packages/GitSnapshot
   <TabItem label="PackageReference">
     ```xml title="MyProject.csproj"
     <ItemGroup>
-      <PackageReference Include="GitSnapshotter" Version="x.y.z" />
+      <PackageReference Include="GitSnapshotter" Version="0.2.0" />
     </ItemGroup>
     ```
 
-    Replace `x.y.z` with the [latest version](https://www.nuget.org/packages/GitSnapshotter).
+    `0.2.0` is the latest version at the time of writing; check [nuget.org](https://www.nuget.org/packages/GitSnapshotter)
+    for newer ones.
   </TabItem>
   <TabItem label="Central versions">
     With `Directory.Packages.props`, put the version there and leave it out of the project:
 
     ```xml title="Directory.Packages.props"
     <ItemGroup>
-      <PackageVersion Include="GitSnapshotter" Version="x.y.z" />
+      <PackageVersion Include="GitSnapshotter" Version="0.2.0" />
     </ItemGroup>
     ```
 
@@ -52,7 +53,7 @@ Releases are published to [nuget.org](https://www.nuget.org/packages/GitSnapshot
   </TabItem>
 </Tabs>
 
-Release candidates (versions like `0.2.0-rc.1`) are published to nuget.org too. The commands above pick the latest
+Release candidates (versions like `0.2.0-rc.2`) are published to nuget.org too. The commands above pick the latest
 stable version; for the latest release candidate, add `--prerelease` (`-IncludePrerelease` in the PM Console), or
 put its version in the project file. Every release is also on the
 [GitHub releases page](https://github.com/BusHero/GitSnapshotter/releases), with its `.nupkg` attached and its
@@ -102,10 +103,10 @@ GitHub Packages requires authentication even for public packages, so you need a 
 
 3. Find the build you want on the
    [package's page on GitHub](https://github.com/BusHero/GitSnapshotter/pkgs/nuget/GitSnapshotter). Builds are
-   versioned `<next version>-<branch>-<timestamp>`, such as `0.2.0-trunk-20261114122606`. Add that exact version:
+   versioned `<next version>-<branch>-<timestamp>`, such as `0.3.0-trunk-20261114130000`. Add that exact version:
 
    ```sh
-   dotnet add package GitSnapshotter --version 0.2.0-trunk-20261114122606
+   dotnet add package GitSnapshotter --version 0.3.0-trunk-20261114130000
    ```
 
    Give the version explicitly rather than using `--prerelease`, which picks the highest version from either feed.
@@ -157,6 +158,9 @@ needed. These commands install the latest stable version; add `--prerelease` for
     dotnet tool install GitSnapshotter.Tool
     dotnet tool run gitsnapshotter help   # or: dotnet gitsnapshotter help
     ```
+
+    This pins the latest stable version (`0.2.0` at the time of writing). To pin a specific one, add
+    `--version 0.2.0`.
   </TabItem>
 </Tabs>
 
