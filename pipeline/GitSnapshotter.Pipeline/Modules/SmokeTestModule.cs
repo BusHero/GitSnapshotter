@@ -31,8 +31,9 @@ public sealed class SmokeTestModule(IOptions<BuildSettings> settings) : Module<C
             {
                 Project = Paths.SmokeTests(context),
                 Configuration = settings.Value.Configuration,
-                // Every test's output, so a run on a build server shows what it checked.
-                Arguments = ["--", "--output", "Detailed"],
+                // Every test's output, so a run on a build server shows what it checked; and a limit, so a run that
+                // hangs fails with what each test was doing instead of waiting for the job to be cancelled.
+                Arguments = ["--", "--output", "Detailed", "--timeout", "45m"],
             },
             new CommandExecutionOptions
             {

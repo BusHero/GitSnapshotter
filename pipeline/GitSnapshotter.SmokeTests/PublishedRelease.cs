@@ -40,8 +40,11 @@ public sealed class PublishedRelease : IAsyncInitializer, IAsyncDisposable
 
     public HttpClient Http { get; }
 
-    /// <summary>The temporary directory everything happens in.</summary>
-    public string Work { get; } = Directory.CreateTempSubdirectory("gitsnapshotter-smoke-").FullName;
+    /// <summary>
+    /// The temporary directory everything happens in. Made when the tests start, not when the fixture is: listing
+    /// the tests creates it without starting or disposing it.
+    /// </summary>
+    public string Work { get; private set; } = "";
 
     /// <summary>Our packages from <see cref="SmokeTestSettings.Source"/>, the rest from the previous releases' feed.</summary>
     public string NuGetConfig => Path.Combine(Work, "nuget.config");
@@ -88,6 +91,7 @@ public sealed class PublishedRelease : IAsyncInitializer, IAsyncDisposable
 
     public async Task InitializeAsync()
     {
+        Work = Directory.CreateTempSubdirectory("gitsnapshotter-smoke-").FullName;
         Console.WriteLine($"Smoke testing {Version} from {Settings.Source} in {Work}");
 
         await WriteAsync(NuGetConfig, SmokeTestChecks.NuGetConfig(
@@ -123,16 +127,36 @@ public sealed class PublishedRelease : IAsyncInitializer, IAsyncDisposable
     {
         Http.Dispose();
         _handler.Dispose();
+        // Only a temporary directory: failing to remove it fails no test.
+        if (Work.Length == 0)
+        {
+            return ValueTask.CompletedTask;
+        }
+
         try
         {
-            Directory.Delete(Work, recursive: true);
+            DeleteDirectory(Work);
         }
-        catch (IOException exception)
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
             Console.WriteLine($"Could not delete {Work}: {exception.Message}");
         }
 
         return ValueTask.CompletedTask;
+    }
+
+    /// <summary>
+    /// Deletes a directory with everything in it, read-only files included: git makes its object files read-only, and
+    /// on Windows a read-only file can't be deleted (UnauthorizedAccessException).
+    /// </summary>
+    public static void DeleteDirectory(string path)
+    {
+        foreach (var file in Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
+        {
+            File.SetAttributes(file, FileAttributes.Normal);
+        }
+
+        Directory.Delete(path, recursive: true);
     }
 
     /// <summary>The tool's command in a tool path.</summary>
@@ -162,6 +186,12 @@ public sealed class PublishedRelease : IAsyncInitializer, IAsyncDisposable
                 ["DOTNET_CLI_HOME"] = Path.Combine(Work, "cli-home"),
                 ["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1",
                 ["DOTNET_NOLOGO"] = "1",
+
+                // No MSBuild nodes or compiler server left running after a build: they inherit the command's output,
+                // which then never ends.
+                ["MSBUILDDISABLENODEREUSE"] = "1",
+                ["DOTNET_CLI_USE_MSBUILD_SERVER"] = "0",
+                ["UseSharedCompilation"] = "false",
             });
     }
 

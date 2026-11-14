@@ -325,6 +325,8 @@ jobs:
           - { name: Alpine Linux, os: ubuntu-latest, container: 'mcr.microsoft.com/dotnet/sdk:11.0-alpine' }
     runs-on: ${{ matrix.os }}
     container: ${{ matrix.container }}
+    # The smoke tests time out after 45 minutes themselves; this catches a hang outside them.
+    timeout-minutes: 60
     permissions:
       contents: read
       # A CI build's packages are on GitHub Packages, which needs a token even for public packages.
