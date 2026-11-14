@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <title>GitSnapshotter</title>
+  <rect width="256" height="256" rx="56" fill="#FFF7ED"/>
+  <g transform="rotate(-10 128 128)">
+    <rect x="58" y="46" width="140" height="164" rx="12" fill="#FDBA74"/>
+  </g>
+  <g transform="rotate(5 128 128)">
+    <rect x="58" y="46" width="140" height="164" rx="12" fill="#FFFFFF" stroke="#7C2D12" stroke-width="8"/>
+    <rect x="74" y="62" width="108" height="104" rx="6" fill="#7C2D12"/>
+    <g fill="none" stroke="#FFF7ED" stroke-width="8" stroke-linecap="round">
+      <path d="M106 82V146"/>
+      <path d="M106 128c0-20 44-18 44-40"/>
+    </g>
+    <g fill="#FFF7ED"><circle cx="106" cy="82" r="10"/><circle cx="106" cy="146" r="10"/></g>
+    <circle cx="150" cy="86" r="12" fill="#FB923C"/>
+    <rect x="88" y="182" width="80" height="8" rx="4" fill="#FDBA74"/>
+  </g>
+</svg>
