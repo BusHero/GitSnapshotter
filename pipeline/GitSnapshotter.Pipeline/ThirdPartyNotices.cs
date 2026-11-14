@@ -21,6 +21,16 @@ internal static class ThirdPartyNotices
     /// </summary>
     public static readonly string[] PackageAssets = ["contentFiles"];
 
+    /// <summary>
+    /// Copyright holders for packages whose nuspec doesn't state one, taken from the project's own license file.
+    /// Used only when the package has no copyright of its own.
+    /// </summary>
+    private static readonly Dictionary<string, string> Copyrights = new(StringComparer.OrdinalIgnoreCase)
+    {
+        // https://github.com/SimonCropp/Polyfill/blob/main/license.txt
+        ["Polyfill"] = "Copyright (c) Simon Cropp",
+    };
+
     /// <summary>License texts for license expressions whose packages don't include a license file.</summary>
     private static readonly Dictionary<string, string> LicenseTexts = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -162,7 +172,9 @@ internal static class ThirdPartyNotices
             .Select(file => (Path.GetFileName(file), File.ReadAllText(file)))
             .ToList();
 
-        return new Package(id, version, Get("projectUrl"), Get("copyright"), licenseName, licenseText, notices);
+        var copyright = Get("copyright") ?? Copyrights.GetValueOrDefault(id);
+
+        return new Package(id, version, Get("projectUrl"), copyright, licenseName, licenseText, notices);
     }
 
     private static string Render(string product, List<Package> packages)
