@@ -5,12 +5,17 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>
-    
+
     <PropertyGroup>
         <PackageId>GitSnapshotter</PackageId>
-        <VersionPrefix>0.0.5</VersionPrefix>
+        <VersionPrefix>0.1.0</VersionPrefix>
         <Authors>BusHero</Authors>
+        <Description>Take a snapshot of a git repository's branches, tags, remotes, HEAD and (optionally) working tree, and restore it later.</Description>
+        <PackageTags>git;snapshot;restore;libgit2sharp;testing</PackageTags>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
         <RepositoryUrl>https://github.com/BusHero/GitSnapshotter.git</RepositoryUrl>
     </PropertyGroup>
 
@@ -19,5 +24,8 @@
     </ItemGroup>
     <ItemGroup>
         <None Include="docs\README.md" Pack="true" PackagePath="\"/>
+    </ItemGroup>
+    <ItemGroup>
+        <InternalsVisibleTo Include="GitSnapshotter.UnitTests" />
     </ItemGroup>
 </Project>
