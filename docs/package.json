@@ -3,6 +3,9 @@
   "type": "module",
   "private": true,
   "scripts": {
+    "copy-favicon": "node -e \"require('fs').copyFileSync('../assets/logo/icon.svg','public/favicon.svg')\"",
+    "predev": "npm run copy-favicon",
+    "prebuild": "npm run copy-favicon",
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview"

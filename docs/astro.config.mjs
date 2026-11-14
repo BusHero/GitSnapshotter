@@ -9,6 +9,12 @@ export default defineConfig({
   integrations: [
     starlight({
       title: 'GitSnapshotter',
+      // The logo lives in assets/logo at the repository root; see also the favicon copy in package.json.
+      logo: {
+        light: '../assets/logo/icon-light.svg',
+        dark: '../assets/logo/icon-dark.svg',
+      },
+      favicon: '/favicon.svg',
       description:
         "Snapshot a git repository's HEAD, branches, remotes, tags and working tree, and restore it later.",
       social: [

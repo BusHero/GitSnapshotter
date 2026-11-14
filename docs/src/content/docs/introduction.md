@@ -4,7 +4,8 @@ description: What GitSnapshotter records, and what it doesn't.
 ---
 
 GitSnapshotter is a .NET library and command-line tool that records the state of a git repository and puts it back
-later. It is built on [LibGit2Sharp](https://github.com/libgit2/libgit2sharp) and targets .NET 10.
+later. It is built on [LibGit2Sharp](https://github.com/libgit2/libgit2sharp) and runs on .NET 8 and later, and on .NET
+Framework 4.7.2 and later.
 
 ## What a snapshot records
 
