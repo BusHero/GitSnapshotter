@@ -1,4 +1,9 @@
-# GitSnapshotter
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo/wordmark-dark.svg">
+    <img alt="GitSnapshotter" src="assets/logo/wordmark-light.svg" width="380">
+  </picture>
+</h1>
 
 A .NET library and command-line tool that snapshots a git repository's state (HEAD, branches, remotes, tags, other
 refs, and optionally the index and working tree) and restores it later.

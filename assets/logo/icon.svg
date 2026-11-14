@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256"><title>GitSnapshotter</title><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1E3A8A"/><stop offset="1" stop-color="#0F172A"/></linearGradient></defs>
+<rect width="256" height="256" rx="56" fill="url(#g)"/><g fill="none" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round" stroke-linejoin="round">
+<path d="M36 82V50a14 14 0 0 1 14-14h32"/><path d="M174 36h32a14 14 0 0 1 14 14v32"/>
+<path d="M220 174v32a14 14 0 0 1-14 14h-32"/><path d="M82 220h-32a14 14 0 0 1-14-14v-32"/></g><g transform="translate(-1 9)"><g fill="none" stroke="#7DD3FC" stroke-width="12" stroke-linecap="round"><path d="M104 78V178"/><path d="M104 150c0-30 50-26 50-56V88"/></g>
+<g fill="#15296b" stroke="#7DD3FC" stroke-width="10"><circle cx="104" cy="78" r="13"/><circle cx="104" cy="178" r="13"/></g>
+<circle cx="154" cy="80" r="17" fill="#F472B6"/></g></svg>
