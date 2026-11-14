@@ -1,0 +1,8 @@
+<Project>
+  <PropertyGroup>
+    <!-- Every project records its full resolved package graph in packages.lock.json. -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <!-- On CI (GitHub Actions sets CI=true), restore fails if a lock file is missing or out of date. -->
+    <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
+  </PropertyGroup>
+</Project>

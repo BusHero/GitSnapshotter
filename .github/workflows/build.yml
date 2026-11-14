@@ -7,6 +7,8 @@ on:
       - 'pipeline/**'
       - '.github/workflows/**'
       - 'global.json'
+      - 'Directory.Build.props'
+      - 'Directory.Packages.props'
       - 'build.sh'
       - 'build.cmd'
 
@@ -26,7 +28,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-${{ hashFiles('**/global.json', '**/*.csproj', '**/Directory.Packages.props') }}
+          key: ${{ runner.os }}-${{ hashFiles('**/global.json', '**/packages.lock.json') }}
       
       - name: 'Configure git credentials'
         run: |

@@ -27,6 +27,10 @@ The pipeline is written with [ModularPipelines](https://github.com/thomhurst/Mod
 | `NuGetApiKey` | none | Pushes the package when set; otherwise the push is skipped |
 | `NuGetSource` | GitHub Packages | Feed to push to |
 
+Package versions live in `Directory.Packages.props`, and each project's resolved package graph is recorded in its
+`packages.lock.json`. A normal restore updates the lock files; commit them with the version change. CI (and the
+pre-push hook) restore in locked mode and fail if a lock file is out of date.
+
 Every push to `trunk` publishes a prerelease package, so enable the pre-push hook once per clone. It runs the
 test suite on the commit being pushed to `trunk` and stops the push if anything fails:
 
