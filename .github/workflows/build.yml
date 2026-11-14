@@ -2,7 +2,7 @@ name: build
 
 on:
   push:
-    # Version tags are built by release.yml.
+    # Branches only: a release tag points at a commit release.yml already built and published.
     branches: ['**']
     paths:
       - 'Source/**'
