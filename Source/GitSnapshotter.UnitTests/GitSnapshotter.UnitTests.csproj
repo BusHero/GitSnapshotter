@@ -24,6 +24,13 @@
       .NET Framework tests can only run on Windows. Elsewhere the net472 build still compiles (so the lock file is
       the same on every OS), but dotnet test leaves it out.
     -->
+    <!--
+      A .NET Framework test app gets a runtime identifier picked by the SDK on Windows (win-x86), which the restored
+      packages don't cover. Set it explicitly, on every OS, so restore and the lock file include it.
+    -->
+    <PropertyGroup Condition="'$(TargetFramework)' == 'net472'">
+        <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    </PropertyGroup>
     <PropertyGroup Condition="'$(TargetFramework)' == 'net472' and !$([MSBuild]::IsOSPlatform('Windows'))">
         <IsTestProject>false</IsTestProject>
         <IsTestingPlatformApplication>false</IsTestingPlatformApplication>
