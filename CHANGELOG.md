@@ -10,6 +10,11 @@ empty **Unreleased** section above it. A prerelease with no section of its own u
 
 ## [Unreleased]
 
+### Changed
+
+- `gitsnapshotter` runs on .NET 8 and later; it needed .NET 11 before. The tool package carries a .NET 8 and a
+  .NET 11 build, and the console app attached to each GitHub release is the .NET 8 build.
+
 ## [0.3.0] - 2026-11-14
 
 - `gitsnapshotter` parses its command line with System.CommandLine. Each command has its own help

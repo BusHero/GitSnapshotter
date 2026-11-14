@@ -16,12 +16,17 @@ namespace GitSnapshotter.Pipeline.Modules;
 [DependsOn<CompileModule>]
 public sealed class PublishConsoleModule(IOptions<BuildSettings> settings) : Module<string>
 {
+    /// <summary>The target framework of the published console app.</summary>
+    public const string ConsoleFramework = "net8.0";
+
     protected override async Task<string?> ExecuteAsync(IModuleContext context, CancellationToken cancellationToken)
     {
         await context.DotNet().Publish(
             new DotNetPublishOptions
             {
                 ProjectSolution = Paths.Console(context),
+                // One build in the zip: the .NET 8 one, which runs on .NET 8 and every later runtime (RollForward).
+                Framework = ConsoleFramework,
                 Configuration = settings.Value.Configuration,
                 NoBuild = true,
                 NoRestore = true,
