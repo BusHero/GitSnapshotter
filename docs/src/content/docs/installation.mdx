@@ -11,14 +11,58 @@ The `GitSnapshotter` package targets `net8.0` and `net472`, so it works in proje
 .NET Framework 4.7.2 or later. Its only dependency is LibGit2Sharp, which brings the native libgit2 binaries for
 Windows, macOS and Linux.
 
-The package is published to **GitHub Packages**. GitHub Packages requires authentication even for public packages,
-so you need a GitHub personal access token (classic) with the `read:packages` scope.
+### From NuGet
+
+Stable releases are published to [nuget.org](https://www.nuget.org/packages/GitSnapshotter), so no setup is
+needed:
+
+<Tabs syncKey="package-manager">
+  <TabItem label=".NET CLI">
+    ```sh
+    dotnet add package GitSnapshotter
+    ```
+  </TabItem>
+  <TabItem label="PackageReference">
+    ```xml title="MyProject.csproj"
+    <ItemGroup>
+      <PackageReference Include="GitSnapshotter" Version="x.y.z" />
+    </ItemGroup>
+    ```
+
+    Replace `x.y.z` with the [latest version](https://www.nuget.org/packages/GitSnapshotter).
+  </TabItem>
+  <TabItem label="Central versions">
+    With `Directory.Packages.props`, put the version there and leave it out of the project:
+
+    ```xml title="Directory.Packages.props"
+    <ItemGroup>
+      <PackageVersion Include="GitSnapshotter" Version="x.y.z" />
+    </ItemGroup>
+    ```
+
+    ```xml title="MyProject.csproj"
+    <ItemGroup>
+      <PackageReference Include="GitSnapshotter" />
+    </ItemGroup>
+    ```
+  </TabItem>
+  <TabItem label="PM Console">
+    ```powershell
+    Install-Package GitSnapshotter
+    ```
+  </TabItem>
+</Tabs>
+
+### Prereleases from GitHub Packages
+
+Every push to `trunk` publishes a prerelease to **GitHub Packages**, so you can try changes before they are
+released on nuget.org. GitHub Packages requires authentication even for public packages, so you need a GitHub
+personal access token (classic) with the `read:packages` scope.
 
 <Steps>
 
 1. Add a `nuget.config` next to your solution that adds the feed and reads the credentials from environment
-   variables, so no secret is committed:
-
+   variables, so no secret is committed. nuget.org stays available alongside it for your other packages:
    ```xml title="nuget.config"
    <?xml version="1.0" encoding="utf-8"?>
    <configuration>
@@ -51,13 +95,14 @@ so you need a GitHub personal access token (classic) with the `read:packages` sc
      </TabItem>
    </Tabs>
 
-3. Add the package:
+3. Add the package with `--prerelease`, which picks the newest version from either feed:
 
    ```sh
    dotnet add package GitSnapshotter --prerelease
    ```
 
-   Every push to `trunk` publishes a new prerelease version, so `--prerelease` is needed and picks the latest.
+   To go back to stable releases, add the package again without `--prerelease`, or set the version in your
+   project file to one from nuget.org.
 
 </Steps>
 
@@ -65,6 +110,11 @@ so you need a GitHub personal access token (classic) with the `read:packages` sc
   Set `GITHUB_USERNAME` to `${{ github.actor }}` and `GITHUB_TOKEN` to `${{ secrets.GITHUB_TOKEN }}`, and give the
   job `packages: read` permission. If the workflow is in a different repository, the package's settings on GitHub
   must also grant that repository access.
+</Aside>
+
+<Aside type="note" title="Package source mapping">
+  If your `nuget.config` uses `<packageSourceMapping>`, add a `<package pattern="GitSnapshotter" />` entry under
+  both `nuget.org` and `BusHero`, so stable versions can come from one and prereleases from the other.
 </Aside>
 
 ## The command-line tool
