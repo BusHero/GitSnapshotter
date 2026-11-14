@@ -6,7 +6,7 @@
     <!-- The version being worked towards: builds from branches are <VersionPrefix>-<branch>-<time>, and release
          builds override it with the release version (Build:Version in the pipeline). Raise it after each stable
          release, so branch builds sort above what is already released. -->
-    <VersionPrefix>0.2.0</VersionPrefix>
+    <VersionPrefix>0.3.0</VersionPrefix>
     <Authors>BusHero</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageIcon>icon.png</PackageIcon>

@@ -10,6 +10,24 @@ empty **Unreleased** section above it. A prerelease with no section of its own u
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-14
+
+The first stable release made by the release workflow, with the library and the tool at the same version. The code
+is the same as in 0.2.0-rc.2. 0.1.0 was published without a changelog, so this lists what the packages contain.
+
+### Added
+
+- The `GitSnapshotter` library, for .NET 8 and later and .NET Framework 4.7.2 and later. It takes a snapshot of a
+  repository and restores it later:
+  - HEAD, local branches and their upstreams, remotes with their URLs and remote-tracking branches, tags
+    (lightweight and annotated), and other references such as `refs/stash` and `refs/notes/*`.
+  - Optionally the index and working tree: staged content, modified files and untracked files.
+  - Snapshots save to and load from JSON, and two snapshots can be compared.
+  - `GitRepository.Preserve` puts a repository back after a test, even when the test fails.
+- The `gitsnapshotter` command-line tool, published as the `GitSnapshotter.Tool` .NET tool, with `snapshot`,
+  `restore` and `diff` commands.
+- Symbol packages (`.snupkg`) with SourceLink for both packages.
+
 ## [0.2.0-rc.2] - 2026-11-14
 
 Publishes the `GitSnapshotter` library alongside the tool, which 0.2.0-rc.1 left out. The code of both is the same as
@@ -39,6 +57,7 @@ no `GitSnapshotter` 0.2.0-rc.1 package.
   `restore` and `diff` commands.
 - Symbol packages (`.snupkg`) with SourceLink for the library.
 
-[Unreleased]: https://github.com/BusHero/GitSnapshotter/compare/v0.2.0-rc.2...HEAD
+[Unreleased]: https://github.com/BusHero/GitSnapshotter/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/BusHero/GitSnapshotter/compare/v0.2.0-rc.2...v0.2.0
 [0.2.0-rc.2]: https://github.com/BusHero/GitSnapshotter/compare/v0.2.0-rc.1...v0.2.0-rc.2
 [0.2.0-rc.1]: https://github.com/BusHero/GitSnapshotter/releases/tag/v0.2.0-rc.1
