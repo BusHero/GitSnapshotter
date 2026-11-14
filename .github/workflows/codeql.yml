@@ -1,0 +1,57 @@
+name: codeql
+
+# Advanced setup: C# is built manually so CodeQL sees the real compilation
+# (default setup's build-mode 'none' gave low analysis quality).
+# Default setup must be disabled in Settings > Code security for these results to upload.
+on:
+  push:
+    branches: [trunk]
+  pull_request:
+    branches: [trunk]
+  schedule:
+    - cron: '27 3 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: csharp
+            build-mode: manual
+          - language: actions
+            build-mode: none
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: 'Setup: .NET SDK from global.json'
+        if: matrix.language == 'csharp'
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: 'Init: CodeQL'
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+      - name: 'Build: solution and pipeline'
+        if: matrix.build-mode == 'manual'
+        run: |
+          dotnet build Source/GitSnapshotter.slnx --configuration Release
+          dotnet build pipeline/GitSnapshotter.Pipeline --configuration Release
+
+      - name: 'Analyze: CodeQL'
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:${{ matrix.language }}
