@@ -10,8 +10,12 @@ using ModularPipelines.Modules;
 
 namespace GitSnapshotter.Pipeline.Modules;
 
-/// <summary>Pushes the packages (library and tool) once the tests have passed. Skipped when no API key is configured.</summary>
+/// <summary>
+/// Pushes the packages (the library and the .NET tool) once the tests have passed. Skipped when no API key is
+/// configured.
+/// </summary>
 [DependsOn<PackModule>]
+[DependsOn<PackToolModule>]
 [DependsOn<RunUnitTestsModule>]
 public sealed class PushPackageModule(IOptions<BuildSettings> settings) : Module<CommandResult>
 {

@@ -86,7 +86,7 @@ jobs:
           git config --global user.name github-actions
 
       # Builds, tests and packs with the release version. No API key, so the pipeline does not push:
-      # the package goes to nuget.org only after the GitHub release has its assets.
+      # the packages go to nuget.org only after the GitHub release has its assets.
       - name: 'Run: pipeline'
         env:
           Build__DefaultBranch: ${{ github.event.repository.default_branch }}
@@ -99,7 +99,8 @@ jobs:
         run: |
           mkdir release
           cp publish/*.nupkg release/
-          # PackModule and PublishConsoleModule share the publish directory; zip the console app without the package.
+          # Both packages (GitSnapshotter, GitSnapshotter.Tool) and the console app share the publish directory;
+          # zip the console app without the packages.
           (cd publish && zip -r -q "../release/GitSnapshotter.Console_${VERSION}.zip" . -x '*.nupkg')
           (cd release && sha256sum * > SHA256SUMS.txt)
           ls -l release
@@ -134,7 +135,7 @@ jobs:
         with:
           user: bus1hero
 
-      - name: 'Push package to nuget.org'
+      - name: 'Push packages to nuget.org'
         env:
           NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
         run: dotnet nuget push "release/*.nupkg" --source https://api.nuget.org/v3/index.json --api-key "$NUGET_API_KEY" --skip-duplicate
