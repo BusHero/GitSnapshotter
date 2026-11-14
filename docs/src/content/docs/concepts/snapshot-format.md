@@ -3,7 +3,7 @@ title: Snapshot format
 description: Every field of the snapshot JSON.
 ---
 
-Snapshots are stored as UTF-8 JSON, written by `Save`, `ToJson` and `GitSnapshotter.Console snapshot`.
+Snapshots are stored as UTF-8 JSON, written by `Save`, `ToJson` and `gitsnapshotter snapshot`.
 Property names are PascalCase, `null` values are left out, and lists are sorted by name with ordinal comparison.
 Object ids are 40-character lowercase hexadecimal SHA-1 ids.
 

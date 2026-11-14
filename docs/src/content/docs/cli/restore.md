@@ -4,7 +4,7 @@ description: Restore a repository from a snapshot file, or preview what would ch
 ---
 
 ```text
-GitSnapshotter.Console restore <repository> <snapshot-file> [--force] [--dry-run]
+gitsnapshotter restore <repository> <snapshot-file> [--force] [--dry-run]
 ```
 
 Puts `<repository>` back to the state recorded in `<snapshot-file>`: HEAD, branches and their upstreams, remotes,
@@ -23,13 +23,13 @@ snapshot are deleted.
 Preview, then restore:
 
 ```console
-$ GitSnapshotter.Console restore . ../before.json --dry-run
+$ gitsnapshotter restore . ../before.json --dry-run
 ~ Head HEAD experiment -> main
 ~ Branch feature 7bb0b8d12decfd8d9f6deb827c519008c80dcf4c -> b803aa0e577d422308d789b5a64ec784def50469
 - Branch experiment 7bb0b8d12decfd8d9f6deb827c519008c80dcf4c
 + Tag v1.0 b803aa0e577d422308d789b5a64ec784def50469 (annotation 2fd9fb7f8beecc53171b02184a760937711b3b70)
 
-$ GitSnapshotter.Console restore . ../before.json
+$ gitsnapshotter restore . ../before.json
 Restored . from ../before.json.
 ```
 
@@ -39,13 +39,13 @@ will create it. If there is nothing to do, it prints `Nothing to restore.`
 When uncommitted changes are in the way:
 
 ```console
-$ GitSnapshotter.Console restore . ../before.json
+$ gitsnapshotter restore . ../before.json
 error: The working tree has uncommitted changes that the restore would overwrite: src/app.cs. Commit or stash them, or restore with Force.
 
 $ git stash                                     # keep them
-$ GitSnapshotter.Console restore . ../before.json
+$ gitsnapshotter restore . ../before.json
 
-$ GitSnapshotter.Console restore . ../before.json --force   # or throw them away
+$ gitsnapshotter restore . ../before.json --force   # or throw them away
 ```
 
 ## What gets checked

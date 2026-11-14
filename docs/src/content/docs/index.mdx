@@ -30,7 +30,7 @@ import { Card, CardGrid, LinkCard, Tabs, TabItem } from '@astrojs/starlight/comp
     Wrap a test in `GitRepository.Preserve(path)` and every change to the repository is undone on dispose.
   </Card>
   <Card title="Library and CLI" icon="seti:shell">
-    Use the `GitSnapshotter` package from .NET, or the `GitSnapshotter.Console` tool from a shell script.
+    Use the `GitSnapshotter` package from .NET, or the `gitsnapshotter` tool from a shell script.
   </Card>
 </CardGrid>
 
@@ -50,11 +50,11 @@ import { Card, CardGrid, LinkCard, Tabs, TabItem } from '@astrojs/starlight/comp
   </TabItem>
   <TabItem label="Command line">
     ```sh
-    GitSnapshotter.Console snapshot . -o before.json
+    gitsnapshotter snapshot . -o before.json
 
     # rebase, delete branches, move tags, add remotes...
 
-    GitSnapshotter.Console restore . before.json
+    gitsnapshotter restore . before.json
     ```
   </TabItem>
 </Tabs>

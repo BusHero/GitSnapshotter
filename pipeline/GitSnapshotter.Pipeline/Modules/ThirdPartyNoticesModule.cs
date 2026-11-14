@@ -8,8 +8,11 @@ using ModularPipelines.Modules;
 namespace GitSnapshotter.Pipeline.Modules;
 
 /// <summary>Where <see cref="ThirdPartyNoticesModule"/> wrote the notices.</summary>
-/// <param name="Console">The console app's notices, in the publish directory next to the app.</param>
-/// <param name="Library">The NuGet package's notices, which <see cref="PackModule"/> puts in the package.</param>
+/// <param name="Console">
+/// The console app's notices, in the publish directory next to the app. <see cref="PackModule"/> also puts them in the
+/// tool package.
+/// </param>
+/// <param name="Library">The library package's notices, which <see cref="PackModule"/> puts in the package.</param>
 public sealed record ThirdPartyNoticesFiles(string Console, string Library);
 
 /// <summary>

@@ -88,7 +88,7 @@ jobs:
           Build__NuGetApiKey: ${{ secrets.GITHUB_TOKEN }}
         run: dotnet run --project pipeline/GitSnapshotter.Pipeline --configuration Release
 
-      # PackModule and PublishConsoleModule share the publish directory; the package gets its own artifact.
+      # PackModule and PublishConsoleModule share the publish directory; the packages (library and tool) get their own artifact.
       - uses: actions/upload-artifact@v7
         with:
           name: GitSnapshotter.Console_${{ steps.pipeline.outputs.version }}

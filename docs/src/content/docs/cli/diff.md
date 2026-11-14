@@ -4,7 +4,7 @@ description: List what changed in a repository since a snapshot was taken.
 ---
 
 ```text
-GitSnapshotter.Console diff <repository> <snapshot-file>
+gitsnapshotter diff <repository> <snapshot-file>
 ```
 
 Takes a fresh snapshot of `<repository>` and compares it with `<snapshot-file>`, printing one line per change. It
@@ -13,7 +13,7 @@ never changes the repository.
 ## Example
 
 ```console
-$ GitSnapshotter.Console diff . ../before.json
+$ gitsnapshotter diff . ../before.json
 ~ Head HEAD main -> experiment
 ~ Branch feature b803aa0e577d422308d789b5a64ec784def50469 -> 7bb0b8d12decfd8d9f6deb827c519008c80dcf4c
 + Branch experiment 7bb0b8d12decfd8d9f6deb827c519008c80dcf4c

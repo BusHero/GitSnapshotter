@@ -1,18 +1,18 @@
 ---
 title: Command-line overview
-description: How GitSnapshotter.Console is invoked, what it prints, and its exit codes.
+description: How gitsnapshotter is invoked, what it prints, and its exit codes.
 sidebar:
   label: Overview
 ---
 
-`GitSnapshotter.Console` brings the library's three operations to the shell: take a snapshot, restore one, and show
+`gitsnapshotter` brings the library's three operations to the shell: take a snapshot, restore one, and show
 what changed. See [Installation](/GitSnapshotter/installation/#the-command-line-tool) for how to get it.
 
 ```text
-GitSnapshotter.Console snapshot <repository> [--output <file>] [--include-working-tree]
-GitSnapshotter.Console restore  <repository> <snapshot-file> [--force] [--dry-run]
-GitSnapshotter.Console diff     <repository> <snapshot-file>
-GitSnapshotter.Console help
+gitsnapshotter snapshot <repository> [--output <file>] [--include-working-tree]
+gitsnapshotter restore  <repository> <snapshot-file> [--force] [--dry-run]
+gitsnapshotter diff     <repository> <snapshot-file>
+gitsnapshotter help
 ```
 
 | Command | Does |
@@ -36,7 +36,7 @@ Results go to standard output; errors go to standard error, prefixed with `error
 usage text.
 
 ```console
-$ GitSnapshotter.Console restore . before.json
+$ gitsnapshotter restore . before.json
 error: The working tree has uncommitted changes that the restore would overwrite: src/app.cs. Commit or stash them, or restore with Force.
 ```
 

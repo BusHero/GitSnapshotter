@@ -29,7 +29,7 @@ shell; the steps are the same. Install the [package or the tool](/GitSnapshotter
      <TabItem label="Command line">
        ```sh
        cd /path/to/repo
-       GitSnapshotter.Console snapshot . --output ../before.json
+       gitsnapshotter snapshot . --output ../before.json
        ```
 
        Keep the file outside the repository, or it shows up as an untracked file.
@@ -56,7 +56,7 @@ shell; the steps are the same. Install the [package or the tool](/GitSnapshotter
      </TabItem>
      <TabItem label="Command line">
        ```sh
-       GitSnapshotter.Console diff . ../before.json
+       gitsnapshotter diff . ../before.json
        ```
      </TabItem>
    </Tabs>
@@ -78,7 +78,7 @@ shell; the steps are the same. Install the [package or the tool](/GitSnapshotter
      </TabItem>
      <TabItem label="Command line">
        ```sh
-       GitSnapshotter.Console restore . ../before.json
+       gitsnapshotter restore . ../before.json
        ```
      </TabItem>
    </Tabs>

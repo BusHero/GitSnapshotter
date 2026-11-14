@@ -4,7 +4,7 @@ description: Take a snapshot of a repository and print it or write it to a file.
 ---
 
 ```text
-GitSnapshotter.Console snapshot <repository> [--output <file>] [--include-working-tree]
+gitsnapshotter snapshot <repository> [--output <file>] [--include-working-tree]
 ```
 
 Takes a snapshot of `<repository>`. Without `--output`, the snapshot is printed to standard output as JSON.
@@ -21,7 +21,7 @@ Takes a snapshot of `<repository>`. Without `--output`, the snapshot is printed 
 Print the snapshot of the current repository:
 
 ```console
-$ GitSnapshotter.Console snapshot .
+$ gitsnapshotter snapshot .
 {
   "Head": "main",
   "IsHeadDetached": false,
@@ -63,20 +63,20 @@ $ GitSnapshotter.Console snapshot .
 Write it to a file next to the repository:
 
 ```console
-$ GitSnapshotter.Console snapshot . -o ../before.json
+$ gitsnapshotter snapshot . -o ../before.json
 Snapshot written to ../before.json.
 ```
 
 Include uncommitted work:
 
 ```sh
-GitSnapshotter.Console snapshot . --include-working-tree -o ../before.json
+gitsnapshotter snapshot . --include-working-tree -o ../before.json
 ```
 
 Pipe the JSON into another tool, for example to list branch names with [jq](https://jqlang.org):
 
 ```console
-$ GitSnapshotter.Console snapshot . | jq -r '.Branches[].Name'
+$ gitsnapshotter snapshot . | jq -r '.Branches[].Name'
 feature
 main
 ```
@@ -90,5 +90,5 @@ main
 - `--include-working-tree` fails with exit code `1` while the index has unresolved merge conflicts.
 - Every field of the JSON is described in [Snapshot format](/GitSnapshotter/concepts/snapshot-format/).
 
-Earlier versions took just a repository path. `GitSnapshotter.Console <repository>` still works and is the same as
-`GitSnapshotter.Console snapshot <repository>`.
+Earlier versions took just a repository path. `gitsnapshotter <repository>` still works and is the same as
+`gitsnapshotter snapshot <repository>`.

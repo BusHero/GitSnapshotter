@@ -1,6 +1,6 @@
 ---
 title: Scripting
-description: Use GitSnapshotter.Console as a safety net in shell scripts and CI.
+description: Use gitsnapshotter as a safety net in shell scripts and CI.
 ---
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
@@ -19,12 +19,12 @@ work comes back too, and keep the snapshot outside the repository.
     repo=.
     snapshot="$(mktemp -d)/before.json"
 
-    GitSnapshotter.Console snapshot "$repo" --include-working-tree -o "$snapshot"
+    gitsnapshotter snapshot "$repo" --include-working-tree -o "$snapshot"
 
     rollback() {
       echo "Something failed, restoring the repository..." >&2
       git rebase --abort 2>/dev/null || true
-      GitSnapshotter.Console restore "$repo" "$snapshot" --force
+      gitsnapshotter restore "$repo" "$snapshot" --force
     }
     trap rollback ERR
 
@@ -45,7 +45,7 @@ work comes back too, and keep the snapshot outside the repository.
     $repo = '.'
     $snapshot = New-TemporaryFile
 
-    GitSnapshotter.Console snapshot $repo --include-working-tree -o $snapshot
+    gitsnapshotter snapshot $repo --include-working-tree -o $snapshot
 
     try {
         git fetch origin
@@ -56,7 +56,7 @@ work comes back too, and keep the snapshot outside the repository.
     catch {
         Write-Warning 'Something failed, restoring the repository...'
         git rebase --abort 2>$null
-        GitSnapshotter.Console restore $repo $snapshot --force
+        gitsnapshotter restore $repo $snapshot --force
         throw
     }
     finally {
@@ -78,7 +78,7 @@ still think the rebase is running. The same goes for merges (`git merge --abort`
 <Tabs syncKey="shell">
   <TabItem label="bash">
     ```bash
-    changes=$(GitSnapshotter.Console diff . "$snapshot")
+    changes=$(gitsnapshotter diff . "$snapshot")
     if [[ "$changes" != "No changes since the snapshot." ]]; then
       echo "The repository changed:" >&2
       echo "$changes" >&2
@@ -88,7 +88,7 @@ still think the rebase is running. The same goes for merges (`git merge --abort`
   </TabItem>
   <TabItem label="PowerShell">
     ```powershell
-    $changes = GitSnapshotter.Console diff . $snapshot
+    $changes = gitsnapshotter diff . $snapshot
     if ($changes -ne 'No changes since the snapshot.') {
         Write-Error "The repository changed:`n$($changes -join "`n")"
     }
@@ -99,18 +99,18 @@ still think the rebase is running. The same goes for merges (`git merge --abort`
 ## Check that a build step leaves git alone
 
 Builds and code generators sometimes create tags, move branches or leave files behind. This GitHub Actions job fails
-if a step changes anything:
+if a step changes anything. It needs the tool on the runner; see [Installation](/GitSnapshotter/installation/#the-command-line-tool).
 
 ```yaml
 - name: Snapshot before the build
-  run: GitSnapshotter.Console snapshot . --include-working-tree -o "$RUNNER_TEMP/before.json"
+  run: gitsnapshotter snapshot . --include-working-tree -o "$RUNNER_TEMP/before.json"
 
 - name: Build
   run: ./build.sh
 
 - name: Fail if the build changed the repository
   run: |
-    changes=$(GitSnapshotter.Console diff . "$RUNNER_TEMP/before.json")
+    changes=$(gitsnapshotter diff . "$RUNNER_TEMP/before.json")
     if [[ "$changes" != "No changes since the snapshot." ]]; then
       echo "::error::The build changed the repository"
       echo "$changes"
@@ -126,11 +126,11 @@ counts as a change.
 A quick undo for bulk branch deletion:
 
 ```bash
-GitSnapshotter.Console snapshot . -o ~/branches-$(date +%F).json
+gitsnapshotter snapshot . -o ~/branches-$(date +%F).json
 git branch --merged main | grep -v '^\*\|main' | xargs -r git branch -d
 
 # changed your mind?
-GitSnapshotter.Console restore . ~/branches-2026-11-14.json
+gitsnapshotter restore . ~/branches-2026-11-14.json
 ```
 
 The commits of deleted branches stay in the object database until `git gc` prunes them, so restore within a few

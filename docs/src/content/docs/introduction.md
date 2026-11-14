@@ -8,7 +8,7 @@ puts the repository back exactly as it was. It comes as:
 
 - **A .NET library**, the `GitSnapshotter` NuGet package, for use from code and tests. It runs on .NET 8 and later
   and on .NET Framework 4.7.2 and later, and is built on [LibGit2Sharp](https://github.com/libgit2/libgit2sharp).
-- **A command-line tool**, `GitSnapshotter.Console`, for use from a shell or a script.
+- **A command-line tool**, `gitsnapshotter`, for use from a shell or a script.
 
 ## What a snapshot records
 
