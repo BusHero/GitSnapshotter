@@ -1,3 +1,5 @@
+using System.CommandLine;
+using System.CommandLine.Help;
 using System.Text.Json;
 
 using LibGit2Sharp;
@@ -11,39 +13,42 @@ internal static class Cli
     public const int Failure = 1;
     public const int UsageError = 2;
 
-    public const string Usage = """
-        Usage:
-          gitsnapshotter snapshot <repository> [--output <file>] [--include-working-tree]
-              Take a snapshot. Prints JSON, or writes it to <file>.
-          gitsnapshotter restore <repository> <snapshot-file> [--force] [--dry-run]
-              Restore a snapshot. --force overwrites uncommitted changes;
-              --dry-run only lists what would change.
-          gitsnapshotter diff <repository> <snapshot-file>
-              List what changed in the repository since the snapshot was taken.
-          gitsnapshotter help
-              Show this message.
-        """;
-
     public static int Run(string[] args, TextWriter output, TextWriter error)
     {
-        if (args.Length == 0)
+        var root = BuildRootCommand(output, error);
+
+        // Earlier versions took just a repository path and printed its snapshot.
+        if (args is [var path] && root.Subcommands.All(command => command.Name != path) && Directory.Exists(path))
         {
-            error.WriteLine(Usage);
+            args = ["snapshot", path];
+        }
+
+        var configuration = new InvocationConfiguration
+        {
+            Output = output,
+            Error = error,
+            // Expected failures are reported below as "error: <message>"; anything else is a bug and should crash.
+            EnableDefaultExceptionHandler = false,
+        };
+
+        var result = root.Parse(args);
+
+        // --help wins over other mistakes on the command line, as it does in the dotnet CLI.
+        if (result.Errors.Count > 0 && result.Action is not HelpAction)
+        {
+            foreach (var parseError in result.Errors)
+            {
+                error.WriteLine($"error: {parseError.Message}");
+            }
+
+            error.WriteLine();
+            WriteHelp(root, result.CommandResult.Command, error);
             return UsageError;
         }
 
         try
         {
-            return args[0] switch
-            {
-                "help" or "--help" or "-h" => Help(output),
-                "snapshot" => Snapshot(args[1..], output, error),
-                "restore" => Restore(args[1..], output, error),
-                "diff" => Diff(args[1..], output, error),
-                // Earlier versions took just a repository path and printed its snapshot.
-                _ when args.Length == 1 && Directory.Exists(args[0]) => Snapshot(args, output, error),
-                _ => Fail(error, $"Unknown command '{args[0]}'."),
-            };
+            return result.Invoke(configuration);
         }
         catch (Exception exception) when (exception is GitSnapshotterException
                                               or LibGit2SharpException
@@ -57,77 +62,179 @@ internal static class Cli
         }
     }
 
-    private static int Help(TextWriter output)
+    private static Command BuildRootCommand(TextWriter output, TextWriter error)
     {
-        output.WriteLine(Usage);
-        return Success;
+        // Named here rather than taken from the executable, which is GitSnapshotter.Console.dll (or the test host).
+        var root = new Command(
+            "gitsnapshotter",
+            "Takes a snapshot of a git repository's branches, tags, remotes, HEAD and (optionally) working tree, "
+            + "and restores it later.")
+        {
+            new HelpOption(),
+            new VersionOption(),
+        };
+
+        root.Subcommands.Add(SnapshotCommand(output));
+        root.Subcommands.Add(RestoreCommand(output));
+        root.Subcommands.Add(DiffCommand(output));
+        root.Subcommands.Add(HelpCommand(root, output));
+
+        // With no command, show the help on stderr and exit with a usage error, as before.
+        root.SetAction(_ =>
+        {
+            WriteHelp(root, root, error);
+            return UsageError;
+        });
+
+        return root;
     }
 
-    private static int Snapshot(string[] args, TextWriter output, TextWriter error)
+    private static Command SnapshotCommand(TextWriter output)
     {
-        if (!TryParse(args, ["--include-working-tree"], ["--output", "-o"], out var positional, out var flags, out var values, out var message)
-            || positional.Count != 1)
+        var repository = RepositoryArgument();
+        var outputFile = new Option<string>("--output", "-o")
         {
-            return Fail(error, message ?? "snapshot takes exactly one repository path.");
-        }
-
-        var snapshot = GitRepository.GetSnapshot(
-            positional[0],
-            new SnapshotOptions { IncludeWorkingTree = flags.Contains("--include-working-tree") });
-
-        var file = values.GetValueOrDefault("--output") ?? values.GetValueOrDefault("-o");
-        if (file is null)
+            Description = "Write the snapshot to this file instead of printing it.",
+            HelpName = "file",
+        };
+        var includeWorkingTree = new Option<bool>("--include-working-tree")
         {
-            output.WriteLine(snapshot.ToJson());
-        }
-        else
+            Description = "Also record the index and the working tree.",
+        };
+
+        var command = new Command("snapshot", "Take a snapshot. Prints JSON, or writes it to the --output file.")
         {
-            snapshot.Save(file);
-            output.WriteLine($"Snapshot written to {file}.");
-        }
+            repository,
+            outputFile,
+            includeWorkingTree,
+        };
 
-        return Success;
-    }
-
-    private static int Restore(string[] args, TextWriter output, TextWriter error)
-    {
-        if (!TryParse(args, ["--force", "--dry-run"], [], out var positional, out var flags, out _, out var message)
-            || positional.Count != 2)
+        command.SetAction(result =>
         {
-            return Fail(error, message ?? "restore takes a repository path and a snapshot file.");
-        }
+            var snapshot = GitRepository.GetSnapshot(
+                result.GetRequiredValue(repository),
+                new SnapshotOptions { IncludeWorkingTree = result.GetValue(includeWorkingTree) });
 
-        var (repository, file) = (positional[0], positional[1]);
-        var snapshot = GitRepositorySnapshot.Load(file);
+            var file = result.GetValue(outputFile);
+            if (file is null)
+            {
+                output.WriteLine(snapshot.ToJson());
+            }
+            else
+            {
+                snapshot.Save(file);
+                output.WriteLine($"Snapshot written to {file}.");
+            }
 
-        if (flags.Contains("--dry-run"))
-        {
-            var current = GitRepository.GetSnapshot(
-                repository,
-                new SnapshotOptions { IncludeWorkingTree = snapshot.WorkingTree is not null });
-            WriteDiff(output, SnapshotDiff.Compare(current, snapshot), "Nothing to restore.");
             return Success;
-        }
+        });
 
-        GitRepository.Restore(repository, snapshot, new RestoreOptions { Force = flags.Contains("--force") });
-        output.WriteLine($"Restored {repository} from {file}.");
-        return Success;
+        return command;
     }
 
-    private static int Diff(string[] args, TextWriter output, TextWriter error)
+    private static Command RestoreCommand(TextWriter output)
     {
-        if (!TryParse(args, [], [], out var positional, out _, out _, out var message) || positional.Count != 2)
+        var repository = RepositoryArgument();
+        var snapshotFile = SnapshotFileArgument();
+        var force = new Option<bool>("--force")
         {
-            return Fail(error, message ?? "diff takes a repository path and a snapshot file.");
-        }
+            Description = "Overwrite uncommitted changes.",
+        };
+        var dryRun = new Option<bool>("--dry-run")
+        {
+            Description = "Only list what would change.",
+        };
 
-        var snapshot = GitRepositorySnapshot.Load(positional[1]);
-        var current = GitRepository.GetSnapshot(
-            positional[0],
-            new SnapshotOptions { IncludeWorkingTree = snapshot.WorkingTree is not null });
+        var command = new Command("restore", "Restore a snapshot.")
+        {
+            repository,
+            snapshotFile,
+            force,
+            dryRun,
+        };
 
-        WriteDiff(output, SnapshotDiff.Compare(snapshot, current), "No changes since the snapshot.");
-        return Success;
+        command.SetAction(result =>
+        {
+            var path = result.GetRequiredValue(repository);
+            var file = result.GetRequiredValue(snapshotFile);
+            var snapshot = GitRepositorySnapshot.Load(file);
+
+            if (result.GetValue(dryRun))
+            {
+                var current = GitRepository.GetSnapshot(
+                    path,
+                    new SnapshotOptions { IncludeWorkingTree = snapshot.WorkingTree is not null });
+                WriteDiff(output, SnapshotDiff.Compare(current, snapshot), "Nothing to restore.");
+                return Success;
+            }
+
+            GitRepository.Restore(path, snapshot, new RestoreOptions { Force = result.GetValue(force) });
+            output.WriteLine($"Restored {path} from {file}.");
+            return Success;
+        });
+
+        return command;
+    }
+
+    private static Command DiffCommand(TextWriter output)
+    {
+        var repository = RepositoryArgument();
+        var snapshotFile = SnapshotFileArgument();
+
+        var command = new Command("diff", "List what changed in the repository since the snapshot was taken.")
+        {
+            repository,
+            snapshotFile,
+        };
+
+        command.SetAction(result =>
+        {
+            var snapshot = GitRepositorySnapshot.Load(result.GetRequiredValue(snapshotFile));
+            var current = GitRepository.GetSnapshot(
+                result.GetRequiredValue(repository),
+                new SnapshotOptions { IncludeWorkingTree = snapshot.WorkingTree is not null });
+
+            WriteDiff(output, SnapshotDiff.Compare(snapshot, current), "No changes since the snapshot.");
+            return Success;
+        });
+
+        return command;
+    }
+
+    private static Command HelpCommand(Command root, TextWriter output)
+    {
+        var name = new Argument<string?>("command")
+        {
+            Description = "The command to show help for.",
+            HelpName = "command",
+            Arity = ArgumentArity.ZeroOrOne,
+        };
+        name.AcceptOnlyFromAmong([.. root.Subcommands.Select(command => command.Name)]);
+
+        var command = new Command("help", "Show help for gitsnapshotter or one of its commands.") { name };
+
+        command.SetAction(result =>
+        {
+            var target = result.GetValue(name) is { } commandName
+                ? root.Subcommands.First(subcommand => subcommand.Name == commandName)
+                : root;
+            WriteHelp(root, target, output);
+            return Success;
+        });
+
+        return command;
+    }
+
+    private static Argument<string> RepositoryArgument() =>
+        new("repository") { Description = "Path to the git repository." };
+
+    private static Argument<string> SnapshotFileArgument() =>
+        new("snapshot-file") { Description = "A snapshot written by the snapshot command." };
+
+    private static void WriteHelp(Command root, Command command, TextWriter writer)
+    {
+        string[] helpArgs = command == root ? ["--help"] : [command.Name, "--help"];
+        root.Parse(helpArgs).Invoke(new InvocationConfiguration { Output = writer });
     }
 
     private static void WriteDiff(TextWriter output, SnapshotDiff diff, string noChanges)
@@ -142,59 +249,5 @@ internal static class Cli
         {
             output.WriteLine(change);
         }
-    }
-
-    private static bool TryParse(
-        string[] args,
-        string[] knownFlags,
-        string[] knownOptions,
-        out List<string> positional,
-        out HashSet<string> flags,
-        out Dictionary<string, string> values,
-        out string? error)
-    {
-        positional = [];
-        flags = [];
-        values = [];
-        error = null;
-
-        for (var i = 0; i < args.Length; i++)
-        {
-            var arg = args[i];
-
-            if (knownFlags.Contains(arg))
-            {
-                flags.Add(arg);
-            }
-            else if (knownOptions.Contains(arg))
-            {
-                if (i + 1 >= args.Length)
-                {
-                    error = $"{arg} needs a value.";
-                    return false;
-                }
-
-                values[arg] = args[++i];
-            }
-            else if (arg is ['-', ..])
-            {
-                error = $"Unknown option '{arg}'.";
-                return false;
-            }
-            else
-            {
-                positional.Add(arg);
-            }
-        }
-
-        return true;
-    }
-
-    private static int Fail(TextWriter error, string message)
-    {
-        error.WriteLine($"error: {message}");
-        error.WriteLine();
-        error.WriteLine(Usage);
-        return UsageError;
     }
 }

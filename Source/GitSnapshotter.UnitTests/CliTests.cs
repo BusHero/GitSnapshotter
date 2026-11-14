@@ -44,6 +44,48 @@ public sealed class CliTests : IDisposable
     }
 
     [Test]
+    [Arguments("help", "restore")]
+    [Arguments("restore", "--help")]
+    public async Task HelpForACommandPrintsItsUsage(params string[] args)
+    {
+        var exitCode = Run(args);
+
+        using (Assert.Multiple())
+        {
+            await Assert.That(exitCode).IsEqualTo(Cli.Success);
+            await Assert.That(_output.ToString())
+                .Contains($"Usage:{Environment.NewLine}  gitsnapshotter restore <repository> <snapshot-file>");
+            await Assert.That(_output.ToString()).Contains("--dry-run");
+            await Assert.That(_error.ToString()).IsEmpty();
+        }
+    }
+
+    [Test]
+    public async Task HelpForAnUnknownCommandIsAUsageError()
+    {
+        var exitCode = Run("help", "frobnicate");
+
+        using (Assert.Multiple())
+        {
+            await Assert.That(exitCode).IsEqualTo(Cli.UsageError);
+            await Assert.That(_error.ToString()).Contains("frobnicate");
+        }
+    }
+
+    [Test]
+    public async Task VersionPrintsTheVersion()
+    {
+        var exitCode = Run("--version");
+
+        using (Assert.Multiple())
+        {
+            await Assert.That(exitCode).IsEqualTo(Cli.Success);
+            await Assert.That(_output.ToString().Trim()).IsNotEmpty();
+            await Assert.That(_error.ToString()).IsEmpty();
+        }
+    }
+
+    [Test]
     public async Task UnknownCommandIsAUsageError()
     {
         await Assert.That(Run("frobnicate", "x")).IsEqualTo(Cli.UsageError);
@@ -230,7 +272,7 @@ public sealed class CliTests : IDisposable
 
         using (Assert.Multiple())
         {
-            await Assert.That(_error.ToString()).Contains("Unknown command 'frobnicate'.");
+            await Assert.That(_error.ToString()).Contains("error: Unrecognized command or argument 'frobnicate'.");
             await Assert.That(_error.ToString()).Contains("Usage:");
             await Assert.That(_output.ToString()).IsEmpty();
         }
@@ -261,7 +303,7 @@ public sealed class CliTests : IDisposable
         using (Assert.Multiple())
         {
             await Assert.That(exitCode).IsEqualTo(Cli.UsageError);
-            await Assert.That(_error.ToString()).Contains("snapshot takes exactly one repository path.");
+            await Assert.That(_error.ToString()).Contains($"Usage:{Environment.NewLine}  gitsnapshotter snapshot <repository>");
         }
     }
 
@@ -276,7 +318,7 @@ public sealed class CliTests : IDisposable
         using (Assert.Multiple())
         {
             await Assert.That(exitCode).IsEqualTo(Cli.UsageError);
-            await Assert.That(_error.ToString()).Contains("restore takes a repository path and a snapshot file.");
+            await Assert.That(_error.ToString()).Contains($"Usage:{Environment.NewLine}  gitsnapshotter restore <repository> <snapshot-file>");
         }
     }
 
@@ -291,7 +333,7 @@ public sealed class CliTests : IDisposable
         using (Assert.Multiple())
         {
             await Assert.That(exitCode).IsEqualTo(Cli.UsageError);
-            await Assert.That(_error.ToString()).Contains("diff takes a repository path and a snapshot file.");
+            await Assert.That(_error.ToString()).Contains($"Usage:{Environment.NewLine}  gitsnapshotter diff <repository> <snapshot-file>");
         }
     }
 
@@ -307,7 +349,7 @@ public sealed class CliTests : IDisposable
         using (Assert.Multiple())
         {
             await Assert.That(exitCode).IsEqualTo(Cli.UsageError);
-            await Assert.That(_error.ToString()).Contains($"Unknown option '{option}'.");
+            await Assert.That(_error.ToString()).Contains($"error: Unrecognized command or argument '{option}'.");
         }
     }
 
@@ -323,7 +365,7 @@ public sealed class CliTests : IDisposable
         using (Assert.Multiple())
         {
             await Assert.That(exitCode).IsEqualTo(Cli.UsageError);
-            await Assert.That(_error.ToString()).Contains($"{option} needs a value.");
+            await Assert.That(_error.ToString()).Contains($"error: Required argument missing for option: '{option}'.");
         }
     }
 

@@ -10,6 +10,12 @@ empty **Unreleased** section above it. A prerelease with no section of its own u
 
 ## [Unreleased]
 
+### Changed
+
+- `gitsnapshotter` parses its command line with System.CommandLine. Each command has its own help
+  (`gitsnapshotter help restore` or `gitsnapshotter restore --help`), and the tool now accepts `--version`.
+  Error messages for a wrong command line are worded differently; the exit codes are unchanged.
+
 ## [0.2.0] - 2026-11-14
 
 The first stable release made by the release workflow, with the library and the tool at the same version. The code
