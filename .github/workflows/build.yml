@@ -1,5 +1,7 @@
 name: build
-run-name: ${{ inputs.version && format('release {0}', inputs.version) || github.event.head_commit.message || format('build {0}', github.ref_name) }}
+# Releases are named after their version. Otherwise the name is empty, so GitHub uses its default: the first line of
+# the commit message on a push. (head_commit.message would be the whole message, body and all, on one line.)
+run-name: ${{ inputs.version && format('release {0}', inputs.version) || '' }}
 
 # One workflow for CI builds and releases.
 #
