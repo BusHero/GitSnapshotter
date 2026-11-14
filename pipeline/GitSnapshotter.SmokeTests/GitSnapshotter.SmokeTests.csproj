@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Smoke tests of a published version: they download the packages from a feed and use them as a user would. Run them
+    with the pipeline's SmokeTest target, or with `dotnet run` and the SmokeTest__* environment variables (see
+    SmokeTestSettings.cs). They need a published version, so `dotnet test` on the solution leaves them out.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <!-- Not a library: no XML docs required on public members. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <IsPackable>false</IsPackable>
+    <!--
+      Not a test project to `dotnet test`, which picks Microsoft.Testing.Platform apps (IsTestingPlatformApplication):
+      without a published version to test, the smoke tests can't run with the unit tests. Still a test app to `dotnet
+      run`: its entry point and test framework registration are generated all the same.
+    -->
+    <IsTestProject>false</IsTestProject>
+    <IsTestingPlatformApplication>false</IsTestingPlatformApplication>
+    <GenerateTestingPlatformEntryPoint>true</GenerateTestingPlatformEntryPoint>
+    <GenerateSelfRegisteredExtensions>true</GenerateSelfRegisteredExtensions>
+    <GenerateTestingPlatformConfigurationFile>true</GenerateTestingPlatformConfigurationFile>
+  </PropertyGroup>
+
+  <!--
+    The pure parts of the pipeline the checks share with it: the notices' format, versions and the changelog. Compiled
+    in rather than referenced, as the pipeline's own tests do.
+  -->
+  <PropertyGroup>
+    <PipelineDirectory>$(MSBuildThisFileDirectory)..\GitSnapshotter.Pipeline\</PipelineDirectory>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(PipelineDirectory)ThirdPartyNotices.cs;$(PipelineDirectory)ReleaseVersion.cs;$(PipelineDirectory)Changelog.cs"
+             LinkBase="Pipeline" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="TUnit.Assertions" />
+    <PackageReference Include="TUnit.Engine" />
+  </ItemGroup>
+
+</Project>

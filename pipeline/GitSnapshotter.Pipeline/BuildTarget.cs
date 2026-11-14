@@ -19,11 +19,9 @@ public enum BuildTarget
     VerifyRelease,
 
     /// <summary>
-    /// Checks that <see cref="BuildSettings.Version"/> was published: downloads both packages from
-    /// <see cref="BuildSettings.SmokeTestSource"/>, installs and runs the tool, builds and runs an app that uses the
-    /// library, and checks that both packages carry their third-party notices and, with
-    /// <see cref="BuildSettings.SmokeTestReleaseDirectory"/>, that they are the GitHub release's packages. Builds
-    /// nothing from this repository.
+    /// Runs the smoke tests (pipeline/GitSnapshotter.SmokeTests) on <see cref="BuildSettings.Version"/>: they download
+    /// the published packages and use them as a user would. Their settings are <c>SmokeTest__*</c> environment
+    /// variables. Builds nothing of the product.
     /// </summary>
     SmokeTest,
 

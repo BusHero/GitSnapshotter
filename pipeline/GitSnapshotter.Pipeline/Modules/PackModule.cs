@@ -35,8 +35,8 @@ public sealed class PackModule(IOptions<BuildSettings> settings) : Module<string
 
         // For the jobs that test the packages: the version they were packed at.
         var version = settings.Value.Version
-            ?? SmokeTestChecks.PackedVersion(Directory.EnumerateFiles(output, "*.nupkg").Select(file => Path.GetFileName(file)), suffix)
-            ?? throw new InvalidOperationException($"No {SmokeTestChecks.LibraryId} package ending in {suffix} in {output}.");
+            ?? PackageVersion.Packed(Directory.EnumerateFiles(output, "*.nupkg").Select(file => Path.GetFileName(file)), suffix)
+            ?? throw new InvalidOperationException($"No GitSnapshotter package ending in {suffix} in {output}.");
         await GitHubActions.SetOutputAsync("package-version", version, cancellationToken);
 
         return output;

@@ -2,6 +2,7 @@ using System.IO.Compression;
 using System.Xml.Linq;
 
 using GitSnapshotter.Pipeline.Modules;
+using GitSnapshotter.SmokeTests;
 
 using TUnit.Assertions.Enums;
 
@@ -9,7 +10,7 @@ using TUnit.Core;
 
 namespace GitSnapshotter.Pipeline.Tests;
 
-public sealed class SmokeTestTests : IDisposable
+public sealed class SmokeTestChecksTests : IDisposable
 {
     private readonly FakeRestore _restore = new();
 
@@ -72,7 +73,7 @@ public sealed class SmokeTestTests : IDisposable
     {
         WritePackage((ThirdPartyNotices.FileName, await GeneratedNoticesAsync()));
 
-        await Assert.That(() => SmokeTestChecks.CheckNotices(Package, ThirdPartyNoticesModule.LibraryProduct))
+        await Assert.That(() => SmokeTestChecks.CheckNotices(Package, ThirdPartyNotices.LibraryProduct))
             .Throws<InvalidOperationException>()
             .WithMessageContaining("is not the notices for", StringComparison.Ordinal);
     }
@@ -486,7 +487,7 @@ public sealed class SmokeTestTests : IDisposable
     // ---- Symbols --------------------------------------------------------------------------------------------------
 
     // This test assembly is built like the packages' assemblies: deterministic, with a portable PDB and its checksum.
-    private static string ThisAssembly => typeof(SmokeTestTests).Assembly.Location;
+    private static string ThisAssembly => typeof(SmokeTestChecksTests).Assembly.Location;
 
     private static SmokeTestChecks.SymbolQuery ThisQuery() =>
         SmokeTestChecks.SymbolQueryFor(File.ReadAllBytes(ThisAssembly), "test assembly");
@@ -811,7 +812,7 @@ public sealed class SmokeTestTests : IDisposable
     [Arguments(new[] { "GitSnapshotter.Tool.0.4.0-x.nupkg" }, "x", null)]
     public async Task PackedVersionIsTheLibrarysWithTheSuffix(string[] files, string suffix, string? expected)
     {
-        await Assert.That(SmokeTestChecks.PackedVersion(files, suffix)).IsEqualTo(expected);
+        await Assert.That(PackageVersion.Packed(files, suffix)).IsEqualTo(expected);
     }
 
     // ---- Breaking changes and size ----------------------------------------------------------------------------------
@@ -953,5 +954,11 @@ public sealed class SmokeTestTests : IDisposable
     public async Task BuildSortingBelowAReleaseIsFound(string version, string? released)
     {
         await Assert.That(SmokeTestChecks.ReleasedAtOrAbove(["0.1.0", "0.2.0", "0.3.0", "0.4.0-rc.1"], version)).IsEqualTo(released);
+    }
+
+    [Test]
+    public async Task ChecksumsFileIsTheOneTheReleaseAssetsHave()
+    {
+        await Assert.That(SmokeTestChecks.ChecksumsFile).IsEqualTo(ReleaseAssetsModule.ChecksumsFile);
     }
 }

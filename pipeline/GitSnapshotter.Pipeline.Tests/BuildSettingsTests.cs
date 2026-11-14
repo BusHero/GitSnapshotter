@@ -27,7 +27,6 @@ public sealed class BuildSettingsTests
             await Assert.That(settings.VersionProperties).IsEmpty();
             await Assert.That(settings.NuGetApiKey).IsNull();
             await Assert.That(settings.ReleaseEnvironment).IsEqualTo("nuget");
-            await Assert.That(settings.SmokeTestSource).IsEqualTo("https://api.nuget.org/v3/index.json");
         }
     }
 

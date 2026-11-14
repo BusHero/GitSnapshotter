@@ -13,6 +13,12 @@ internal static class ThirdPartyNotices
 {
     public const string FileName = "THIRD-PARTY-NOTICES.txt";
 
+    /// <summary>What the console app's notices (also in the tool package) call the product.</summary>
+    public const string ConsoleProduct = "GitSnapshotter.Console";
+
+    /// <summary>What the library package's notices call the product.</summary>
+    public const string LibraryProduct = "The GitSnapshotter package";
+
     /// <summary>How each package is listed at the top of the file, before its ID and version.</summary>
     public const string ListItem = "  - ";
 

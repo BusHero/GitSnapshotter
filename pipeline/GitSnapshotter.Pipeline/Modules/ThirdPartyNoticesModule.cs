@@ -22,12 +22,6 @@ public sealed record ThirdPartyNoticesFiles(string Console, string Library);
 [DependsOn<CompileModule>]
 public sealed class ThirdPartyNoticesModule(IOptions<BuildSettings> settings) : Module<ThirdPartyNoticesFiles>
 {
-    /// <summary>What the console app's notices (also in the tool package) call the product.</summary>
-    public const string ConsoleProduct = "GitSnapshotter.Console";
-
-    /// <summary>What the library package's notices call the product.</summary>
-    public const string LibraryProduct = "The GitSnapshotter package";
-
     protected override async Task<ThirdPartyNoticesFiles?> ExecuteAsync(IModuleContext context, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -36,14 +30,14 @@ public sealed class ThirdPartyNoticesModule(IOptions<BuildSettings> settings) : 
         var library = Path.Combine(Paths.IntermediateDirectory(Paths.Library(context)), ThirdPartyNotices.FileName);
 
         var consolePackages = await ThirdPartyNotices.WriteAsync(
-            ConsoleProduct,
+            ThirdPartyNotices.ConsoleProduct,
             Paths.AssetsFile(Paths.Console(context)),
             ThirdPartyNotices.AppAssets,
             console,
             cancellationToken);
 
         var libraryPackages = await ThirdPartyNotices.WriteAsync(
-            LibraryProduct,
+            ThirdPartyNotices.LibraryProduct,
             Paths.AssetsFile(Paths.Library(context)),
             ThirdPartyNotices.PackageAssets,
             library,

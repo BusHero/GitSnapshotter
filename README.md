@@ -46,20 +46,6 @@ the `Build` configuration section, as environment variables (`Build__PublishDire
 | `ReleaseDirectory` | `release` | Where a release build puts the GitHub release assets |
 | `ReleaseNotesDirectory` | `release-notes` | Where `VerifyRelease` writes the release description |
 | `ReleaseEnvironment` | `nuget` | The GitHub environment `VerifyRelease` requires a reviewer on |
-| `SmokeTestSource` | nuget.org | Feed `SmokeTest` downloads the packages from |
-| `SmokeTestWaitMinutes` | `30` | How long `SmokeTest` waits for the feed to list the packages |
-| `SmokeTestReleaseDirectory` | none | The GitHub release's assets; when set, `SmokeTest` checks them against `SHA256SUMS.txt`, that the feed's packages and symbols are the release's, and that the console app zip runs |
-| `SmokeTestSymbolServer` | nuget.org's | Where `SmokeTest` downloads the PDBs from; empty skips the symbols |
-| `SmokeTestCommit` | none | The commit the release was made from; `SmokeTest` checks the packages, Source Link and the release tag against it (otherwise the commit the library package names) |
-| `SmokeTestVerifySignatures` | `true` | Whether `SmokeTest` verifies the packages' signatures; off for a feed that doesn't sign, like GitHub Packages |
-| `SmokeTestGitHubRelease` | `true` | Whether `SmokeTest` checks the GitHub release; reads it with `GITHUB_TOKEN` |
-| `SmokeTestFeedMetadata` | `true` | Whether `SmokeTest` checks what the feed shows (nuget.org's registration API) |
-| `SmokeTestSymbols` | `true` | Whether `SmokeTest` downloads the PDBs from `SmokeTestSymbolServer` |
-| `SmokeTestPreviousSource` | nuget.org | Where the previous releases and our packages' dependencies come from |
-| `SmokeTestSourceUsername`, `SmokeTestSourcePassword` | none | Credentials for `SmokeTestSource` (GitHub Packages) |
-| `SmokeTestDocs`, `SmokeTestDocsPage` | `true`, the installation page | Whether and which published page `SmokeTest` checks against the release |
-| `SmokeTestMaxGrowthPercent` | `25` | How much each framework's part of a package may grow over the previous release |
-| `SmokeTestAboveReleases` | `false` | Fail when the version sorts below a release (CI builds: raise `VersionPrefix` after each release) |
 
 The CI workflows run the pipeline too, one target per job, so a job only sets up the machine and hands files to
 the next. Each target runs on a developer machine as well (`./build.sh --Build:Target=Test`):
@@ -68,11 +54,45 @@ the next. Each target runs on a developer machine as well (`./build.sh --Build:T
 |---|---|---|
 | `All` | Format check, compile, tests, third-party notices, console app, packages, push; on a release, the release assets (packages, console app zip, `SHA256SUMS.txt`) | Build and release > Build and package |
 | `VerifyRelease` | Checks the release may go ahead and writes its description from `CHANGELOG.md`; needs `GITHUB_TOKEN` | Build and release > Check release |
-| `SmokeTest` | Checks `Version` was published and works, building nothing. From the feed: installs the tool (globally, as a local tool from a manifest, with `dotnet tool exec`), runs each framework's build, snapshots and restores a repository and its working tree, also from a snapshot the previous release took, upgrades from the previous release and uninstalls; uses the library as a test would (snapshot, `Preserve`, JSON, `Restore`) on each framework it is built for and the newest runtime. Checks the notices, contents, signatures, known vulnerabilities, API compatibility (a break must be under a "Breaking" heading in `CHANGELOG.md`) and size against the previous release, what the feed shows, the symbols, deterministic builds and Source Link, the GitHub release and the published installation page; with `SmokeTestReleaseDirectory`, compares the packages, PDBs and console app zip with the release's | Build and release > Smoke test (Linux x64, ARM64 and Alpine, Windows, macOS), after every release and on every CI build (from GitHub Packages, without the release-only checks) |
+| `SmokeTest` | Runs the smoke tests (`pipeline/GitSnapshotter.SmokeTests`) on `Version`, building nothing of the product; see below | Build and release > Smoke test (Linux x64, ARM64 and Alpine, Windows, macOS), after every release and on every CI build (from GitHub Packages, without the release-only checks) |
 | `Test` | Compile and tests | Build and release > Test on Windows |
 | `Compile` | Compile | CodeQL |
 | `Restore` | Restore the solution | Build and release > Submit dependency graph |
 | `Docs` | `npm ci` and `npm run build` in `docs` | Docs |
+
+The smoke tests are a TUnit app in `pipeline/GitSnapshotter.SmokeTests`, one test per check, so a failed run names
+what broke. They download the published packages into an empty directory and use them as a user would: the tool
+(installed globally, as a local tool from a manifest, with `dotnet tool exec`; each framework's build; a snapshot and
+restore of a repository and its working tree, also from a snapshot the previous release took; an upgrade from the
+previous release) and the library (snapshot, `Preserve`, JSON and `Restore`, on each framework it is built for).
+They check both packages' third-party notices and contents (an assembly must be ours or covered by the notices; the
+library may depend only on packages its project passes on), signatures, known vulnerabilities, API compatibility (a
+break must be under a "Breaking" heading in the version's `CHANGELOG.md` section) and size against the previous
+release, what the feed shows, the symbols, deterministic builds and Source Link, the GitHub release, and the published
+installation page. Releases run them on nuget.org's packages, CI builds on GitHub Packages' prereleases with the
+release-only checks off.
+
+`dotnet test` on the solution leaves them out, as they need a published version. Run them with the `SmokeTest` target
+(`./build.sh --Build:Target=SmokeTest --Build:Version=0.3.0`), or directly with
+`dotnet run --project pipeline/GitSnapshotter.SmokeTests` and `SmokeTest__Version`. Their settings are `SmokeTest__*`
+environment variables (`pipeline/GitSnapshotter.SmokeTests/SmokeTestSettings.cs`); booleans are `true` or `false`:
+
+| Setting | Default | Purpose |
+|---|---|---|
+| `Version` | the target's `Version` | The version to test |
+| `Source` | nuget.org | Feed our packages are tested from |
+| `SourceUsername`, `SourcePassword` | none | Credentials for `Source` (GitHub Packages) |
+| `PreviousSource` | nuget.org | Where the previous releases and our packages' dependencies come from |
+| `WaitMinutes` | `30` | How long to retry while the feed doesn't list the packages, their metadata or symbols yet |
+| `ReleaseDirectory` | none | The GitHub release's assets: checked against `SHA256SUMS.txt`, and compared with the feed's packages, the PDBs and the console app zip |
+| `Commit` | the library package's | The commit the packages, Source Link and the release tag must point at |
+| `VerifySignatures` | `true` | Verify the packages' signatures; off for a feed that doesn't sign, like GitHub Packages |
+| `FeedMetadata` | `true` | Check what the feed shows (nuget.org's registration API) |
+| `Symbols`, `SymbolServer` | `true`, nuget.org's | Download our PDBs from the symbol server |
+| `GitHubRelease`, `GitHubRepository` | `true`, this one | Check the GitHub release (with `GITHUB_TOKEN`, when set) |
+| `Docs`, `DocsPage` | `true`, the installation page | Check the published page against the release |
+| `MaxGrowthPercent` | `25` | How much each framework's part of a package may grow over the previous release |
+| `AboveReleases` | `false` | Fail when the version sorts below a release (CI builds: raise `VersionPrefix` after each release) |
 
 On a build server the pipeline also gives git a user name and email for the tests; on a developer machine it leaves
 the git configuration alone.

@@ -21,6 +21,8 @@
     <Compile Include="$(PipelineDirectory)**\*.cs"
              Exclude="$(PipelineDirectory)Program.cs;$(PipelineDirectory)bin\**;$(PipelineDirectory)obj\**"
              LinkBase="Pipeline" />
+    <!-- The smoke tests' checks, which are pure, to test them on files of their own. -->
+    <Compile Include="$(MSBuildThisFileDirectory)..\GitSnapshotter.SmokeTests\SmokeTestChecks.cs" LinkBase="SmokeTests" />
   </ItemGroup>
 
   <ItemGroup>

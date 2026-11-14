@@ -375,22 +375,22 @@ jobs:
         env:
           Build__Target: SmokeTest
           Build__Version: ${{ needs.verify.outputs.release == 'true' && needs.verify.outputs.version || needs.build.outputs.package-version }}
-          Build__SmokeTestCommit: ${{ github.sha }}
-          Build__SmokeTestSource: >-
+          SmokeTest__Commit: ${{ github.sha }}
+          SmokeTest__Source: >-
             ${{ needs.verify.outputs.release == 'true' && 'https://api.nuget.org/v3/index.json'
             || format('https://nuget.pkg.github.com/{0}/index.json', github.repository_owner) }}
-          Build__SmokeTestSourceUsername: ${{ needs.verify.outputs.release != 'true' && github.actor || '' }}
-          Build__SmokeTestSourcePassword: ${{ needs.verify.outputs.release != 'true' && github.token || '' }}
-          Build__SmokeTestReleaseDirectory: ${{ needs.verify.outputs.release == 'true' && format('{0}/release', runner.temp) || '' }}
+          SmokeTest__SourceUsername: ${{ needs.verify.outputs.release != 'true' && github.actor || '' }}
+          SmokeTest__SourcePassword: ${{ needs.verify.outputs.release != 'true' && github.token || '' }}
+          SmokeTest__ReleaseDirectory: ${{ needs.verify.outputs.release == 'true' && format('{0}/release', runner.temp) || '' }}
           # Only a release is signed, shown and indexed by nuget.org, has a GitHub release and matches the published docs.
           # true/false, never empty: on Windows an empty variable is no variable, and the default would apply.
-          Build__SmokeTestVerifySignatures: ${{ needs.verify.outputs.release == 'true' }}
-          Build__SmokeTestFeedMetadata: ${{ needs.verify.outputs.release == 'true' }}
-          Build__SmokeTestGitHubRelease: ${{ needs.verify.outputs.release == 'true' }}
-          Build__SmokeTestSymbols: ${{ needs.verify.outputs.release == 'true' }}
-          Build__SmokeTestDocs: ${{ needs.verify.outputs.release == 'true' }}
+          SmokeTest__VerifySignatures: ${{ needs.verify.outputs.release == 'true' }}
+          SmokeTest__FeedMetadata: ${{ needs.verify.outputs.release == 'true' }}
+          SmokeTest__GitHubRelease: ${{ needs.verify.outputs.release == 'true' }}
+          SmokeTest__Symbols: ${{ needs.verify.outputs.release == 'true' }}
+          SmokeTest__Docs: ${{ needs.verify.outputs.release == 'true' }}
           # A CI build must sort above every release (VersionPrefix raised after each one).
-          Build__SmokeTestAboveReleases: ${{ needs.verify.outputs.release != 'true' }}
+          SmokeTest__AboveReleases: ${{ needs.verify.outputs.release != 'true' }}
           # Reads the GitHub release.
           GITHUB_TOKEN: ${{ github.token }}
         run: dotnet run --project pipeline/GitSnapshotter.Pipeline --configuration Release

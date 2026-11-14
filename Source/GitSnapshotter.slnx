@@ -15,6 +15,7 @@
     <File Path="../README.md" />
   </Folder>
   <Project Path="../pipeline/GitSnapshotter.Pipeline.Tests/GitSnapshotter.Pipeline.Tests.csproj" />
+  <Project Path="../pipeline/GitSnapshotter.SmokeTests/GitSnapshotter.SmokeTests.csproj" />
   <Project Path="../pipeline/GitSnapshotter.Pipeline/GitSnapshotter.Pipeline.csproj">
     <Build Project="false" />
   </Project>

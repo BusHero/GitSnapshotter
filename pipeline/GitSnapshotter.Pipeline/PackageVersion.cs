@@ -64,4 +64,18 @@ internal static class PackageVersion
         var git = context.Git().Information;
         return Console(settings, git.BranchName, git.DefaultBranchName, DateTime.UtcNow);
     }
+
+    /// <summary>
+    /// The version the library was packed at, from the package file names in the publish directory: the one ending
+    /// in <paramref name="suffix"/> on a CI build, the release version otherwise.
+    /// </summary>
+    public static string? Packed(IEnumerable<string> fileNames, string? suffix) =>
+        fileNames
+            .Where(name => name.StartsWith("GitSnapshotter.", StringComparison.Ordinal)
+                && !name.StartsWith("GitSnapshotter.Tool.", StringComparison.Ordinal)
+                && name.EndsWith(".nupkg", StringComparison.Ordinal))
+            .Select(name => name["GitSnapshotter.".Length..^".nupkg".Length])
+            .Where(version => suffix is null || version.EndsWith("-" + suffix, StringComparison.Ordinal))
+            .Order(StringComparer.Ordinal)
+            .LastOrDefault();
 }

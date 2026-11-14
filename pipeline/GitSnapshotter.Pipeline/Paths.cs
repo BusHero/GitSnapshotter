@@ -26,6 +26,9 @@ internal static class Paths
 
     public static string Docs(IPipelineContext context) => Path.Combine(Root(context), "docs");
 
+    public static string SmokeTests(IPipelineContext context) =>
+        Path.Combine(Root(context), "pipeline", "GitSnapshotter.SmokeTests", "GitSnapshotter.SmokeTests.csproj");
+
     public static string ReleaseDirectory(IPipelineContext context, BuildSettings settings) =>
         Path.GetFullPath(settings.ReleaseDirectory, Root(context));
 

@@ -7,11 +7,13 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Xml.Linq;
 
-namespace GitSnapshotter.Pipeline;
+using GitSnapshotter.Pipeline;
+
+namespace GitSnapshotter.SmokeTests;
 
 /// <summary>
-/// The checks <see cref="Modules.SmokeTestModule"/> makes on a published version, kept free of the pipeline so the
-/// tests can run them on files of their own.
+/// The checks the smoke tests make on a published version, kept free of any I/O beyond the files they're given, so
+/// the pipeline's unit tests (which compile this file) can run them on files of their own.
 /// </summary>
 internal static class SmokeTestChecks
 {
@@ -23,6 +25,12 @@ internal static class SmokeTestChecks
 
     /// <summary>The console app's entry assembly, in the tool package and the release zip.</summary>
     public const string ConsoleAssembly = "GitSnapshotter.Console.dll";
+
+    /// <summary>
+    /// The checksums file attached to each release, as the pipeline's ReleaseAssetsModule writes it (a pipeline test
+    /// checks the two agree).
+    /// </summary>
+    public const string ChecksumsFile = "SHA256SUMS.txt";
 
     /// <summary>The repository signature nuget.org adds to every package it accepts.</summary>
     public const string RepositorySignature = ".signature.p7s";
@@ -975,7 +983,7 @@ internal static class SmokeTestChecks
     [
         $"{LibraryId}.{version}.nupkg", $"{LibraryId}.{version}.snupkg",
         $"{ToolId}.{version}.nupkg", $"{ToolId}.{version}.snupkg",
-        $"GitSnapshotter.Console_{version}.zip", Modules.ReleaseAssetsModule.ChecksumsFile,
+        $"GitSnapshotter.Console_{version}.zip", ChecksumsFile,
     ];
 
     /// <summary>
@@ -1151,20 +1159,4 @@ internal static class SmokeTestChecks
 
         return problems;
     }
-
-    // ---- The CI build's version ---------------------------------------------------------------------------------------
-
-    /// <summary>
-    /// The version the library was packed at, from the package file names in the publish directory: the one ending
-    /// in <paramref name="suffix"/> on a CI build, the release version otherwise.
-    /// </summary>
-    public static string? PackedVersion(IEnumerable<string> fileNames, string? suffix) =>
-        fileNames
-            .Where(name => name.StartsWith($"{LibraryId}.", StringComparison.Ordinal)
-                && !name.StartsWith($"{ToolId}.", StringComparison.Ordinal)
-                && name.EndsWith(".nupkg", StringComparison.Ordinal))
-            .Select(name => name[(LibraryId.Length + 1)..^".nupkg".Length])
-            .Where(version => suffix is null || version.EndsWith("-" + suffix, StringComparison.Ordinal))
-            .Order(StringComparer.Ordinal)
-            .LastOrDefault();
 }
