@@ -127,6 +127,58 @@ jobs:
           fi
           echo "'$RELEASE_ENVIRONMENT' requires approval from $reviewers reviewer(s)."
 
+      - uses: actions/checkout@v7
+        if: inputs.version != ''
+        with:
+          persist-credentials: false
+          sparse-checkout: CHANGELOG.md
+          sparse-checkout-cone-mode: false
+
+      # The GitHub release description is the CHANGELOG.md section for the version. A prerelease with no section of
+      # its own uses Unreleased; a stable release must have its own section.
+      - name: 'Release notes from CHANGELOG.md'
+        if: inputs.version != ''
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+        run: |
+          # The lines under "## [<name>]", up to the next section or the link definitions, without blank lines at
+          # either end.
+          section() {
+            awk -v heading="## [$1]" '
+              found && (/^## / || /^\[[^]]+\]: /) { exit }
+              found { print }
+              index($0, heading) == 1 { found = 1 }
+            ' CHANGELOG.md | sed -e '/./,$!d' | tac | sed -e '/./,$!d' | tac
+          }
+
+          from="$VERSION"
+          notes=$(section "$VERSION")
+          if [[ -z "$notes" && "$PRERELEASE" == true ]]; then
+            from=Unreleased
+            notes=$(section Unreleased)
+          fi
+          if [[ -z "$notes" ]]; then
+            if [[ "$PRERELEASE" == true ]]; then
+              echo "::error::CHANGELOG.md has nothing under '## [$VERSION]' or '## [Unreleased]' to describe this release"
+            else
+              echo "::error::CHANGELOG.md has no '## [$VERSION]' section. Rename Unreleased to it before releasing."
+            fi
+            exit 1
+          fi
+
+          mkdir release-notes
+          printf '%s\n' "$notes" > release-notes/release-notes.md
+          echo "Release description, from the '$from' section of CHANGELOG.md:"
+          cat release-notes/release-notes.md
+
+      - uses: actions/upload-artifact@v7
+        if: inputs.version != ''
+        with:
+          name: release-notes
+          path: release-notes
+          if-no-files-found: error
+
       - name: 'CI build'
         if: inputs.version == ''
         run: echo "No version given, so this is a CI build and nothing is released."
@@ -275,21 +327,28 @@ jobs:
           name: GitSnapshotter_${{ needs.verify.outputs.version }}
           path: release
 
+      # Kept out of release/: everything there is attached to the release.
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-notes
+          path: release-notes
+
       - name: 'Verify checksums'
         working-directory: release
         run: sha256sum --check SHA256SUMS.txt
 
       # A draft first: if the NuGet push fails, nothing is public yet and the run can be retried. A draft has no git
-      # tag yet; GitHub creates the tag on the released commit when the release is published.
+      # tag yet; GitHub creates the tag on the released commit when the release is published. The description is
+      # the version's CHANGELOG.md section, from the verify job.
       - name: 'Create draft GitHub release'
         run: |
           if gh release view "$TAG" > /dev/null 2>&1; then
             # A draft left behind by a failed run (verify rejects a published one): point it at this commit and
-            # refresh its assets.
-            gh release edit "$TAG" --target "$GITHUB_SHA"
+            # refresh its description and assets.
+            gh release edit "$TAG" --target "$GITHUB_SHA" --notes-file release-notes/release-notes.md
             gh release upload "$TAG" release/* --clobber
           else
-            flags=(--draft --target "$GITHUB_SHA" --generate-notes --title "$TAG")
+            flags=(--draft --target "$GITHUB_SHA" --notes-file release-notes/release-notes.md --title "$TAG")
             if [[ "$PRERELEASE" == true ]]; then flags+=(--prerelease); fi
             gh release create "$TAG" "${flags[@]}" release/*
           fi
