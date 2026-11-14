@@ -8,7 +8,7 @@
 A .NET library and command-line tool that snapshots a git repository's state (HEAD, branches, remotes, tags, other
 refs, and optionally the index and working tree) and restores it later.
 
-See [the package README](Source/GitSnapshotter/docs/README.md) for usage.
+Documentation: https://bushero.github.io/GitSnapshotter/ (or see [the package README](Source/GitSnapshotter/docs/README.md)).
 
 ## Development
 
@@ -59,3 +59,17 @@ git config core.hooksPath .githooks
 | `Source/GitSnapshotter.Console` | The command-line tool |
 | `Source/GitSnapshotter.UnitTests` | [TUnit](https://tunit.dev) tests; each test builds throwaway repositories in the temp directory |
 | `pipeline/GitSnapshotter.Pipeline` | Build pipeline (ModularPipelines) |
+| `docs` | Documentation site ([Astro](https://astro.build) + [Starlight](https://starlight.astro.build)) |
+
+## Documentation site
+
+The site in `docs/` is deployed to GitHub Pages by `.github/workflows/docs.yml` on every push to `trunk` that
+touches it. To work on it locally (Node.js 22.23.4 or later):
+
+```sh
+cd docs
+npm install
+npm run dev                # http://localhost:4321/GitSnapshotter/
+```
+
+Pages live in `docs/src/content/docs/` as Markdown.
