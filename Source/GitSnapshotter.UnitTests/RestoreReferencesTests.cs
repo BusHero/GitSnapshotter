@@ -74,7 +74,7 @@ public sealed class RestoreReferencesTests
         using (Assert.Multiple())
         {
             await Assert.That(fresh.Refs["refs/stash"].TargetIdentifier).IsEqualTo(stash.WorkTree.Sha);
-            await Assert.That(fresh.Snapshot()).IsEquivalentTo(snapshot);
+            await SnapshotAssert.AreEquivalent(fresh.Snapshot(), snapshot);
         }
     }
 

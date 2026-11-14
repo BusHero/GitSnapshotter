@@ -74,7 +74,7 @@ public sealed class CliTests : IDisposable
         using (Assert.Multiple())
         {
             await Assert.That(exitCode).IsEqualTo(Cli.Success);
-            await Assert.That(GitRepositorySnapshot.FromJson(_output.ToString())).IsEquivalentTo(repo.Snapshot());
+            await SnapshotAssert.AreEquivalent(GitRepositorySnapshot.FromJson(_output.ToString()), repo.Snapshot());
         }
     }
 
@@ -89,7 +89,7 @@ public sealed class CliTests : IDisposable
         using (Assert.Multiple())
         {
             await Assert.That(exitCode).IsEqualTo(Cli.Success);
-            await Assert.That(GitRepositorySnapshot.FromJson(_output.ToString())).IsEquivalentTo(repo.Snapshot());
+            await SnapshotAssert.AreEquivalent(GitRepositorySnapshot.FromJson(_output.ToString()), repo.Snapshot());
         }
     }
 
@@ -340,7 +340,7 @@ public sealed class CliTests : IDisposable
         {
             await Assert.That(exitCode).IsEqualTo(Cli.Success);
             await Assert.That(_output.ToString().Trim()).IsEqualTo($"Snapshot written to {file}.");
-            await Assert.That(GitRepositorySnapshot.Load(file)).IsEquivalentTo(repo.Snapshot());
+            await SnapshotAssert.AreEquivalent(GitRepositorySnapshot.Load(file), repo.Snapshot());
         }
     }
 

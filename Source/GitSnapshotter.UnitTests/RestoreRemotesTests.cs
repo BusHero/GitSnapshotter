@@ -19,7 +19,7 @@ public sealed class RestoreRemotesTests
             await Assert.That(fresh.Network.Remotes["origin"].Url).IsEqualTo(origin.Info.Path);
             await Assert.That(fresh.Branches["origin/master"]).IsNotNull();
             await Assert.That(fresh.Branches["master"].TrackedBranch.FriendlyName).IsEqualTo("origin/master");
-            await Assert.That(fresh.Snapshot()).IsEquivalentTo(snapshot);
+            await SnapshotAssert.AreEquivalent(fresh.Snapshot(), snapshot);
         }
     }
 
@@ -71,7 +71,7 @@ public sealed class RestoreRemotesTests
         clone.RestoreFrom(snapshot);
 
         using var reopened = clone.Reopen();
-        await Assert.That(reopened.Snapshot()).IsEquivalentTo(snapshot);
+        await SnapshotAssert.AreEquivalent(reopened.Snapshot(), snapshot);
     }
 
     [Test, AutoData]
@@ -90,7 +90,7 @@ public sealed class RestoreRemotesTests
         using (Assert.Multiple())
         {
             await Assert.That(fresh.Branches[$"origin/{branchName}"]).IsNull();
-            await Assert.That(fresh.Snapshot()).IsEquivalentTo(snapshot);
+            await SnapshotAssert.AreEquivalent(fresh.Snapshot(), snapshot);
         }
     }
 
@@ -144,7 +144,7 @@ public sealed class RestoreRemotesTests
             var typed = await Assert.That(fresh.Refs["refs/remotes/origin/HEAD"])
                 .IsTypeOf<LibGit2Sharp.SymbolicReference>();
             await Assert.That(typed!.TargetIdentifier).IsEqualTo("refs/remotes/origin/master");
-            await Assert.That(fresh.Snapshot()).IsEquivalentTo(snapshot);
+            await SnapshotAssert.AreEquivalent(fresh.Snapshot(), snapshot);
         }
     }
 }

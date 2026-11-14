@@ -65,7 +65,7 @@ public sealed class WorkingTreeTests
         using (Assert.Multiple())
         {
             await Assert.That(fresh.ReadFile("a.txt")).IsEqualTo("work in progress");
-            await Assert.That(fresh.SnapshotWithWorkingTree()).IsEquivalentTo(snapshot);
+            await SnapshotAssert.AreEquivalent(fresh.SnapshotWithWorkingTree(), snapshot);
         }
     }
 
@@ -86,7 +86,7 @@ public sealed class WorkingTreeTests
         {
             await Assert.That(fresh.ReadFile("a.txt")).IsEqualTo("work in progress");
             await Assert.That(fresh.RetrieveStatus("a.txt")).IsEqualTo(FileStatus.ModifiedInWorkdir);
-            await Assert.That(fresh.SnapshotWithWorkingTree()).IsEquivalentTo(snapshot);
+            await SnapshotAssert.AreEquivalent(fresh.SnapshotWithWorkingTree(), snapshot);
         }
     }
 
@@ -255,7 +255,7 @@ public sealed class WorkingTreeTests
             await Assert.That((File.GetUnixFileMode(repo.FullPath("script.sh")) & UnixFileMode.UserExecute))
                 .IsEqualTo(UnixFileMode.UserExecute);
             using var reopened = repo.Reopen();
-            await Assert.That(reopened.SnapshotWithWorkingTree()).IsEquivalentTo(snapshot);
+            await SnapshotAssert.AreEquivalent(reopened.SnapshotWithWorkingTree(), snapshot);
         }
     }
 #endif
