@@ -1,0 +1,181 @@
+---
+title: Testing
+description: Undo everything a test does to a git repository, with xUnit, NUnit, MSTest or TUnit.
+---
+
+import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+
+Tests for code that works with git, such as release scripts, versioning tools, hooks or custom git commands, often
+need a real repository, and they leave it changed: new branches, moved tags, commits, remotes. GitSnapshotter makes
+each test put the repository back the way it found it.
+
+## The pattern
+
+Take a snapshot before the test with `GitRepository.Preserve`, and dispose the scope after it. Disposing restores the
+repository, whether the test passed or failed.
+
+```csharp
+using (GitRepository.Preserve(repositoryPath))
+{
+    // arrange, act, assert
+}
+```
+
+For a single test a `using` block is enough. For a whole test class, create the scope in the framework's per-test
+setup and dispose it in the per-test teardown.
+
+<Tabs syncKey="test-framework">
+  <TabItem label="xUnit">
+    xUnit creates a new instance of the test class for every test, so the constructor and `Dispose` run around each one.
+
+    ```csharp
+    using GitSnapshotter;
+    using Xunit;
+
+    public sealed class ReleaseScriptTests : IDisposable
+    {
+        private const string RepositoryPath = "/path/to/fixture-repo";
+
+        private readonly SnapshotScope _scope = GitRepository.Preserve(
+            RepositoryPath,
+            restoreOptions: new RestoreOptions { Force = true });
+
+        public void Dispose() => _scope.Dispose();
+
+        [Fact]
+        public void CreatesAReleaseTag()
+        {
+            ReleaseScript.Run(RepositoryPath, "1.2.0");
+
+            Assert.Contains(GitRepository.GetSnapshot(RepositoryPath).Tags, t => t.Name == "v1.2.0");
+        }
+    }
+    ```
+  </TabItem>
+  <TabItem label="NUnit">
+    ```csharp
+    using GitSnapshotter;
+    using NUnit.Framework;
+
+    [NonParallelizable]
+    public class ReleaseScriptTests
+    {
+        private const string RepositoryPath = "/path/to/fixture-repo";
+        private SnapshotScope? _scope;
+
+        [SetUp]
+        public void TakeSnapshot() =>
+            _scope = GitRepository.Preserve(RepositoryPath, restoreOptions: new RestoreOptions { Force = true });
+
+        [TearDown]
+        public void RestoreRepository() => _scope?.Dispose();
+
+        [Test]
+        public void CreatesAReleaseTag()
+        {
+            ReleaseScript.Run(RepositoryPath, "1.2.0");
+
+            Assert.That(GitRepository.GetSnapshot(RepositoryPath).Tags.Select(t => t.Name), Does.Contain("v1.2.0"));
+        }
+    }
+    ```
+  </TabItem>
+  <TabItem label="MSTest">
+    ```csharp
+    using GitSnapshotter;
+    using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+    [TestClass]
+    [DoNotParallelize]
+    public class ReleaseScriptTests
+    {
+        private const string RepositoryPath = "/path/to/fixture-repo";
+        private SnapshotScope? _scope;
+
+        [TestInitialize]
+        public void TakeSnapshot() =>
+            _scope = GitRepository.Preserve(RepositoryPath, restoreOptions: new RestoreOptions { Force = true });
+
+        [TestCleanup]
+        public void RestoreRepository() => _scope?.Dispose();
+
+        [TestMethod]
+        public void CreatesAReleaseTag()
+        {
+            ReleaseScript.Run(RepositoryPath, "1.2.0");
+
+            CollectionAssert.Contains(
+                GitRepository.GetSnapshot(RepositoryPath).Tags.Select(t => t.Name).ToList(), "v1.2.0");
+        }
+    }
+    ```
+  </TabItem>
+  <TabItem label="TUnit">
+    ```csharp
+    using GitSnapshotter;
+
+    [NotInParallel]
+    public class ReleaseScriptTests
+    {
+        private const string RepositoryPath = "/path/to/fixture-repo";
+        private SnapshotScope? _scope;
+
+        [Before(Test)]
+        public void TakeSnapshot() =>
+            _scope = GitRepository.Preserve(RepositoryPath, restoreOptions: new RestoreOptions { Force = true });
+
+        [After(Test)]
+        public void RestoreRepository() => _scope?.Dispose();
+
+        [Test]
+        public async Task CreatesAReleaseTag()
+        {
+            ReleaseScript.Run(RepositoryPath, "1.2.0");
+
+            await Assert.That(GitRepository.GetSnapshot(RepositoryPath).Tags.Select(t => t.Name)).Contains("v1.2.0");
+        }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Things to get right
+
+### Use `Force` in tests
+
+Without `Force`, a test that leaves uncommitted changes behind makes the restore throw `UncommittedChangesException`
+and the repository stays changed for the next test. In a test fixture you almost always want the changes discarded,
+so pass `new RestoreOptions { Force = true }`.
+
+### Capture the working tree if tests touch files
+
+A plain snapshot restores references, and resets files only when HEAD's commit changes. If tests write files without
+committing, or the fixture repository has uncommitted content that tests rely on, include the working tree:
+
+```csharp
+GitRepository.Preserve(
+    RepositoryPath,
+    new SnapshotOptions { IncludeWorkingTree = true },
+    new RestoreOptions { Force = true });
+```
+
+That also deletes untracked files a test created. Ignored files are still left alone.
+
+### Don't share a repository between parallel tests
+
+Each scope restores the state from when *it* was created. Two tests running at the same time against the same
+repository would undo each other's work halfway through. Either give each test its own repository, or run the tests
+that share one sequentially: a collection defined with `[CollectionDefinition(DisableParallelization = true)]` in xUnit, `[NonParallelizable]` in
+NUnit, `[DoNotParallelize]` in MSTest, `[NotInParallel]` in TUnit.
+
+### Prefer a throwaway repository when you can
+
+If a test doesn't need a particular existing repository, creating a fresh one in the temp directory per test is
+simpler still, and parallel-safe. GitSnapshotter's own test suite does that. Snapshots shine when the fixture is
+expensive to build, such as a clone of a real project, or when the code under test must run against one specific
+repository.
+
+<Aside type="tip">
+  Asserting on a snapshot is a convenient way to check what code under test did to a repository. Take one before and
+  one after, and assert on [`SnapshotDiff.Compare(before, after).Changes`](/GitSnapshotter/library/comparing-snapshots/).
+</Aside>

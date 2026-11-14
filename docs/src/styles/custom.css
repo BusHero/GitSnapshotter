@@ -1,0 +1,4 @@
+/* Keep option names and identifiers such as `--dry-run` on one line inside tables. */
+.sl-markdown-content td:first-child code {
+  white-space: nowrap;
+}

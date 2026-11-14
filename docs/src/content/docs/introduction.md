@@ -1,36 +1,46 @@
 ---
 title: Introduction
-description: What GitSnapshotter records, and what it doesn't.
+description: What GitSnapshotter is, what a snapshot records, and when to use one.
 ---
 
-GitSnapshotter is a .NET library and command-line tool that records the state of a git repository and puts it back
-later. It is built on [LibGit2Sharp](https://github.com/libgit2/libgit2sharp) and runs on .NET 8 and later, and on .NET
-Framework 4.7.2 and later.
+GitSnapshotter records the state of a git repository, its references and optionally its uncommitted work, and later
+puts the repository back exactly as it was. It comes as:
+
+- **A .NET library**, the `GitSnapshotter` NuGet package, for use from code and tests. It runs on .NET 8 and later
+  and on .NET Framework 4.7.2 and later, and is built on [LibGit2Sharp](https://github.com/libgit2/libgit2sharp).
+- **A command-line tool**, `GitSnapshotter.Console`, for use from a shell or a script.
 
 ## What a snapshot records
 
-- **HEAD**: the checked-out branch, or the commit when HEAD is detached
-- **Local branches**: their tips and their upstream (`branch.<name>.remote` / `.merge`)
-- **Remotes**: their URLs, remote-tracking branches, and `refs/remotes/<remote>/HEAD`
-- **Tags**: lightweight and annotated, including the annotation object id
-- **Other references**: anything else under `refs/`, such as `refs/stash` and `refs/notes/*`
-- **Index and working tree** (optional): staged content, modified and untracked files
+| Part | What is recorded |
+|---|---|
+| HEAD | The checked-out branch, or the commit when HEAD is detached |
+| Local branches | Each branch's tip, and its upstream (`branch.<name>.remote` and `branch.<name>.merge`) |
+| Remotes | Each remote's URL, its remote-tracking branches, and `refs/remotes/<remote>/HEAD` |
+| Tags | Lightweight and annotated tags, including the annotation's object id and message |
+| Other references | Everything else under `refs/`, such as `refs/stash` and `refs/notes/*` |
+| Index and working tree | *Optional.* Staged content, modified files and untracked (non-ignored) files |
 
-A snapshot stores names and object ids only, so it is small and cheap to take. It can only be restored while the
-commits it refers to are still in the repository's object database.
+A snapshot holds **names and object ids, not content**. Taking one is cheap and the result is a small JSON
+document. The commits themselves stay in the repository's object database, so a snapshot can only be restored
+while the commits it refers to are still there. See [How it works](/GitSnapshotter/concepts/how-it-works/) for
+what that means in practice.
 
 ## When to use it
 
-- **Tests** that create branches, commit, move tags or add remotes in a real repository and need to leave it as
-  they found it.
-- **Tooling** that rewrites history or experiments with refs and wants an undo button.
-- **Inspection**: compare two snapshots to see exactly which refs moved.
+**Tests that touch a real repository.** Tests for git tooling, release scripts or build steps often create
+branches, commit, tag or add remotes. Wrap each test in `GitRepository.Preserve` and the repository is put back
+afterwards, even when the test fails. See [Testing](/GitSnapshotter/library/testing/).
 
-## Limitations
+**An undo button for risky operations.** Take a snapshot before a scripted rebase, history rewrite or bulk branch
+clean-up. If anything goes wrong, restore it. See [Scripting](/GitSnapshotter/cli/scripting/).
 
-- Restoring `refs/stash` brings back the latest stash only; older entries live in the stash reflog, which isn't
-  recorded.
-- Reflogs, git config other than remotes and branch upstreams, hooks and submodule contents aren't recorded.
-- Remote push URLs and custom fetch refspecs aren't recorded. A remote that gets re-added uses the default refspec.
-- Working-tree snapshots are stored as unreferenced tree objects, so `git gc` can prune them once they are older
-  than `gc.pruneExpire` (two weeks by default).
+**Finding out what changed.** Compare two snapshots to see exactly which branches moved, which tags were added and
+which remotes changed. See [Comparing snapshots](/GitSnapshotter/library/comparing-snapshots/).
+
+## What it is not
+
+GitSnapshotter is not a backup tool. It doesn't copy commits, files or the object database. If you need a copy of
+the repository that survives `git gc` or deleting the folder, use `git clone --mirror` or `git bundle`.
+Reflogs, hooks, most git configuration and submodule contents aren't recorded either; see
+[Limitations](/GitSnapshotter/concepts/limitations/).

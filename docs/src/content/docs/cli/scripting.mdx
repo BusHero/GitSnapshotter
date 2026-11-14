@@ -1,0 +1,137 @@
+---
+title: Scripting
+description: Use GitSnapshotter.Console as a safety net in shell scripts and CI.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+## Roll back if a script fails
+
+Take a snapshot before something risky and restore it if the script fails. Include the working tree so uncommitted
+work comes back too, and keep the snapshot outside the repository.
+
+<Tabs syncKey="shell">
+  <TabItem label="bash">
+    ```bash
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    repo=.
+    snapshot="$(mktemp -d)/before.json"
+
+    GitSnapshotter.Console snapshot "$repo" --include-working-tree -o "$snapshot"
+
+    rollback() {
+      echo "Something failed, restoring the repository..." >&2
+      git rebase --abort 2>/dev/null || true
+      GitSnapshotter.Console restore "$repo" "$snapshot" --force
+    }
+    trap rollback ERR
+
+    git fetch origin
+    git rebase origin/main
+    ./scripts/bump-version.sh
+    git tag "v$(cat VERSION)"
+
+    trap - ERR
+    rm -r "$(dirname "$snapshot")"
+    ```
+  </TabItem>
+  <TabItem label="PowerShell">
+    ```powershell
+    $ErrorActionPreference = 'Stop'
+    $PSNativeCommandUseErrorActionPreference = $true
+
+    $repo = '.'
+    $snapshot = New-TemporaryFile
+
+    GitSnapshotter.Console snapshot $repo --include-working-tree -o $snapshot
+
+    try {
+        git fetch origin
+        git rebase origin/main
+        ./scripts/bump-version.ps1
+        git tag "v$(Get-Content VERSION)"
+    }
+    catch {
+        Write-Warning 'Something failed, restoring the repository...'
+        git rebase --abort 2>$null
+        GitSnapshotter.Console restore $repo $snapshot --force
+        throw
+    }
+    finally {
+        Remove-Item $snapshot
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+The rollback aborts any rebase that stopped halfway first. GitSnapshotter restores references and files, but not
+git's own record of an operation in progress (the `.git/rebase-merge` folder and similar), so git would otherwise
+still think the rebase is running. The same goes for merges (`git merge --abort`) and cherry-picks
+(`git cherry-pick --abort`).
+
+## Detecting changes
+
+`diff` exits with `0` whether or not anything changed, so compare its output with the "no changes" message:
+
+<Tabs syncKey="shell">
+  <TabItem label="bash">
+    ```bash
+    changes=$(GitSnapshotter.Console diff . "$snapshot")
+    if [[ "$changes" != "No changes since the snapshot." ]]; then
+      echo "The repository changed:" >&2
+      echo "$changes" >&2
+      exit 1
+    fi
+    ```
+  </TabItem>
+  <TabItem label="PowerShell">
+    ```powershell
+    $changes = GitSnapshotter.Console diff . $snapshot
+    if ($changes -ne 'No changes since the snapshot.') {
+        Write-Error "The repository changed:`n$($changes -join "`n")"
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Check that a build step leaves git alone
+
+Builds and code generators sometimes create tags, move branches or leave files behind. This GitHub Actions job fails
+if a step changes anything:
+
+```yaml
+- name: Snapshot before the build
+  run: GitSnapshotter.Console snapshot . --include-working-tree -o "$RUNNER_TEMP/before.json"
+
+- name: Build
+  run: ./build.sh
+
+- name: Fail if the build changed the repository
+  run: |
+    changes=$(GitSnapshotter.Console diff . "$RUNNER_TEMP/before.json")
+    if [[ "$changes" != "No changes since the snapshot." ]]; then
+      echo "::error::The build changed the repository"
+      echo "$changes"
+      exit 1
+    fi
+```
+
+Make sure build output is in `.gitignore`; with `--include-working-tree`, any untracked file that isn't ignored
+counts as a change.
+
+## Save a snapshot before cleaning up branches
+
+A quick undo for bulk branch deletion:
+
+```bash
+GitSnapshotter.Console snapshot . -o ~/branches-$(date +%F).json
+git branch --merged main | grep -v '^\*\|main' | xargs -r git branch -d
+
+# changed your mind?
+GitSnapshotter.Console restore . ~/branches-2026-11-14.json
+```
+
+The commits of deleted branches stay in the object database until `git gc` prunes them, so restore within a few
+weeks.

@@ -17,7 +17,7 @@ hero:
       variant: minimal
 ---
 
-import { Card, CardGrid } from '@astrojs/starlight/components';
+import { Card, CardGrid, LinkCard, Tabs, TabItem } from '@astrojs/starlight/components';
 
 <CardGrid stagger>
   <Card title="Small and cheap" icon="rocket">
@@ -30,6 +30,40 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
     Wrap a test in `GitRepository.Preserve(path)` and every change to the repository is undone on dispose.
   </Card>
   <Card title="Library and CLI" icon="seti:shell">
-    Use the `GitSnapshotter` NuGet package from .NET, or the `GitSnapshotter.Console` tool from a shell.
+    Use the `GitSnapshotter` package from .NET, or the `GitSnapshotter.Console` tool from a shell script.
   </Card>
+</CardGrid>
+
+## At a glance
+
+<Tabs syncKey="interface">
+  <TabItem label="C#">
+    ```csharp
+    using GitSnapshotter;
+
+    var snapshot = GitRepository.GetSnapshot(path);
+
+    // rebase, delete branches, move tags, add remotes...
+
+    GitRepository.Restore(path, snapshot);
+    ```
+  </TabItem>
+  <TabItem label="Command line">
+    ```sh
+    GitSnapshotter.Console snapshot . -o before.json
+
+    # rebase, delete branches, move tags, add remotes...
+
+    GitSnapshotter.Console restore . before.json
+    ```
+  </TabItem>
+</Tabs>
+
+## Where to next
+
+<CardGrid>
+  <LinkCard title="Introduction" description="What a snapshot records and when to use one." href="/GitSnapshotter/introduction/" />
+  <LinkCard title="Use it in tests" description="Undo every change a test makes to a real repository." href="/GitSnapshotter/library/testing/" />
+  <LinkCard title="Command line" description="Snapshot, restore and diff from a shell." href="/GitSnapshotter/cli/overview/" />
+  <LinkCard title="How it works" description="What restore does, step by step, and why it is safe." href="/GitSnapshotter/concepts/how-it-works/" />
 </CardGrid>

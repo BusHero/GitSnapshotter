@@ -1,0 +1,118 @@
+---
+title: Installation
+description: Add the GitSnapshotter package to a project, or get the command-line tool.
+---
+
+import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+
+## The library
+
+The `GitSnapshotter` package targets `net8.0` and `net472`, so it works in projects for .NET 8 or later and
+.NET Framework 4.7.2 or later. Its only dependency is LibGit2Sharp, which brings the native libgit2 binaries for
+Windows, macOS and Linux.
+
+The package is published to **GitHub Packages**. GitHub Packages requires authentication even for public packages,
+so you need a GitHub personal access token (classic) with the `read:packages` scope.
+
+<Steps>
+
+1. Add a `nuget.config` next to your solution that adds the feed and reads the credentials from environment
+   variables, so no secret is committed:
+
+   ```xml title="nuget.config"
+   <?xml version="1.0" encoding="utf-8"?>
+   <configuration>
+     <packageSources>
+       <add key="BusHero" value="https://nuget.pkg.github.com/BusHero/index.json" />
+     </packageSources>
+     <packageSourceCredentials>
+       <BusHero>
+         <add key="Username" value="%GITHUB_USERNAME%" />
+         <add key="ClearTextPassword" value="%GITHUB_TOKEN%" />
+       </BusHero>
+     </packageSourceCredentials>
+   </configuration>
+   ```
+
+2. Set the two variables in your shell:
+
+   <Tabs syncKey="shell">
+     <TabItem label="bash / zsh">
+       ```sh
+       export GITHUB_USERNAME=<your-github-user>
+       export GITHUB_TOKEN=<token-with-read:packages>
+       ```
+     </TabItem>
+     <TabItem label="PowerShell">
+       ```powershell
+       $env:GITHUB_USERNAME = "<your-github-user>"
+       $env:GITHUB_TOKEN = "<token-with-read:packages>"
+       ```
+     </TabItem>
+   </Tabs>
+
+3. Add the package:
+
+   ```sh
+   dotnet add package GitSnapshotter --prerelease
+   ```
+
+   Every push to `trunk` publishes a new prerelease version, so `--prerelease` is needed and picks the latest.
+
+</Steps>
+
+<Aside type="tip" title="In GitHub Actions">
+  Set `GITHUB_USERNAME` to `${{ github.actor }}` and `GITHUB_TOKEN` to `${{ secrets.GITHUB_TOKEN }}`, and give the
+  job `packages: read` permission. If the workflow is in a different repository, the package's settings on GitHub
+  must also grant that repository access.
+</Aside>
+
+## The command-line tool
+
+`GitSnapshotter.Console` is a framework-dependent .NET 11 application, so it needs the
+[.NET 11 runtime](https://dotnet.microsoft.com/download) installed.
+
+<Tabs>
+  <TabItem label="Download a build">
+    Every CI run of the `build` workflow attaches the published tool as an artifact named
+    `GitSnapshotter.Console_<version>`.
+
+    1. Open the [build workflow runs](https://github.com/BusHero/GitSnapshotter/actions/workflows/build.yml) and pick
+       a successful run on `trunk`.
+    2. Download the `GitSnapshotter.Console_…` artifact (you need to be signed in to GitHub) and unzip it.
+    3. Run it with the .NET host:
+
+       ```sh
+       dotnet path/to/GitSnapshotter.Console.dll help
+       ```
+
+    The artifact also contains a native `GitSnapshotter.Console` launcher. CI builds on Linux, so the launcher only
+    runs on Linux x64; `dotnet GitSnapshotter.Console.dll` works everywhere.
+  </TabItem>
+  <TabItem label="Run from source">
+    With the .NET 11 SDK installed:
+
+    ```sh
+    git clone https://github.com/BusHero/GitSnapshotter.git
+    cd GitSnapshotter
+    dotnet run --project Source/GitSnapshotter.Console -- help
+    ```
+
+    To build a copy you can keep, run `./build.sh` (or `build.cmd` on Windows); the tool lands in `./publish`.
+  </TabItem>
+</Tabs>
+
+To type `GitSnapshotter.Console` as in the rest of these docs, add an alias:
+
+<Tabs syncKey="shell">
+  <TabItem label="bash / zsh">
+    ```sh
+    alias GitSnapshotter.Console='dotnet /opt/gitsnapshotter/GitSnapshotter.Console.dll'
+    ```
+  </TabItem>
+  <TabItem label="PowerShell">
+    ```powershell
+    function GitSnapshotter.Console { dotnet C:\Tools\GitSnapshotter\GitSnapshotter.Console.dll @args }
+    ```
+  </TabItem>
+</Tabs>

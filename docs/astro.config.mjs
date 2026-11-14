@@ -15,6 +15,7 @@ export default defineConfig({
         dark: '../assets/logo/icon-dark.svg',
       },
       favicon: '/favicon.svg',
+      customCss: ['./src/styles/custom.css'],
       description:
         "Snapshot a git repository's HEAD, branches, remotes, tags and working tree, and restore it later.",
       social: [
@@ -26,13 +27,45 @@ export default defineConfig({
       sidebar: [
         {
           label: 'Start here',
+          items: ['introduction', 'installation', 'getting-started'],
+        },
+        {
+          label: 'Library',
           items: [
-            { label: 'Introduction', slug: 'introduction' },
-            { label: 'Getting started', slug: 'getting-started' },
+            'library/taking-snapshots',
+            'library/restoring',
+            'library/choosing-what-to-restore',
+            'library/working-tree',
+            'library/testing',
+            'library/saving-and-loading',
+            'library/comparing-snapshots',
+            'library/error-handling',
           ],
         },
-        { label: 'Guides', items: [{ autogenerate: { directory: 'guides' } }] },
-        { label: 'Reference', items: [{ autogenerate: { directory: 'reference' } }] },
+        {
+          label: 'Command line',
+          items: [
+            'cli/overview',
+            'cli/snapshot',
+            'cli/restore',
+            'cli/diff',
+            'cli/scripting',
+          ],
+        },
+        {
+          label: 'Concepts',
+          items: ['concepts/how-it-works', 'concepts/snapshot-format', 'concepts/limitations'],
+        },
+        {
+          label: 'API reference',
+          items: [
+            'reference/gitrepository',
+            'reference/options',
+            'reference/snapshot-types',
+            'reference/snapshot-diff',
+            'reference/exceptions',
+          ],
+        },
       ],
     }),
   ],
