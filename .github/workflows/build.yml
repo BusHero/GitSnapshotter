@@ -2,9 +2,14 @@ name: build
 
 on:
   push:
-    path-include:
-      - 'Source/'
-      - 'build/'
+    paths:
+      - 'Source/**'
+      - 'build/**'
+      - '.github/workflows/**'
+      - 'global.json'
+      - 'build.sh'
+      - 'build.cmd'
+      - 'build.ps1'
 
 jobs:
   ubuntu-latest:
@@ -28,7 +33,7 @@ jobs:
       - name: 'Run: Nuke'
         id: nuke
         run: |
-          ./build.cmd Publish-Package \
+          ./build.cmd Publish Publish-Package \
               -publish-directory publish \
               -configuration Release \
               -github-output "$GITHUB_OUTPUT" \

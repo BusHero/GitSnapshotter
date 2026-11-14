@@ -100,7 +100,8 @@ sealed class Build : NukeBuild
                 .SetProjectFile(Solution)
                 .EnableNoBuild()
                 .EnableNoRestore()
-                .SetFilter($"{Traits.Names.CATEGORY}~{Traits.Values.DISCOVERY}")
+                // Exploratory LibGit2Sharp tests document library behaviour; they are not part of the suite.
+                .SetFilter($"{Traits.Names.CATEGORY}!={Traits.Values.DISCOVERY}")
                 .SetConfiguration(Configuration)
                 .EnableNoLogo());
         });

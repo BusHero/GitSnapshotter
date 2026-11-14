@@ -1,9 +1,3 @@
-﻿using System.Text.Json;
+using GitSnapshotter.Console;
 
-using GitSnapshotter;
-
-var snapshot = GitRepository.GetSnapshot(args[0]);
-
-var json = JsonSerializer.Serialize(snapshot, new JsonSerializerOptions { WriteIndented = true });
-
-Console.WriteLine(json);
+return Cli.Run(args, System.Console.Out, System.Console.Error);

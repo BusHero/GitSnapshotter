@@ -35,6 +35,7 @@
     <ItemGroup>
       <ProjectReference Include="..\GitSnapshotter\GitSnapshotter.csproj" />
       <ProjectReference Include="..\Constants\Constants.csproj" />
+      <ProjectReference Include="..\GitSnapshotter.Console\GitSnapshotter.Console.csproj" />
     </ItemGroup>
 
 </Project>
