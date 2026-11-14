@@ -70,28 +70,29 @@ git config core.hooksPath .githooks
 
 ### Releasing
 
-Push a version tag on the commit to release:
+Start the `release` workflow by hand: **Actions > release > Run workflow**, on `trunk`, with the version to release
+(`1.2.0`, or `1.2.0-rc.1` for a prerelease). It releases the latest commit on `trunk` and creates the `v1.2.0` tag
+when the release is published. From a terminal:
 
 ```sh
-git tag v1.2.0
-git push origin v1.2.0
+gh workflow run release.yml --ref trunk -f version=1.2.0
 ```
 
-The `release` workflow (`.github/workflows/release.yml`) never publishes on the tag push alone:
+The workflow (`.github/workflows/release.yml`) never publishes without approval:
 
-1. **verify** checks that the tag is a version, that its commit is on the default branch, and that the `nuget`
-   environment requires a reviewer. If anyone removes that protection, releases fail instead of publishing
-   unattended.
+1. **verify** checks that the version is valid and has no tag yet, that the run is on the default branch, and that
+   the `nuget` environment requires a reviewer. If anyone removes that protection, releases fail instead of
+   publishing unattended.
 2. **test** runs the tests on Windows.
-3. **build** runs the pipeline with `Build:Version` set from the tag. It has read-only access and no publishing
+3. **build** runs the pipeline with `Build:Version` set to the version. It has read-only access and no publishing
    credentials.
 4. **publish** waits for a reviewer to approve the `nuget` environment. It then creates a draft GitHub release with
    both NuGet packages (the `GitSnapshotter` library and the `GitSnapshotter.Tool` .NET tool), the zipped console
-   app and `SHA256SUMS.txt`, pushes the packages to nuget.org, and publishes the release. It is the only job that can
-   write to the repository or get a nuget.org key.
+   app and `SHA256SUMS.txt`, pushes the packages to nuget.org, and publishes the release, which creates the tag. It
+   is the only job that can write to the repository or get a nuget.org key.
 
-A tag with a prerelease label (`v1.2.0-rc.1`) makes a GitHub prerelease and a NuGet prerelease. The release stays a
-draft until the push to nuget.org succeeds, so a failed run can be re-run.
+A version with a prerelease label (`1.2.0-rc.1`) makes a GitHub prerelease and a NuGet prerelease. The release stays
+a draft until the push to nuget.org succeeds, so a failed run can be re-run.
 
 Setup, once:
 
@@ -100,7 +101,8 @@ Setup, once:
   repository `GitSnapshotter`, workflow file `release.yml` and environment `nuget`. The push uses
   [trusted publishing](https://learn.microsoft.com/nuget/nuget-org/trusted-publishing), so there is no API key to
   store or rotate: the `NuGet/login` action exchanges the workflow's OIDC token for a short-lived key.
-- Optionally, add a tag ruleset (Settings > Rules) so only maintainers can create `v*` tags.
+- Optionally, add a tag ruleset (Settings > Rules) so only maintainers can create `v*` tags. Add GitHub Actions
+  to its bypass list: the workflow creates the tag when it publishes the release.
 
 ## Documentation site
 
