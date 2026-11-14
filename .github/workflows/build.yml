@@ -92,25 +92,3 @@ jobs:
         with:
           name: GitSnapshotter.Console_${{ steps.pipeline.outputs.version }}
           path: publish
-  # Uploads the resolved package graph to GitHub's dependency graph (Dependabot alerts, Insights > Dependency graph).
-  dependency-submission:
-    name: dependency-submission
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: 'Setup: .NET SDK from global.json'
-        uses: actions/setup-dotnet@v6
-        with:
-          global-json-file: global.json
-
-      # Component Detection reads the restore output (obj/project.assets.json), which includes transitive packages.
-      - name: 'Restore: solution and pipeline'
-        run: |
-          dotnet restore Source/GitSnapshotter.slnx
-          dotnet restore pipeline/GitSnapshotter.Pipeline
-
-      - name: 'Submit dependencies'
-        uses: advanced-security/component-detection-dependency-submission-action@v0.2.0
