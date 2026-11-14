@@ -1,3 +1,5 @@
+using GitSnapshotter.Pipeline.Modules;
+
 using TUnit.Core;
 
 namespace GitSnapshotter.Pipeline.Tests;
@@ -51,5 +53,17 @@ public sealed class GitHubActionsTests : IDisposable
         await Assert.That(async () => await GitHubActions.SetOutputAsync("tag", value, CancellationToken.None))
             .Throws<ArgumentException>();
         await Assert.That(File.Exists(_outputFile)).IsFalse();
+    }
+
+    [Test]
+    [Arguments("1.2.0", "version=1.2.0\ntag=v1.2.0\nprerelease=false\n")]
+    [Arguments("v1.2.0-rc.1", "version=1.2.0-rc.1\ntag=v1.2.0-rc.1\nprerelease=true\n")]
+    public async Task ReleaseVersionOutputsTheVersionTagAndKind(string version, string expected)
+    {
+        Environment.SetEnvironmentVariable(Variable, _outputFile);
+
+        await ReleaseVersionModule.SetOutputsAsync(ReleaseVersion.Parse(version), CancellationToken.None);
+
+        await Assert.That(await File.ReadAllTextAsync(_outputFile)).IsEqualTo(expected);
     }
 }
