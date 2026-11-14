@@ -10,8 +10,9 @@ using ModularPipelines.Modules;
 namespace GitSnapshotter.Pipeline.Modules;
 
 /// <summary>
-/// Publishes the console app and returns the build version (<c>yyyyMMddHHmmss+trunk</c>, or <c>+merge</c> off the
-/// default branch). On GitHub Actions the version is also written to the step's <c>version</c> output.
+/// Publishes the console app and returns the build version: the release version on a release build, otherwise
+/// <c>yyyyMMddHHmmss+trunk</c> (or <c>+merge</c> off the default branch). On GitHub Actions the version is also
+/// written to the step's <c>version</c> output.
 /// </summary>
 [DependsOn<CompileModule>]
 public sealed class PublishConsoleModule(IOptions<BuildSettings> settings) : Module<string>
@@ -27,12 +28,11 @@ public sealed class PublishConsoleModule(IOptions<BuildSettings> settings) : Mod
                 NoRestore = true,
                 Output = Paths.PublishDirectory(context, settings.Value),
                 Nologo = true,
+                Properties = settings.Value.VersionProperties,
             },
             cancellationToken: cancellationToken);
 
-        var git = context.Git().Information;
-        var defaultBranch = settings.Value.DefaultBranch ?? git.DefaultBranchName;
-        var version = $"{DateTime.UtcNow:yyyyMMddHHmmss}+{(git.BranchName == defaultBranch ? "trunk" : "merge")}";
+        var version = settings.Value.IsRelease ? settings.Value.Version! : BuildVersion(context);
 
         var githubOutput = Environment.GetEnvironmentVariable("GITHUB_OUTPUT");
         if (!string.IsNullOrEmpty(githubOutput))
@@ -41,5 +41,12 @@ public sealed class PublishConsoleModule(IOptions<BuildSettings> settings) : Mod
         }
 
         return version;
+    }
+
+    private string BuildVersion(IModuleContext context)
+    {
+        var git = context.Git().Information;
+        var defaultBranch = settings.Value.DefaultBranch ?? git.DefaultBranchName;
+        return $"{DateTime.UtcNow:yyyyMMddHHmmss}+{(git.BranchName == defaultBranch ? "trunk" : "merge")}";
     }
 }

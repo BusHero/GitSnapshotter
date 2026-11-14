@@ -4,7 +4,6 @@ using ModularPipelines.Attributes;
 using ModularPipelines.Context;
 using ModularPipelines.DotNet.Extensions;
 using ModularPipelines.DotNet.Options;
-using ModularPipelines.Git.Extensions;
 using ModularPipelines.Models;
 using ModularPipelines.Modules;
 
@@ -22,8 +21,7 @@ public sealed class PackModule(IOptions<BuildSettings> settings) : Module<string
 {
     protected override async Task<string?> ExecuteAsync(IModuleContext context, CancellationToken cancellationToken)
     {
-        var branch = (context.Git().Information.BranchName ?? "local").Replace('/', '-');
-        var suffix = $"{branch}-{DateTime.UtcNow:yyyyMMddHHmmss}";
+        var suffix = PackageVersion.Suffix(context, settings.Value);
         var output = Paths.PublishDirectory(context, settings.Value);
         var notices = await context.GetModule<ThirdPartyNoticesModule>();
 

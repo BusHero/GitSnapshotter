@@ -299,7 +299,7 @@
           "LibGit2Sharp": "[0.32.0, )"
         }
       },
-      "gitsnapshotter.tool": {
+      "GitSnapshotter.Tool": {
         "type": "Project",
         "dependencies": {
           "GitSnapshotter": "[0.1.0, )"

@@ -9,7 +9,7 @@ using ModularPipelines.Modules;
 
 namespace GitSnapshotter.Pipeline.Modules;
 
-/// <summary>Restores and builds the solution.</summary>
+/// <summary>Restores and builds the solution, stamped with the release version on a release build.</summary>
 // After the format check: both touch obj/, and running them together breaks the build.
 [DependsOn<VerifyFormattingModule>]
 public sealed class CompileModule(IOptions<BuildSettings> settings) : Module<CommandResult>
@@ -21,6 +21,7 @@ public sealed class CompileModule(IOptions<BuildSettings> settings) : Module<Com
                 ProjectSolution = Paths.Solution(context),
                 Configuration = settings.Value.Configuration,
                 Nologo = true,
+                Properties = settings.Value.VersionProperties,
             },
             cancellationToken: cancellationToken);
 }
