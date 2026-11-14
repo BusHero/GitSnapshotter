@@ -70,22 +70,23 @@ git config core.hooksPath .githooks
 
 ### Releasing
 
-Start the `release` workflow by hand: **Actions > release > Run workflow**, on `trunk`, with the version to release
-(`1.2.0`, or `1.2.0-rc.1` for a prerelease). It releases the latest commit on `trunk` and creates the `v1.2.0` tag
-when the release is published. From a terminal:
+Releases come from the same `build` workflow as CI builds. Start it by hand: **Actions > build > Run workflow**, on
+`trunk`, with the version to release (`1.2.0`, or `1.2.0-rc.1` for a prerelease). With no version, the run is an
+ordinary CI build. A release builds the latest commit on `trunk` and creates the `v1.2.0` tag when the release is
+published. From a terminal:
 
 ```sh
-gh workflow run release.yml --ref trunk -f version=1.2.0
+gh workflow run build.yml --ref trunk -f version=1.2.0
 ```
 
-The workflow (`.github/workflows/release.yml`) never publishes without approval:
+The workflow (`.github/workflows/build.yml`) never publishes without approval:
 
 1. **verify** checks that the version is valid and has no tag yet, that the run is on the default branch, and that
    the `nuget` environment requires a reviewer. If anyone removes that protection, releases fail instead of
    publishing unattended.
-2. **test** runs the tests on Windows.
-3. **build** runs the pipeline with `Build:Version` set to the version. It has read-only access and no publishing
-   credentials.
+2. **windows-latest** runs the tests on Windows.
+3. **ubuntu-latest** runs the pipeline with `Build:Version` set to the version. On a release it gets no token, so the
+   code being built cannot publish anything.
 4. **publish** waits for a reviewer to approve the `nuget` environment. It then creates a draft GitHub release with
    both NuGet packages (the `GitSnapshotter` library and the `GitSnapshotter.Tool` .NET tool), the zipped console
    app and `SHA256SUMS.txt`, pushes the packages to nuget.org, and publishes the release, which creates the tag. It
@@ -98,7 +99,7 @@ Setup, once:
 
 - Create a `nuget` environment (Settings > Environments) with at least one required reviewer.
 - Create a trusted publishing policy on nuget.org (account > Trusted Publishing) with repository owner `BusHero`,
-  repository `GitSnapshotter`, workflow file `release.yml` and environment `nuget`. The push uses
+  repository `GitSnapshotter`, workflow file `build.yml` and environment `nuget`. The push uses
   [trusted publishing](https://learn.microsoft.com/nuget/nuget-org/trusted-publishing), so there is no API key to
   store or rotate: the `NuGet/login` action exchanges the workflow's OIDC token for a short-lived key.
 - Optionally, add a tag ruleset (Settings > Rules) so only maintainers can create `v*` tags. Add GitHub Actions
