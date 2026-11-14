@@ -1,0 +1,27 @@
+<Project>
+  <!-- Central Package Management: every package version is set here, and projects reference packages without a version. -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+  <ItemGroup Label="Library">
+    <PackageVersion Include="LibGit2Sharp" Version="0.31.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="Tests">
+    <PackageVersion Include="AutoFixture.Xunit2" Version="4.18.1" />
+    <PackageVersion Include="coverlet.collector" Version="10.1.0" />
+    <!-- Pinned: FluentAssertions 8 and later need a commercial licence. -->
+    <PackageVersion Include="FluentAssertions" Version="[7.0.0]" />
+    <PackageVersion Include="FluentAssertions.Analyzers" Version="0.34.1" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.12.0" />
+    <PackageVersion Include="xunit" Version="2.9.3" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.1" />
+  </ItemGroup>
+
+  <ItemGroup Label="Pipeline">
+    <PackageVersion Include="ModularPipelines" Version="3.2.8" />
+    <PackageVersion Include="ModularPipelines.DotNet" Version="3.2.8" />
+    <PackageVersion Include="ModularPipelines.Git" Version="3.2.8" />
+  </ItemGroup>
+</Project>

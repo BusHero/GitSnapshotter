@@ -10,9 +10,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="ModularPipelines" Version="3.2.8" />
-    <PackageReference Include="ModularPipelines.DotNet" Version="3.2.8" />
-    <PackageReference Include="ModularPipelines.Git" Version="3.2.8" />
+    <PackageReference Include="ModularPipelines" />
+    <PackageReference Include="ModularPipelines.DotNet" />
+    <PackageReference Include="ModularPipelines.Git" />
   </ItemGroup>
 
   <ItemGroup>

@@ -20,7 +20,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="LibGit2Sharp" Version="0.31.0" />
+      <PackageReference Include="LibGit2Sharp" />
     </ItemGroup>
     <ItemGroup>
         <None Include="docs\README.md" Pack="true" PackagePath="\"/>
