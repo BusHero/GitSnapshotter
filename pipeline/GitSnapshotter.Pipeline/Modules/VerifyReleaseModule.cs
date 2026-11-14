@@ -134,7 +134,11 @@ public sealed class VerifyReleaseModule(IOptions<BuildSettings> settings) : Modu
             "'{Environment}' requires approval from {Reviewers} reviewer(s)", environment, reviewers);
     }
 
-    private static int CountRequiredReviewers(byte[] body)
+    /// <summary>
+    /// The number of reviewers an environment's <c>required_reviewers</c> rules name, from the REST API's environment
+    /// response; 0 when it has no such rule.
+    /// </summary>
+    internal static int CountRequiredReviewers(byte[] body)
     {
         using var json = JsonDocument.Parse(body);
         if (!json.RootElement.TryGetProperty("protection_rules", out var rules) || rules.ValueKind != JsonValueKind.Array)

@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <!-- Not a library: no XML docs required on public members. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <IsPackable>false</IsPackable>
+    <!-- TUnit.Core's DependsOn clashes with ModularPipelines' in the pipeline's sources: test files import it themselves. -->
+    <TUnitImplicitUsings>false</TUnitImplicitUsings>
+  </PropertyGroup>
+
+  <!--
+    The pipeline's sources are compiled into the tests rather than referenced as a project. Building the solution
+    then never rebuilds the pipeline itself, whose output is in use by the pipeline run that builds the solution
+    (and locked on Windows). Program.cs is left out: the test platform has its own entry point.
+  -->
+  <PropertyGroup>
+    <PipelineDirectory>$(MSBuildThisFileDirectory)..\GitSnapshotter.Pipeline\</PipelineDirectory>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(PipelineDirectory)**\*.cs"
+             Exclude="$(PipelineDirectory)Program.cs;$(PipelineDirectory)bin\**;$(PipelineDirectory)obj\**"
+             LinkBase="Pipeline" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ModularPipelines" />
+    <PackageReference Include="ModularPipelines.DotNet" />
+    <PackageReference Include="ModularPipelines.Git" />
+    <PackageReference Include="ModularPipelines.GitHub" />
+    <PackageReference Include="TUnit.Assertions" />
+    <PackageReference Include="TUnit.Engine" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Source\Constants\Constants.csproj" />
+  </ItemGroup>
+
+</Project>
