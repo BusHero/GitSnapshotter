@@ -1,11 +1,11 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using FluentAssertions.Execution;
 
 namespace GitSnapshotter.UnitTests;
 
 public sealed class RestoreUpstreamTests
 {
-    [Fact]
+    [Test]
     public void SnapshotRecordsUpstreamBranch()
     {
         var (clone, origin) = GitTasks.CreateClonedRepository();
@@ -22,7 +22,7 @@ public sealed class RestoreUpstreamTests
         }
     }
 
-    [Fact]
+    [Test]
     public void RemovedUpstreamIsRestored()
     {
         var (clone, origin) = GitTasks.CreateClonedRepository();
@@ -41,7 +41,7 @@ public sealed class RestoreUpstreamTests
         }
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void AddedUpstreamIsRemoved(string branchName)
     {
         var (clone, origin) = GitTasks.CreateClonedRepository();
@@ -64,7 +64,7 @@ public sealed class RestoreUpstreamTests
         }
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void ChangedUpstreamIsRestored(string otherBranch)
     {
         var (clone, origin) = GitTasks.CreateClonedRepository();
@@ -81,7 +81,7 @@ public sealed class RestoreUpstreamTests
         fresh.Branches["master"].UpstreamBranchCanonicalName.Should().Be("refs/heads/master");
     }
 
-    [Fact]
+    [Test]
     public void UpstreamIsRestoredFromSnapshotWithoutUpstreamBranch()
     {
         var (clone, origin) = GitTasks.CreateClonedRepository();

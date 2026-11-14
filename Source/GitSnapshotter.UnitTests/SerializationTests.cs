@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 
 using FluentAssertions;
 using FluentAssertions.Execution;
@@ -7,7 +7,7 @@ namespace GitSnapshotter.UnitTests;
 
 public sealed class SerializationTests
 {
-    [Theory, AutoData]
+    [Test, AutoData]
     public void JsonRoundTripKeepsEverything(string tagName, string message)
     {
         var (clone, origin) = GitTasks.CreateClonedRepository();
@@ -24,7 +24,7 @@ public sealed class SerializationTests
         copy.Should().BeEquivalentTo(snapshot);
     }
 
-    [Fact]
+    [Test]
     public void SaveAndLoadUseAFile()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -41,7 +41,7 @@ public sealed class SerializationTests
         }
     }
 
-    [Fact]
+    [Test]
     public void LoadedSnapshotCanBeRestored()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -56,7 +56,7 @@ public sealed class SerializationTests
         repo.Reopen().Snapshot().Should().BeEquivalentTo(GitRepositorySnapshot.Load(file));
     }
 
-    [Fact]
+    [Test]
     public void SnapshotFromEarlierVersionCanBeRead()
     {
         // The format written by version 0.0.5's console app.
@@ -86,7 +86,7 @@ public sealed class SerializationTests
         }
     }
 
-    [Fact]
+    [Test]
     public void JsonWithoutRequiredFieldsIsRejected()
     {
         var read = () => GitRepositorySnapshot.FromJson("""{ "Head": "master" }""");
@@ -94,7 +94,7 @@ public sealed class SerializationTests
         read.Should().Throw<JsonException>();
     }
 
-    [Fact]
+    [Test]
     public void NullJsonIsRejected()
     {
         var read = () => GitRepositorySnapshot.FromJson("null");

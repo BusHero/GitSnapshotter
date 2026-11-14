@@ -1,4 +1,4 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using FluentAssertions.Execution;
 
 using LibGit2Sharp;
@@ -9,7 +9,7 @@ public sealed class RestoreSafetyTests
 {
     private const string UnknownSha = "0123456789abcdef0123456789abcdef01234567";
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void MissingBranchTipFailsWithoutChangingAnything(string branchName, string tagName)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -31,7 +31,7 @@ public sealed class RestoreSafetyTests
         }
     }
 
-    [Fact]
+    [Test]
     public void InvalidShaIsReportedAsMissing()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -46,7 +46,7 @@ public sealed class RestoreSafetyTests
         restore.Should().Throw<MissingObjectsException>().Which.MissingObjects.Should().Equal("not-a-sha");
     }
 
-    [Fact]
+    [Test]
     public void MissingObjectsInSkippedPartsAreIgnored()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -61,7 +61,7 @@ public sealed class RestoreSafetyTests
         restore.Should().NotThrow();
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void TagsAreLeftAloneWhenOptionIsOff(string tagName)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -74,7 +74,7 @@ public sealed class RestoreSafetyTests
         repo.Tags[tagName].Should().NotBeNull();
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void BranchesAreLeftAloneWhenOptionIsOff(string branchName)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -87,7 +87,7 @@ public sealed class RestoreSafetyTests
         repo.Branches[branchName].Should().NotBeNull();
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void HeadIsLeftAloneWhenOptionIsOff(string branchName)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -106,7 +106,7 @@ public sealed class RestoreSafetyTests
         }
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void HeadStaysDetachedWhenItsBranchIsRemovedAndHeadIsNotRestored(string branchName)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -126,7 +126,7 @@ public sealed class RestoreSafetyTests
         }
     }
 
-    [Fact]
+    [Test]
     public void RestoreWorksOnAnOpenRepository()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -140,7 +140,7 @@ public sealed class RestoreSafetyTests
         GitRepository.GetSnapshot(repo).Should().BeEquivalentTo(snapshot);
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void BranchNamesWithSlashesAreRestored(string suffix)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();

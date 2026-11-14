@@ -17,17 +17,19 @@ namespace GitSnapshotter.Pipeline.Modules;
 [DependsOn<CompileModule>]
 public sealed class RunUnitTestsModule(IOptions<BuildSettings> settings) : Module<CommandResult>
 {
+    // TUnit tree filter: /assembly/namespace/class/test[property].
     private static readonly string Filter =
-        $"{TestConstants.Traits.Names.CATEGORY}!={TestConstants.Traits.Values.DISCOVERY}";
+        $"/*/*/*/*[{TestConstants.Traits.Names.CATEGORY}!={TestConstants.Traits.Values.DISCOVERY}]";
 
     protected override async Task<CommandResult?> ExecuteAsync(IModuleContext context, CancellationToken cancellationToken) =>
         await context.DotNet().Test(
             new DotNetTestOptions
             {
+                Solution = Paths.Solution(context),
                 Configuration = settings.Value.Configuration,
                 NoBuild = true,
                 NoRestore = true,
-                Arguments = [Paths.Solution(context), "--filter", Filter, "--nologo"],
+                Arguments = ["--treenode-filter", Filter],
             },
             cancellationToken: cancellationToken);
 }

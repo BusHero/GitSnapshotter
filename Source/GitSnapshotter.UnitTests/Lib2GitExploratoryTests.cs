@@ -7,10 +7,10 @@ using LibGit2Sharp;
 
 namespace GitSnapshotter.UnitTests;
 
-[Trait(TestConstants.Traits.Names.CATEGORY, TestConstants.Traits.Values.DISCOVERY)]
+[Category(TestConstants.Traits.Values.DISCOVERY)]
 public sealed class Lib2GitExploratoryTests
 {
-    [Fact]
+    [Test]
     public void EmptyRepositoryContainsNoBranches()
     {
         var path = GitTasks.GetTempPath();
@@ -22,7 +22,7 @@ public sealed class Lib2GitExploratoryTests
         repo.Branches.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void RepositoryInitiation()
     {
         var path = GitTasks.GetTempPath();
@@ -36,7 +36,7 @@ public sealed class Lib2GitExploratoryTests
         }
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void CommitFile(
         string filename,
         string[] contents,
@@ -58,7 +58,7 @@ public sealed class Lib2GitExploratoryTests
         commit.MessageShort.Should().Be(commitMessage);
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void CommitedFileIsStaged(
         string filename,
         string[] contents,
@@ -80,7 +80,7 @@ public sealed class Lib2GitExploratoryTests
         repo.Index[filename].StageLevel.Should().Be(StageLevel.Staged);
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void FileNotAddedToIndexIsNotPresent(
         string filename,
         string[] contents)
@@ -95,7 +95,7 @@ public sealed class Lib2GitExploratoryTests
         repo.Index.Select(x => x.Path).Should().NotContain(filename);
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void FileAddedToIndexButNotToFilesystemIsPresent(
         string filename,
         string[] contents)
@@ -111,7 +111,7 @@ public sealed class Lib2GitExploratoryTests
         repo.Index[filename].StageLevel.Should().Be(StageLevel.Staged);
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void Branch(
         string filename,
         string[] contents,
@@ -139,7 +139,7 @@ public sealed class Lib2GitExploratoryTests
         }
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void CreateNewBranch(
         string filename,
         string[] contents,
@@ -164,7 +164,7 @@ public sealed class Lib2GitExploratoryTests
         repo.Branches.Select(x => x.FriendlyName).Should().Contain(branchName);
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void SwitchBranches(
         string filename,
         string[] contents,

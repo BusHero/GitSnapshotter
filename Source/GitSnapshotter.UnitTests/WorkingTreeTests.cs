@@ -1,4 +1,4 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using FluentAssertions.Execution;
 
 using LibGit2Sharp;
@@ -7,7 +7,7 @@ namespace GitSnapshotter.UnitTests;
 
 public sealed class WorkingTreeTests
 {
-    [Fact]
+    [Test]
     public void WorkingTreeIsNotCapturedByDefault()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -16,7 +16,7 @@ public sealed class WorkingTreeTests
         repo.Snapshot().WorkingTree.Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public void CleanWorkingTreeMatchesHeadTree()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -31,7 +31,7 @@ public sealed class WorkingTreeTests
         }
     }
 
-    [Fact]
+    [Test]
     public void CapturingDoesNotChangeTheWorkingTree()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -53,7 +53,7 @@ public sealed class WorkingTreeTests
         }
     }
 
-    [Fact]
+    [Test]
     public void ModifiedFileIsRestored()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -72,7 +72,7 @@ public sealed class WorkingTreeTests
         }
     }
 
-    [Fact]
+    [Test]
     public void UncommittedChangesComeBackAfterACommit()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -93,7 +93,7 @@ public sealed class WorkingTreeTests
         }
     }
 
-    [Fact]
+    [Test]
     public void DeletedFileIsRestored()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -106,7 +106,7 @@ public sealed class WorkingTreeTests
         repo.ReadFile("a.txt").Should().Be("1");
     }
 
-    [Fact]
+    [Test]
     public void FileDeletedInSnapshotIsDeletedAgain()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -125,7 +125,7 @@ public sealed class WorkingTreeTests
         }
     }
 
-    [Fact]
+    [Test]
     public void UntrackedFileIsRestored()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -144,7 +144,7 @@ public sealed class WorkingTreeTests
         }
     }
 
-    [Fact]
+    [Test]
     public void UntrackedFileNotInSnapshotBlocksRestoreUnlessForced()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -164,7 +164,7 @@ public sealed class WorkingTreeTests
         repo.FileExists("new.txt").Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void IgnoredFilesAreLeftAlone()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -177,7 +177,7 @@ public sealed class WorkingTreeTests
         repo.ReadFile("build.log").Should().Be("ignored");
     }
 
-    [Fact]
+    [Test]
     public void StagedContentIsRestoredSeparatelyFromWorkingDirectory()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -201,7 +201,7 @@ public sealed class WorkingTreeTests
         }
     }
 
-    [Fact]
+    [Test]
     public void RestoreIsNotBlockedWhenCurrentContentMatchesSnapshot()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -219,7 +219,7 @@ public sealed class WorkingTreeTests
         }
     }
 
-    [Fact]
+    [Test]
     public void WorkingTreeIsNotRestoredWhenOptionIsOff()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -233,7 +233,7 @@ public sealed class WorkingTreeTests
         repo.ReadFile("a.txt").Should().Be("changed later");
     }
 
-    [Fact]
+    [Test]
     public void ExecutableBitIsRestored()
     {
         if (OperatingSystem.IsWindows())
@@ -257,7 +257,7 @@ public sealed class WorkingTreeTests
         }
     }
 
-    [Fact]
+    [Test]
     public void WorkingTreeOfUnbornRepositoryIsRestored()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();

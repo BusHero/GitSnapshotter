@@ -4,7 +4,7 @@ namespace GitSnapshotter.UnitTests;
 
 public sealed class RemoveBranchesTests
 {
-    [Theory, AutoData]
+    [Test, AutoData]
     public void RemoveNewlyAddedBranch(string branchName)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -20,7 +20,7 @@ public sealed class RemoveBranchesTests
         newSnapshot.Should().BeEquivalentTo(originalSnapshot);
     }
     
-    [Theory, AutoData]
+    [Test, AutoData]
     public void RemoveSeveralBranches(string branchName1, string branchName2)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();

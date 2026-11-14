@@ -11,7 +11,7 @@ Requires the .NET 10 SDK (see `global.json`).
 
 ```sh
 ./build.sh                 # run the build pipeline: build, test, pack, publish the console app
-dotnet test Source/GitSnapshotter.slnx
+dotnet test --solution Source/GitSnapshotter.slnx
 ```
 
 The pipeline is written with [ModularPipelines](https://github.com/thomhurst/ModularPipelines) in
@@ -40,5 +40,5 @@ git config core.hooksPath .githooks
 |---|---|
 | `Source/GitSnapshotter` | The library, published as the `GitSnapshotter` NuGet package |
 | `Source/GitSnapshotter.Console` | The command-line tool |
-| `Source/GitSnapshotter.UnitTests` | xUnit tests; each test builds throwaway repositories in the temp directory |
+| `Source/GitSnapshotter.UnitTests` | [TUnit](https://tunit.dev) tests; each test builds throwaway repositories in the temp directory |
 | `pipeline/GitSnapshotter.Pipeline` | Build pipeline (ModularPipelines) |

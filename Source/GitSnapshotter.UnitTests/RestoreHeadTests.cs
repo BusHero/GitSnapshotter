@@ -1,4 +1,4 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using FluentAssertions.Execution;
 
 using LibGit2Sharp;
@@ -7,7 +7,7 @@ namespace GitSnapshotter.UnitTests;
 
 public sealed class RestoreHeadTests
 {
-    [Theory, AutoData]
+    [Test, AutoData]
     public void RestoreHead(string branchName)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -23,7 +23,7 @@ public sealed class RestoreHeadTests
         newSnapshot.Should().BeEquivalentTo(originalSnapshot);
     }
 
-    [Fact]
+    [Test]
     public void SnapshotOfDetachedHeadRecordsCommit()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -39,7 +39,7 @@ public sealed class RestoreHeadTests
         }
     }
 
-    [Fact]
+    [Test]
     public void SnapshotOfAttachedHeadIsNotDetached()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -48,7 +48,7 @@ public sealed class RestoreHeadTests
         repo.Snapshot().IsHeadDetached.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void RestoreDetachedHead()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -70,7 +70,7 @@ public sealed class RestoreHeadTests
         }
     }
 
-    [Fact]
+    [Test]
     public void RestoreBranchFromDetachedHead()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -90,7 +90,7 @@ public sealed class RestoreHeadTests
         }
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void RestoreWhileOnBranchCreatedAfterSnapshot(string branchName)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -113,7 +113,7 @@ public sealed class RestoreHeadTests
         }
     }
 
-    [Fact]
+    [Test]
     public void RestoreMovesWorkingTreeWhenCheckedOutBranchTipMoves()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -133,7 +133,7 @@ public sealed class RestoreHeadTests
         }
     }
 
-    [Fact]
+    [Test]
     public void RestoreRefusesToOverwriteUncommittedChanges()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -154,7 +154,7 @@ public sealed class RestoreHeadTests
         }
     }
 
-    [Fact]
+    [Test]
     public void RestoreRefusesToOverwriteStagedChanges()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -169,7 +169,7 @@ public sealed class RestoreHeadTests
         restore.Should().Throw<UncommittedChangesException>();
     }
 
-    [Fact]
+    [Test]
     public void RestoreWithForceDiscardsUncommittedChanges()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -188,7 +188,7 @@ public sealed class RestoreHeadTests
         }
     }
 
-    [Fact]
+    [Test]
     public void UntrackedFilesSurviveRestoreWithoutWorkingTree()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -202,7 +202,7 @@ public sealed class RestoreHeadTests
         repo.ReadFile("untracked.txt").Should().Be("keep me");
     }
 
-    [Fact]
+    [Test]
     public void UntrackedFileThatWouldBeOverwrittenBlocksRestore()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -219,7 +219,7 @@ public sealed class RestoreHeadTests
         restore.Should().Throw<UncommittedChangesException>().Which.Paths.Should().Equal("b.txt");
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void DirtyWorkingTreeDoesNotBlockRestoreThatKeepsHeadCommit(string tagName)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -237,7 +237,7 @@ public sealed class RestoreHeadTests
         }
     }
 
-    [Fact]
+    [Test]
     public void RestoreEmptyRepository()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();

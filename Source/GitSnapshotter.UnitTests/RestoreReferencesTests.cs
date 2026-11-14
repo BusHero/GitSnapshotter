@@ -1,4 +1,4 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using FluentAssertions.Execution;
 
 using LibGit2Sharp;
@@ -7,7 +7,7 @@ namespace GitSnapshotter.UnitTests;
 
 public sealed class RestoreReferencesTests
 {
-    [Fact]
+    [Test]
     public void SnapshotContainsOtherReferences()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -19,7 +19,7 @@ public sealed class RestoreReferencesTests
         snapshot.References.Should().Equal(new Dictionary<string, string> { ["refs/custom/marker"] = commit.Sha });
     }
 
-    [Fact]
+    [Test]
     public void SnapshotDoesNotRepeatBranchesTagsOrRemotesInReferences()
     {
         var (clone, origin) = GitTasks.CreateClonedRepository();
@@ -30,7 +30,7 @@ public sealed class RestoreReferencesTests
         clone.Snapshot().References.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void RemovedReferenceIsRestored()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -44,7 +44,7 @@ public sealed class RestoreReferencesTests
         repo.Reopen().Refs["refs/custom/marker"].TargetIdentifier.Should().Be(commit.Sha);
     }
 
-    [Fact]
+    [Test]
     public void AddedReferenceIsRemoved()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -57,7 +57,7 @@ public sealed class RestoreReferencesTests
         repo.Reopen().Refs["refs/custom/marker"].Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public void StashIsRestored()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -78,7 +78,7 @@ public sealed class RestoreReferencesTests
         }
     }
 
-    [Fact]
+    [Test]
     public void NotesAreRestored()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();

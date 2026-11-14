@@ -1,4 +1,4 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using FluentAssertions.Execution;
 
 using GitSnapshotter.Console;
@@ -12,7 +12,7 @@ public sealed class CliTests
 
     private int Run(params string[] args) => Cli.Run(args, _output, _error);
 
-    [Fact]
+    [Test]
     public void NoArgumentsPrintsUsage()
     {
         var exitCode = Run();
@@ -24,7 +24,7 @@ public sealed class CliTests
         }
     }
 
-    [Fact]
+    [Test]
     public void HelpPrintsUsage()
     {
         var exitCode = Run("help");
@@ -36,13 +36,13 @@ public sealed class CliTests
         }
     }
 
-    [Fact]
+    [Test]
     public void UnknownCommandIsAUsageError()
     {
         Run("frobnicate", "x").Should().Be(Cli.UsageError);
     }
 
-    [Fact]
+    [Test]
     public void UnknownOptionIsAUsageError()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -56,7 +56,7 @@ public sealed class CliTests
         }
     }
 
-    [Fact]
+    [Test]
     public void SnapshotPrintsJson()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -71,7 +71,7 @@ public sealed class CliTests
         }
     }
 
-    [Fact]
+    [Test]
     public void RepositoryPathAloneStillPrintsSnapshot()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -86,7 +86,7 @@ public sealed class CliTests
         }
     }
 
-    [Fact]
+    [Test]
     public void SnapshotWritesFile()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -103,7 +103,7 @@ public sealed class CliTests
         }
     }
 
-    [Fact]
+    [Test]
     public void RestoreRestoresTheRepository()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -121,7 +121,7 @@ public sealed class CliTests
         }
     }
 
-    [Fact]
+    [Test]
     public void RestoreDryRunListsChangesWithoutApplyingThem()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -140,7 +140,7 @@ public sealed class CliTests
         }
     }
 
-    [Fact]
+    [Test]
     public void RestoreRefusingUncommittedChangesFails()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -162,7 +162,7 @@ public sealed class CliTests
         repo.ReadFile("a.txt").Should().Be("1");
     }
 
-    [Fact]
+    [Test]
     public void DiffListsChangesSinceSnapshot()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -180,7 +180,7 @@ public sealed class CliTests
         }
     }
 
-    [Fact]
+    [Test]
     public void DiffWithoutChangesSaysSo()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -193,7 +193,7 @@ public sealed class CliTests
         _output.ToString().Should().Contain("No changes");
     }
 
-    [Fact]
+    [Test]
     public void MissingRepositoryIsAnError()
     {
         var exitCode = Run("snapshot", GitTasks.GetTempPath());
@@ -205,7 +205,7 @@ public sealed class CliTests
         }
     }
 
-    [Fact]
+    [Test]
     public void MissingSnapshotFileIsAnError()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();

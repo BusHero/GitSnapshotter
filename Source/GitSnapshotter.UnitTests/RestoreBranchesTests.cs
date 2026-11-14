@@ -6,7 +6,7 @@ namespace GitSnapshotter.UnitTests;
 
 public sealed class RestoreBranchesTests
 {
-    [Theory, AutoData]
+    [Test, AutoData]
     public void RestoreBranch(string branchName)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -23,7 +23,7 @@ public sealed class RestoreBranchesTests
         newSnapshot.Should().BeEquivalentTo(originalSnapshot);
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void RestoreTwoBranches(string branchName1, string branchName2)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -42,7 +42,7 @@ public sealed class RestoreBranchesTests
         newSnapshot.Should().BeEquivalentTo(originalSnapshot);
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void RestoreMaster(string branchName)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -61,7 +61,7 @@ public sealed class RestoreBranchesTests
         newSnapshot.Should().BeEquivalentTo(originalSnapshot);
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void RestoreBranchThatIsNotAtTop(string branchName)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -80,7 +80,7 @@ public sealed class RestoreBranchesTests
         newSnapshot.Should().BeEquivalentTo(originalSnapshot);
     }
 
-    [Fact]
+    [Test]
     public void RestoreIsIdempotent()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -94,7 +94,7 @@ public sealed class RestoreBranchesTests
         newSnapshot.Should().BeEquivalentTo(originalSnapshot);
     }
     
-    [Theory, AutoData]
+    [Test, AutoData]
     public void RestoreTip(string branchName)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();

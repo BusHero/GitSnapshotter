@@ -1,11 +1,11 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using FluentAssertions.Execution;
 
 namespace GitSnapshotter.UnitTests;
 
 public sealed class SnapshotDiffTests
 {
-    [Fact]
+    [Test]
     public void IdenticalSnapshotsHaveNoChanges()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -20,7 +20,7 @@ public sealed class SnapshotDiffTests
         }
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void AddedBranchIsReported(string branchName)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -34,7 +34,7 @@ public sealed class SnapshotDiffTests
             new SnapshotChange(SnapshotChangeKind.Added, ChangeCategory.Branch, branchName, null, commit.Sha));
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void RemovedBranchIsReported(string branchName)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -49,7 +49,7 @@ public sealed class SnapshotDiffTests
             new SnapshotChange(SnapshotChangeKind.Removed, ChangeCategory.Branch, branchName, commit.Sha, null));
     }
 
-    [Fact]
+    [Test]
     public void MovedBranchIsReported()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -63,7 +63,7 @@ public sealed class SnapshotDiffTests
             new SnapshotChange(SnapshotChangeKind.Modified, ChangeCategory.Branch, "master", first.Sha, second.Sha));
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void HeadChangeIsReported(string branchName)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -78,7 +78,7 @@ public sealed class SnapshotDiffTests
             new SnapshotChange(SnapshotChangeKind.Modified, ChangeCategory.Head, "HEAD", "master", branchName));
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void TagChangesAreReported(string added, string removed)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -96,7 +96,7 @@ public sealed class SnapshotDiffTests
         ]);
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void RemoteAndUpstreamChangesAreReported(string newUrl)
     {
         var (clone, origin) = GitTasks.CreateClonedRepository();
@@ -114,7 +114,7 @@ public sealed class SnapshotDiffTests
         ]);
     }
 
-    [Fact]
+    [Test]
     public void RemoteBranchChangesAreReported()
     {
         var (clone, origin) = GitTasks.CreateClonedRepository();
@@ -129,7 +129,7 @@ public sealed class SnapshotDiffTests
             new SnapshotChange(SnapshotChangeKind.Removed, ChangeCategory.RemoteBranch, "origin/HEAD", "-> origin/master", null));
     }
 
-    [Fact]
+    [Test]
     public void ReferenceChangesAreReported()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -143,7 +143,7 @@ public sealed class SnapshotDiffTests
             new SnapshotChange(SnapshotChangeKind.Added, ChangeCategory.Reference, "refs/custom/marker", null, commit.Sha));
     }
 
-    [Fact]
+    [Test]
     public void WorkingTreeChangesAreReportedOnlyWhenBothSnapshotsHaveIt()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -161,7 +161,7 @@ public sealed class SnapshotDiffTests
         }
     }
 
-    [Fact]
+    [Test]
     public void ChangesHaveReadableText()
     {
         var change = new SnapshotChange(SnapshotChangeKind.Modified, ChangeCategory.Branch, "main", "aaa", "bbb");

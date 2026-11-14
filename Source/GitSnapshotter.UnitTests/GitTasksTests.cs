@@ -7,7 +7,7 @@ namespace GitSnapshotter.UnitTests;
 
 public sealed class GitTasksTests
 {
-    [Theory, AutoData]
+    [Test, AutoData]
     public void AddBranchAddsABranchTest(string branch)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -20,7 +20,7 @@ public sealed class GitTasksTests
         repo.Branches.Select(x => x.FriendlyName).Should().Contain(branch);
     }
 
-    [Fact]
+    [Test]
     public void CreateTemporaryGitRepositoryReturnsTemporaryGitRepository()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -34,7 +34,7 @@ public sealed class GitTasksTests
         }
     }
 
-    [Fact]
+    [Test]
     public void AddFileToRepositoryAddsFileToRepository()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -46,7 +46,7 @@ public sealed class GitTasksTests
         repo.Index.Index().Select(x => x.Item.Path).Should().Contain(filename);
     }
 
-    [Fact]
+    [Test]
     public void CommitCommitsTest()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -58,7 +58,7 @@ public sealed class GitTasksTests
         repo.Commits.Should().ContainSingle();
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void IsValidCommit_ValidCommitReturnsTrue(
         string filename,
         string[] contents,
@@ -84,7 +84,7 @@ public sealed class GitTasksTests
         result.Should().BeTrue();
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void IsValidCommit_InvalidCommitReturnsFalse(
         string filename,
         string[] contents,

@@ -1,4 +1,4 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using FluentAssertions.Execution;
 
 using LibGit2Sharp;
@@ -7,7 +7,7 @@ namespace GitSnapshotter.UnitTests;
 
 public sealed class RestoreTagsTests
 {
-    [Theory, AutoData]
+    [Test, AutoData]
     public void RemovedTagIsAddedBack(string tagName)
     {
         using var repository = GitTasks.CreateTemporaryGitRepository();
@@ -23,7 +23,7 @@ public sealed class RestoreTagsTests
         newSnapshot.Should().BeEquivalentTo(originalSnapshot);
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void RemovedAnnotatedTagIsAddedBack(string tagName, string message)
     {
         using var repository = GitTasks.CreateTemporaryGitRepository();
@@ -40,7 +40,7 @@ public sealed class RestoreTagsTests
         newSnapshot.Should().BeEquivalentTo(originalSnapshot);
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void AddedTagIsRemoved(string tagName)
     {
         using var repository = GitTasks.CreateTemporaryGitRepository();
@@ -55,7 +55,7 @@ public sealed class RestoreTagsTests
         newSnapshot.Should().BeEquivalentTo(originalSnapshot);
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void RestoreTagReference(string tagName)
     {
         using var repository = GitTasks.CreateTemporaryGitRepository();
@@ -73,7 +73,7 @@ public sealed class RestoreTagsTests
         newSnapshot.Should().BeEquivalentTo(originalSnapshot);
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void SeveralMovedTagsAreAllRestored(string tag1, string tag2, string tag3)
     {
         using var repository = GitTasks.CreateTemporaryGitRepository();
@@ -98,7 +98,7 @@ public sealed class RestoreTagsTests
         }
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void OnlyTheMovedTagIsChanged(string unchanged, string moved)
     {
         using var repository = GitTasks.CreateTemporaryGitRepository();
@@ -114,7 +114,7 @@ public sealed class RestoreTagsTests
         repository.Snapshot().Should().BeEquivalentTo(snapshot);
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void MovedAnnotatedTagGetsItsOriginalAnnotationBack(string tagName, string message)
     {
         using var repository = GitTasks.CreateTemporaryGitRepository();
@@ -137,7 +137,7 @@ public sealed class RestoreTagsTests
         }
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void AnnotatedTagIsRecreatedWhenSnapshotHasNoAnnotationId(string tagName, string message)
     {
         using var repository = GitTasks.CreateTemporaryGitRepository();
@@ -161,7 +161,7 @@ public sealed class RestoreTagsTests
         }
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void LightweightTagReplacedByAnnotatedTagIsRestored(string tagName, string message)
     {
         using var repository = GitTasks.CreateTemporaryGitRepository();
@@ -180,7 +180,7 @@ public sealed class RestoreTagsTests
         }
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void AnnotatedTagReplacedByLightweightTagIsRestored(string tagName, string message)
     {
         using var repository = GitTasks.CreateTemporaryGitRepository();
@@ -195,7 +195,7 @@ public sealed class RestoreTagsTests
         repository.Snapshot().Should().BeEquivalentTo(snapshot);
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void SnapshotRecordsAnnotationId(string tagName, string message)
     {
         using var repository = GitTasks.CreateTemporaryGitRepository();

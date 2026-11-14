@@ -1,11 +1,11 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using FluentAssertions.Execution;
 
 namespace GitSnapshotter.UnitTests;
 
 public sealed class SnapshotScopeTests
 {
-    [Theory, AutoData]
+    [Test, AutoData]
     public void DisposingTheScopeRestoresTheRepository(string branchName, string tagName)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -27,7 +27,7 @@ public sealed class SnapshotScopeTests
         }
     }
 
-    [Fact]
+    [Test]
     public void ScopeExposesTheSnapshot()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -38,7 +38,7 @@ public sealed class SnapshotScopeTests
         scope.Snapshot.Should().BeEquivalentTo(repo.Snapshot());
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void SecondDisposeDoesNothing(string tagName)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -52,7 +52,7 @@ public sealed class SnapshotScopeTests
         repo.Tags[tagName].Should().NotBeNull();
     }
 
-    [Fact]
+    [Test]
     public void ScopeCanPreserveTheWorkingTree()
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();

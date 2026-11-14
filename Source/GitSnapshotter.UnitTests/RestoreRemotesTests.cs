@@ -1,11 +1,11 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using FluentAssertions.Execution;
 
 namespace GitSnapshotter.UnitTests;
 
 public sealed class RestoreRemotesTests
 {
-    [Fact]
+    [Test]
     public void RemovedRemoteIsAddedBackWithItsBranches()
     {
         var (clone, origin) = GitTasks.CreateClonedRepository();
@@ -26,7 +26,7 @@ public sealed class RestoreRemotesTests
         }
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void AddedRemoteIsRemoved(string remoteName)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -47,7 +47,7 @@ public sealed class RestoreRemotesTests
         }
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void ChangedUrlIsRestored(string newUrl)
     {
         var (clone, origin) = GitTasks.CreateClonedRepository();
@@ -62,7 +62,7 @@ public sealed class RestoreRemotesTests
         fresh.Network.Remotes["origin"].Url.Should().Be(origin.Info.Path);
     }
 
-    [Fact]
+    [Test]
     public void DeletedRemoteTrackingBranchIsRestored()
     {
         var (clone, origin) = GitTasks.CreateClonedRepository();
@@ -76,7 +76,7 @@ public sealed class RestoreRemotesTests
         clone.Reopen().Snapshot().Should().BeEquivalentTo(snapshot);
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void FetchedRemoteTrackingBranchIsRemoved(string branchName)
     {
         var (clone, origin) = GitTasks.CreateClonedRepository();
@@ -96,7 +96,7 @@ public sealed class RestoreRemotesTests
         }
     }
 
-    [Fact]
+    [Test]
     public void MovedRemoteTrackingBranchIsRestored()
     {
         var (clone, origin) = GitTasks.CreateClonedRepository();
@@ -113,7 +113,7 @@ public sealed class RestoreRemotesTests
         fresh.Branches["origin/master"].Tip.Sha.Should().Be(originalTip);
     }
 
-    [Fact]
+    [Test]
     public void SnapshotRecordsRemoteHeadSeparately()
     {
         var (clone, origin) = GitTasks.CreateClonedRepository();
@@ -129,7 +129,7 @@ public sealed class RestoreRemotesTests
         }
     }
 
-    [Fact]
+    [Test]
     public void RemovedRemoteHeadIsRestoredAsSymbolicReference()
     {
         var (clone, origin) = GitTasks.CreateClonedRepository();

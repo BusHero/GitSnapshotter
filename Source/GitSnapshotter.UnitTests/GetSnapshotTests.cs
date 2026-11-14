@@ -7,7 +7,7 @@ namespace GitSnapshotter.UnitTests;
 
 public sealed class GetSnapshotTests
 {
-    [Fact]
+    [Test]
     public void SnapshotOfInitialRepositoryContainsDefaultBranch()
     {
         using var repository = GitTasks.CreateTemporaryGitRepository();
@@ -20,7 +20,7 @@ public sealed class GetSnapshotTests
         snapshot.Branches.FirstOrDefault(x => x.Name == "master").Should().NotBeNull();
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void SnapshotContainsAllCreatedBranches(string branchName)
     {
         using var repository = GitTasks.CreateTemporaryGitRepository();
@@ -33,7 +33,7 @@ public sealed class GetSnapshotTests
         snapshot.Branches.FirstOrDefault(x => x.Name == branchName).Should().NotBeNull();
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void HeadContainsMaster(string branchName)
     {
         using var repository = GitTasks.CreateTemporaryGitRepository();
@@ -46,7 +46,7 @@ public sealed class GetSnapshotTests
         snapshot.Head.Should().Be("master");
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void HeadContainsCheckoutBranch(string branchName)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
@@ -60,7 +60,7 @@ public sealed class GetSnapshotTests
         snapshot.Head.Should().Be(branchName);
     }
 
-    [Fact]
+    [Test]
     public void BranchesContainsCommits()
     {
         using var repository = GitTasks.CreateTemporaryGitRepository();
@@ -74,7 +74,7 @@ public sealed class GetSnapshotTests
         repository.IsValidCommit(commit).Should().BeTrue();
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void SnapshotContainsRemotes(string remoteName)
     {
         using var original = GitTasks.CreateTemporaryGitRepository();
@@ -93,7 +93,7 @@ public sealed class GetSnapshotTests
         snapshot.Remotes.First(x => x.Name == remoteName).Url.Should().Be(remoteUrl);
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void SnapshotContainsRemoteBranches(string remoteName)
     {
         using var original = GitTasks.CreateTemporaryGitRepository();
@@ -120,7 +120,7 @@ public sealed class GetSnapshotTests
             .Be($"{remoteName}/master");
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void SnapshotDoesNotContainRemoteBranches(string remoteName)
     {
         using var original = GitTasks.CreateTemporaryGitRepository();
@@ -145,7 +145,7 @@ public sealed class GetSnapshotTests
             .Be("master");
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void RemoteTipIsValidSha(string remoteName)
     {
         using var original = GitTasks.CreateTemporaryGitRepository();
@@ -172,7 +172,7 @@ public sealed class GetSnapshotTests
         }
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void BranchShowsFollowedBranch(string remoteName, string branchName)
     {
         using var original = GitTasks.CreateTemporaryGitRepository();
@@ -203,7 +203,7 @@ public sealed class GetSnapshotTests
         }
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void SnapshotContainsTags(string tagName)
     {
         using var repository = GitTasks.CreateTemporaryGitRepository();
@@ -217,7 +217,7 @@ public sealed class GetSnapshotTests
         repository.IsValidCommit(tag.Target).Should().BeTrue();
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void AnnotatedTagContainsMessage(string tagName, string tagMessage)
     {
         using var repository = GitTasks.CreateTemporaryGitRepository();
@@ -231,7 +231,7 @@ public sealed class GetSnapshotTests
         snapshot.Tags.First(x => x.Name == tagName).Message!.TrimEnd().Should().Be(tagMessage);
     }
 
-    [Theory, AutoData]
+    [Test, AutoData]
     public void NonAnnotatedTagContainsNullForMessage(string tagName)
     {
         using var repository = GitTasks.CreateTemporaryGitRepository();
