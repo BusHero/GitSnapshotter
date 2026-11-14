@@ -15,15 +15,15 @@ jobs:
     name: ubuntu-latest
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: 'Setup: .NET SDK from global.json'
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
 
       - name: 'Cache: ~/.nuget/packages'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.nuget/packages
           key: ${{ runner.os }}-${{ hashFiles('**/global.json', '**/*.csproj', '**/Directory.Packages.props') }}
@@ -40,7 +40,7 @@ jobs:
           Build__NuGetApiKey: ${{ secrets.GITHUB_TOKEN }}
         run: dotnet run --project pipeline/GitSnapshotter.Pipeline --configuration Release
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: GitSnapshotter.Console_${{ steps.pipeline.outputs.version }}
           path: publish
