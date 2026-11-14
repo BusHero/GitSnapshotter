@@ -42,13 +42,16 @@ jobs:
     name: release
     needs: test
     runs-on: ubuntu-latest
-    # Holds NUGET_API_KEY. Add required reviewers to the environment to approve each release by hand.
+    # Add required reviewers to the environment to approve each release by hand. If the nuget.org trusted
+    # publishing policy names an environment, it must be this one.
     environment:
       name: nuget
       url: https://www.nuget.org/packages/GitSnapshotter/${{ steps.version.outputs.version }}
     permissions:
       # Creates the GitHub release and uploads its assets.
       contents: write
+      # Trusted publishing: NuGet/login exchanges the workflow's OIDC token for a short-lived nuget.org API key.
+      id-token: write
     steps:
       - uses: actions/checkout@v7
 
@@ -123,15 +126,18 @@ jobs:
             gh release create "$TAG" "${flags[@]}" release/*
           fi
 
+      # Right before the push: the key it returns is short-lived. Needs a trusted publishing policy on nuget.org
+      # for this repository and workflow file (release.yml), owned by this user.
+      - name: 'Log in to nuget.org (trusted publishing)'
+        id: nuget-login
+        uses: NuGet/login@v1
+        with:
+          user: bus1hero
+
       - name: 'Push package to nuget.org'
         env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
-        run: |
-          if [[ -z "$NUGET_API_KEY" ]]; then
-            echo "::error::The NUGET_API_KEY secret is not set on the 'nuget' environment"
-            exit 1
-          fi
-          dotnet nuget push "release/*.nupkg" --source https://api.nuget.org/v3/index.json --api-key "$NUGET_API_KEY" --skip-duplicate
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+        run: dotnet nuget push "release/*.nupkg" --source https://api.nuget.org/v3/index.json --api-key "$NUGET_API_KEY" --skip-duplicate
 
       - name: 'Publish GitHub release'
         env:

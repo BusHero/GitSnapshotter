@@ -82,8 +82,12 @@ The `release` workflow (`.github/workflows/release.yml`) runs the tests on Windo
 (`v1.2.0-rc.1`) makes a GitHub prerelease and a NuGet prerelease. The release stays a draft until the push to
 nuget.org succeeds, so a failed run can be re-run.
 
-It needs a nuget.org API key, scoped to push `GitSnapshotter`, saved as the `NUGET_API_KEY` secret on a `nuget`
-environment (Settings > Environments). Add required reviewers there to approve each release by hand.
+The push uses nuget.org [trusted publishing](https://learn.microsoft.com/nuget/nuget-org/trusted-publishing), so
+there is no API key to store or rotate: the `NuGet/login` action exchanges the workflow's OIDC token for a
+short-lived key. It needs a trusted publishing policy on nuget.org (account > Trusted Publishing) with repository
+owner `BusHero`, repository `GitSnapshotter`, workflow file `release.yml`, and environment `nuget` or none. The job
+runs in the `nuget` environment; add required reviewers to it (Settings > Environments) to approve each release by
+hand.
 
 ## Documentation site
 
