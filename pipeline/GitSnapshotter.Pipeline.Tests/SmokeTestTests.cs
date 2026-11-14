@@ -3,6 +3,8 @@ using System.Xml.Linq;
 
 using GitSnapshotter.Pipeline.Modules;
 
+using TUnit.Assertions.Enums;
+
 using TUnit.Core;
 
 namespace GitSnapshotter.Pipeline.Tests;
@@ -42,7 +44,7 @@ public sealed class SmokeTestTests : IDisposable
     {
         WritePackage(("lib/net8.0/GitSnapshotter.dll", "dll"), (ThirdPartyNotices.FileName, await GeneratedNoticesAsync()));
 
-        await Assert.That(() => SmokeTestModule.CheckNotices(Package, "Product")).ThrowsNothing();
+        await Assert.That(() => SmokeTestChecks.CheckNotices(Package, "Product")).ThrowsNothing();
     }
 
     [Test]
@@ -50,7 +52,7 @@ public sealed class SmokeTestTests : IDisposable
     {
         WritePackage(("lib/net8.0/GitSnapshotter.dll", "dll"), ("README.md", "readme"));
 
-        await Assert.That(() => SmokeTestModule.CheckNotices(Package, "Product"))
+        await Assert.That(() => SmokeTestChecks.CheckNotices(Package, "Product"))
             .Throws<InvalidOperationException>()
             .WithMessageContaining($"has no {ThirdPartyNotices.FileName}", StringComparison.Ordinal);
     }
@@ -60,7 +62,7 @@ public sealed class SmokeTestTests : IDisposable
     {
         WritePackage(($"docs/{ThirdPartyNotices.FileName}", await GeneratedNoticesAsync()));
 
-        await Assert.That(() => SmokeTestModule.CheckNotices(Package, "Product"))
+        await Assert.That(() => SmokeTestChecks.CheckNotices(Package, "Product"))
             .Throws<InvalidOperationException>()
             .WithMessageContaining($"has no {ThirdPartyNotices.FileName}", StringComparison.Ordinal);
     }
@@ -70,7 +72,7 @@ public sealed class SmokeTestTests : IDisposable
     {
         WritePackage((ThirdPartyNotices.FileName, await GeneratedNoticesAsync()));
 
-        await Assert.That(() => SmokeTestModule.CheckNotices(Package, ThirdPartyNoticesModule.LibraryProduct))
+        await Assert.That(() => SmokeTestChecks.CheckNotices(Package, ThirdPartyNoticesModule.LibraryProduct))
             .Throws<InvalidOperationException>()
             .WithMessageContaining("is not the notices for", StringComparison.Ordinal);
     }
@@ -80,7 +82,7 @@ public sealed class SmokeTestTests : IDisposable
     {
         WritePackage((ThirdPartyNotices.FileName, ThirdPartyNotices.Heading("Product") + "\n"));
 
-        await Assert.That(() => SmokeTestModule.CheckNotices(Package, "Product"))
+        await Assert.That(() => SmokeTestChecks.CheckNotices(Package, "Product"))
             .Throws<InvalidOperationException>()
             .WithMessageContaining("lists no packages", StringComparison.Ordinal);
     }
@@ -94,7 +96,7 @@ public sealed class SmokeTestTests : IDisposable
         var package = Path.Combine(directory, "gitsnapshotter.tool.1.2.0-rc.1.nupkg");
         await File.WriteAllTextAsync(package, "package");
 
-        await Assert.That(SmokeTestModule.FindPackage(Path.Combine(_restore.Root, "tools"), "GitSnapshotter.Tool", "1.2.0-rc.1"))
+        await Assert.That(SmokeTestChecks.FindPackage(Path.Combine(_restore.Root, "tools"), "GitSnapshotter.Tool", "1.2.0-rc.1"))
             .IsEqualTo(package);
     }
 
@@ -104,7 +106,7 @@ public sealed class SmokeTestTests : IDisposable
         Directory.CreateDirectory(_restore.Root);
         await File.WriteAllTextAsync(Path.Combine(_restore.Root, "gitsnapshotter.1.1.0.nupkg"), "package");
 
-        await Assert.That(() => SmokeTestModule.FindPackage(_restore.Root, "GitSnapshotter", "1.2.0"))
+        await Assert.That(() => SmokeTestChecks.FindPackage(_restore.Root, "GitSnapshotter", "1.2.0"))
             .Throws<FileNotFoundException>();
     }
 
@@ -113,7 +115,7 @@ public sealed class SmokeTestTests : IDisposable
     [Arguments("1.2.0+5be4604abcdef\n")]
     public async Task ToolReportingTheVersionPasses(string output)
     {
-        await Assert.That(() => SmokeTestModule.CheckToolVersion(output, "1.2.0")).ThrowsNothing();
+        await Assert.That(() => SmokeTestChecks.CheckToolVersion(output, "1.2.0")).ThrowsNothing();
     }
 
     [Test]
@@ -123,14 +125,14 @@ public sealed class SmokeTestTests : IDisposable
     [Arguments("")]
     public async Task ToolReportingAnotherVersionFails(string output)
     {
-        await Assert.That(() => SmokeTestModule.CheckToolVersion(output, "1.2.0"))
+        await Assert.That(() => SmokeTestChecks.CheckToolVersion(output, "1.2.0"))
             .Throws<InvalidOperationException>();
     }
 
     [Test]
     public async Task NuGetConfigUsesOnlyTheGivenFeed()
     {
-        var sources = XDocument.Parse(SmokeTestModule.NuGetConfig("https://example.test/v3/index.json?a=1&b=2"))
+        var sources = XDocument.Parse(SmokeTestChecks.NuGetConfig("https://example.test/v3/index.json?a=1&b=2"))
             .Root!.Element("packageSources")!.Elements().ToList();
 
         using (Assert.Multiple())
@@ -144,14 +146,15 @@ public sealed class SmokeTestTests : IDisposable
     [Test]
     public async Task LibraryProjectReferencesExactlyTheVersion()
     {
-        var project = XDocument.Parse(SmokeTestModule.LibraryProject("1.2.0", "net11.0")).Root!;
+        var project = XDocument.Parse(SmokeTestChecks.LibraryProject("1.2.0", ["net11.0"])).Root!;
         var reference = project.Descendants("PackageReference").Single();
 
         using (Assert.Multiple())
         {
-            await Assert.That(reference.Attribute("Include")!.Value).IsEqualTo(SmokeTestModule.LibraryId);
+            await Assert.That(reference.Attribute("Include")!.Value).IsEqualTo(SmokeTestChecks.LibraryId);
             await Assert.That(reference.Attribute("Version")!.Value).IsEqualTo("[1.2.0]");
-            await Assert.That(project.Descendants("TargetFramework").Single().Value).IsEqualTo("net11.0");
+            await Assert.That(project.Descendants("TargetFrameworks").Single().Value).IsEqualTo("net11.0");
+            await Assert.That(project.Descendants("PackageReference").Count()).IsEqualTo(1);
         }
     }
 
@@ -167,9 +170,9 @@ public sealed class SmokeTestTests : IDisposable
     {
         WritePackage(Released, Files);
         // nuget.org adds its repository signature; the order of the files doesn't matter either.
-        WritePackage(Downloaded, [(SmokeTestModule.RepositorySignature, "signature"), .. Files.Reverse()]);
+        WritePackage(Downloaded, [(SmokeTestChecks.RepositorySignature, "signature"), .. Files.Reverse()]);
 
-        await Assert.That(() => SmokeTestModule.ComparePackages(Downloaded, Released)).ThrowsNothing();
+        await Assert.That(() => SmokeTestChecks.ComparePackages(Downloaded, Released)).ThrowsNothing();
     }
 
     [Test]
@@ -178,7 +181,7 @@ public sealed class SmokeTestTests : IDisposable
         WritePackage(Released, Files);
         WritePackage(Downloaded, ("GitSnapshotter.nuspec", "<package/>"), ("lib/net8.0/GitSnapshotter.dll", "other dll"));
 
-        await Assert.That(() => SmokeTestModule.ComparePackages(Downloaded, Released))
+        await Assert.That(() => SmokeTestChecks.ComparePackages(Downloaded, Released))
             .Throws<InvalidOperationException>()
             .WithMessageContaining("lib/net8.0/GitSnapshotter.dll differs", StringComparison.Ordinal);
     }
@@ -189,7 +192,7 @@ public sealed class SmokeTestTests : IDisposable
         WritePackage(Released, Files);
         WritePackage(Downloaded, ("GitSnapshotter.nuspec", "<package/>"), ("lib/net8.0/Extra.dll", "dll"));
 
-        await Assert.That(() => SmokeTestModule.ComparePackages(Downloaded, Released))
+        await Assert.That(() => SmokeTestChecks.ComparePackages(Downloaded, Released))
             .Throws<InvalidOperationException>()
             .WithMessageContaining(
                 "lib/net8.0/Extra.dll is extra; lib/net8.0/GitSnapshotter.dll is missing", StringComparison.Ordinal);
@@ -200,6 +203,370 @@ public sealed class SmokeTestTests : IDisposable
     {
         WritePackage(Downloaded, Files);
 
-        await Assert.That(() => SmokeTestModule.ComparePackages(Downloaded, Released)).Throws<FileNotFoundException>();
+        await Assert.That(() => SmokeTestChecks.ComparePackages(Downloaded, Released)).Throws<FileNotFoundException>();
+    }
+
+    [Test]
+    public async Task NetFrameworkAppAlsoGetsTheReferenceAssemblies()
+    {
+        var project = XDocument.Parse(SmokeTestChecks.LibraryProject("1.2.0", ["net11.0", "net472"])).Root!;
+
+        using (Assert.Multiple())
+        {
+            await Assert.That(project.Descendants("TargetFrameworks").Single().Value).IsEqualTo("net11.0;net472");
+            await Assert.That(project.Descendants("PackageReference").Select(r => r.Attribute("Include")!.Value))
+                .IsEquivalentTo([SmokeTestChecks.LibraryId, "Microsoft.NETFramework.ReferenceAssemblies"]);
+        }
+    }
+
+    [Test]
+    [Arguments(true, new[] { "net11.0", "net472", "net8.0" })]
+    [Arguments(false, new[] { "net11.0", "net8.0" })]
+    public async Task LibraryRunsOnEachFrameworkItIsBuiltForAndTheNewest(bool windows, string[] expected)
+    {
+        await Assert.That(SmokeTestChecks.TestFrameworks(["net8.0", "net472"], "net11.0", windows))
+            .IsEquivalentTo(expected, CollectionOrdering.Matching);
+    }
+
+    [Test]
+    [Arguments("net472", true)]
+    [Arguments("net48", true)]
+    [Arguments("net8.0", false)]
+    [Arguments("netstandard2.0", false)]
+    [Arguments("net11.0", false)]
+    public async Task NetFrameworkIsRecognised(string framework, bool expected)
+    {
+        await Assert.That(SmokeTestChecks.IsNetFramework(framework)).IsEqualTo(expected);
+    }
+
+    // ---- Contents -------------------------------------------------------------------------------------------------
+
+    private static readonly XDocument LibraryCsproj = XDocument.Parse("""
+        <Project Sdk="Microsoft.NET.Sdk">
+          <PropertyGroup><TargetFrameworks>net8.0;net472</TargetFrameworks></PropertyGroup>
+          <ItemGroup>
+            <PackageReference Include="LibGit2Sharp" />
+            <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" PrivateAssets="all" />
+          </ItemGroup>
+          <ItemGroup Condition="'$(TargetFramework)' == 'net472'">
+            <PackageReference Include="Polyfill"><PrivateAssets>all</PrivateAssets></PackageReference>
+            <PackageReference Include="System.Text.Json" />
+          </ItemGroup>
+        </Project>
+        """);
+
+    private static string Nuspec(string id, params string[] dependencies) => $"""
+        <?xml version="1.0" encoding="utf-8"?>
+        <package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+          <metadata>
+            <id>{id}</id>
+            <dependencies><group targetFramework="net8.0">{string.Concat(dependencies.Select(d => $"<dependency id=\"{d}\" version=\"1.0.0\" />"))}</group></dependencies>
+          </metadata>
+        </package>
+        """;
+
+    private static Dictionary<string, byte[]> Entries(params (string Name, string Content)[] entries) =>
+        entries.ToDictionary(e => e.Name, e => System.Text.Encoding.UTF8.GetBytes(e.Content));
+
+    // The library package 0.2.0 as published, with nuget.org's signature.
+    private static (string, string)[] LibraryFiles(params string[] dependencies) =>
+    [
+        ("_rels/.rels", ""), ("[Content_Types].xml", ""), ("package/services/metadata/core-properties/abc.psmdcp", ""),
+        (".signature.p7s", ""), ("GitSnapshotter.nuspec", Nuspec("GitSnapshotter", dependencies)),
+        ("README.md", ""), ("icon.png", ""), (ThirdPartyNotices.FileName, ""),
+        ("lib/net472/GitSnapshotter.dll", ""), ("lib/net472/GitSnapshotter.xml", ""),
+        ("lib/net8.0/GitSnapshotter.dll", ""), ("lib/net8.0/GitSnapshotter.xml", ""),
+    ];
+
+    [Test]
+    public async Task LibraryPackageAsPublishedPasses()
+    {
+        var entries = Entries(LibraryFiles("LibGit2Sharp", "System.Text.Json"));
+
+        await Assert.That(() => SmokeTestChecks.CheckLibraryContents(entries, LibraryCsproj)).ThrowsNothing();
+    }
+
+    [Test]
+    [Arguments("lib/net8.0/Constants.dll", "lib/net8.0/Constants.dll is not expected")]
+    [Arguments("lib/netstandard2.0/GitSnapshotter.dll", "lib/netstandard2.0/GitSnapshotter.dll is not expected")]
+    [Arguments("lib/net8.0/GitSnapshotter.pdb", "lib/net8.0/GitSnapshotter.pdb is not expected")]
+    [Arguments("appsettings.json", "appsettings.json is not expected")]
+    public async Task LibraryPackageWithAnExtraFileFails(string extra, string message)
+    {
+        var entries = Entries([.. LibraryFiles("LibGit2Sharp"), (extra, "")]);
+
+        await Assert.That(() => SmokeTestChecks.CheckLibraryContents(entries, LibraryCsproj))
+            .Throws<InvalidOperationException>()
+            .WithMessageContaining(message, StringComparison.Ordinal);
+    }
+
+    [Test]
+    public async Task LibraryPackageMissingAFrameworkFails()
+    {
+        var entries = Entries([.. LibraryFiles("LibGit2Sharp").Where(e => !e.Item1.StartsWith("lib/net472/", StringComparison.Ordinal))]);
+
+        await Assert.That(() => SmokeTestChecks.CheckLibraryContents(entries, LibraryCsproj))
+            .Throws<InvalidOperationException>()
+            .WithMessageContaining("lib/net472/GitSnapshotter.dll is missing", StringComparison.Ordinal);
+    }
+
+    [Test]
+    [Arguments("Polyfill")]
+    [Arguments("Microsoft.CodeAnalysis.PublicApiAnalyzers")]
+    [Arguments("TUnit.Engine")]
+    public async Task LibraryDependingOnAPrivatePackageFails(string dependency)
+    {
+        var entries = Entries(LibraryFiles("LibGit2Sharp", dependency));
+
+        await Assert.That(() => SmokeTestChecks.CheckLibraryContents(entries, LibraryCsproj))
+            .Throws<InvalidOperationException>()
+            .WithMessageContaining($"it depends on {dependency}", StringComparison.Ordinal);
+    }
+
+    [Test]
+    public async Task PublicPackageReferencesLeaveOutPrivateAssets()
+    {
+        await Assert.That(SmokeTestChecks.PublicPackageReferences(LibraryCsproj)).IsEquivalentTo(["LibGit2Sharp", "System.Text.Json"]);
+    }
+
+    private static readonly HashSet<string> ToolNoticed =
+        new(["LibGit2Sharp", "LibGit2Sharp.NativeBinaries", "System.CommandLine"], StringComparer.OrdinalIgnoreCase);
+
+    private static (string, string)[] ToolFiles() =>
+    [
+        ("_rels/.rels", ""), ("[Content_Types].xml", ""), ("package/services/metadata/core-properties/abc.psmdcp", ""),
+        ("GitSnapshotter.Tool.nuspec", Nuspec("GitSnapshotter.Tool")), ("README.md", ""), ("icon.png", ""),
+        (ThirdPartyNotices.FileName, ""),
+        ("tools/net11.0/any/DotnetToolSettings.xml", ""),
+        ("tools/net11.0/any/GitSnapshotter.Console.deps.json", ""),
+        ("tools/net11.0/any/GitSnapshotter.Console.dll", ""),
+        ("tools/net11.0/any/GitSnapshotter.Console.pdb", ""),
+        ("tools/net11.0/any/GitSnapshotter.Console.runtimeconfig.json", ""),
+        ("tools/net11.0/any/GitSnapshotter.dll", ""),
+        ("tools/net11.0/any/GitSnapshotter.xml", ""),
+        ("tools/net11.0/any/LibGit2Sharp.dll", ""),
+        ("tools/net11.0/any/System.CommandLine.dll", ""),
+        ("tools/net11.0/any/de/System.CommandLine.resources.dll", ""),
+        ("tools/net11.0/any/runtimes/linux-x64/native/libgit2-5853918.so", ""),
+        ("tools/net11.0/any/runtimes/win-x64/native/git2-5853918.dll", ""),
+    ];
+
+    [Test]
+    public async Task ToolPackageAsPublishedPasses()
+    {
+        await Assert.That(() => SmokeTestChecks.CheckToolContents(Entries(ToolFiles()), ToolNoticed)).ThrowsNothing();
+    }
+
+    [Test]
+    [Arguments("tools/net11.0/any/TUnit.Core.dll")]
+    [Arguments("tools/net11.0/any/Constants.dll")]
+    [Arguments("tools/net11.0/any/GitSnapshotter.UnitTests.dll")]
+    [Arguments("tools/net11.0/any/fr/TUnit.Core.resources.dll")]
+    [Arguments("tools/net11.0/any/appsettings.Development.json")]
+    [Arguments("tools/net11.0/GitSnapshotter.Console.dll")]
+    [Arguments("lib/net8.0/GitSnapshotter.dll")]
+    public async Task ToolPackageWithAFileNoNoticeCoversFails(string extra)
+    {
+        var entries = Entries([.. ToolFiles(), (extra, "")]);
+
+        await Assert.That(() => SmokeTestChecks.CheckToolContents(entries, ToolNoticed))
+            .Throws<InvalidOperationException>()
+            .WithMessageContaining($"{extra} is not expected", StringComparison.Ordinal);
+    }
+
+    [Test]
+    public async Task ToolPackageWithDependenciesFails()
+    {
+        var entries = Entries([.. ToolFiles().Where(e => !e.Item1.EndsWith(".nuspec", StringComparison.Ordinal)),
+            ("GitSnapshotter.Tool.nuspec", Nuspec("GitSnapshotter.Tool", "LibGit2Sharp"))]);
+
+        await Assert.That(() => SmokeTestChecks.CheckToolContents(entries, ToolNoticed))
+            .Throws<InvalidOperationException>()
+            .WithMessageContaining("it depends on LibGit2Sharp", StringComparison.Ordinal);
+    }
+
+    [Test]
+    public async Task NoticesListTheirPackages()
+    {
+        var noticed = SmokeTestChecks.CheckNotices(await GeneratedNoticesAsync(), "Product", "test");
+
+        await Assert.That(noticed).IsEquivalentTo(["Package"]);
+    }
+
+    // ---- What nuget.org shows -------------------------------------------------------------------------------------
+
+    private const string Commit = "8bdbf86021adf5f344d3323cefe41d7b09e375d1";
+
+    private static readonly System.Xml.Linq.XElement PackageMetadata = XDocument.Parse($"""
+        <package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+          <metadata>
+            <id>GitSnapshotter</id>
+            <version>0.2.0</version>
+            <authors>BusHero</authors>
+            <license type="expression">MIT</license>
+            <icon>icon.png</icon>
+            <readme>README.md</readme>
+            <description>Take a snapshot.</description>
+            <repository type="git" url="https://github.com/BusHero/GitSnapshotter.git" commit="{Commit}" />
+          </metadata>
+        </package>
+        """).Root!.Elements().Single();
+
+    // Trimmed from nuget.org's catalog entry for GitSnapshotter 0.2.0.
+    private static System.Text.Json.JsonDocument CatalogEntry(string? replace = null, string? with = null)
+    {
+        var json = $$"""
+            {
+              "id": "GitSnapshotter",
+              "version": "0.2.0",
+              "authors": "BusHero",
+              "description": "Take a snapshot.",
+              "iconFile": "icon.png",
+              "licenseExpression": "MIT",
+              "listed": true,
+              "readmeFile": "README.md",
+              "repository": { "branch": "refs/heads/trunk", "commit": "{{Commit}}", "type": "git", "url": "https://github.com/BusHero/GitSnapshotter.git" }
+            }
+            """;
+        return System.Text.Json.JsonDocument.Parse(
+            replace is { Length: > 0 } ? json.Replace(replace, with, StringComparison.Ordinal) : json);
+    }
+
+    [Test]
+    public async Task FeedShowingThePackagesMetadataPasses()
+    {
+        using var catalog = CatalogEntry();
+
+        await Assert.That(SmokeTestChecks.CompareMetadata(PackageMetadata, catalog.RootElement, Commit)).IsEmpty();
+    }
+
+    [Test]
+    [Arguments("\"listed\": true", "\"listed\": false", "the version is not listed")]
+    [Arguments("\"licenseExpression\": \"MIT\",", "", "the license is ''")]
+    [Arguments("\"iconFile\": \"icon.png\"", "\"iconFile\": \"other.png\"", "the icon is 'other.png'")]
+    [Arguments("\"readmeFile\": \"README.md\",", "", "the readme is ''")]
+    [Arguments("\"commit\": \"8bdb", "\"commit\": \"0000", "the commit is '0000")]
+    public async Task FeedShowingOtherMetadataFails(string replace, string with, string problem)
+    {
+        using var catalog = CatalogEntry(replace, with);
+
+        await Assert.That(SmokeTestChecks.CompareMetadata(PackageMetadata, catalog.RootElement, Commit))
+            .Contains(p => p.StartsWith(problem, StringComparison.Ordinal));
+    }
+
+    [Test]
+    public async Task PackageBuiltFromAnotherCommitFails()
+    {
+        using var catalog = CatalogEntry();
+
+        await Assert.That(SmokeTestChecks.CompareMetadata(PackageMetadata, catalog.RootElement, "abc123"))
+            .IsEquivalentTo([$"the package was built from {Commit}, not abc123"]);
+    }
+
+    [Test]
+    public async Task ServiceIndexResourceIsTheFirstTypeFound()
+    {
+        using var index = System.Text.Json.JsonDocument.Parse("""
+            { "resources": [
+                { "@id": "https://example.test/registration-semver1/", "@type": "RegistrationsBaseUrl" },
+                { "@id": "https://example.test/registration-semver2/", "@type": "RegistrationsBaseUrl/3.6.0" }
+            ] }
+            """);
+
+        await Assert.That(SmokeTestChecks.ServiceResource(index.RootElement, "RegistrationsBaseUrl/3.6.0", "RegistrationsBaseUrl"))
+            .IsEqualTo("https://example.test/registration-semver2/");
+        await Assert.That(() => SmokeTestChecks.ServiceResource(index.RootElement, "ReadmeUriTemplate/6.13.0"))
+            .Throws<InvalidOperationException>();
+    }
+
+    // ---- Symbols --------------------------------------------------------------------------------------------------
+
+    // This test assembly is built like the packages' assemblies: deterministic, with a portable PDB and its checksum.
+    private static string ThisAssembly => typeof(SmokeTestTests).Assembly.Location;
+
+    private static SmokeTestChecks.SymbolQuery ThisQuery() =>
+        SmokeTestChecks.SymbolQueryFor(File.ReadAllBytes(ThisAssembly), "test assembly");
+
+    [Test]
+    public async Task SymbolQueryIsTheSsqpKeyAndChecksumOfThePdb()
+    {
+        var query = ThisQuery();
+
+        using (Assert.Multiple())
+        {
+            await Assert.That(query.PdbName).IsEqualTo("GitSnapshotter.Pipeline.Tests.pdb");
+            await Assert.That(query.Key)
+                .IsEqualTo($"gitsnapshotter.pipeline.tests.pdb/{query.Guid:N}ffffffff/gitsnapshotter.pipeline.tests.pdb");
+            await Assert.That(query.Checksum).Matches("^SHA256:[0-9a-f]{64}$");
+        }
+    }
+
+    [Test]
+    public async Task TheAssemblysOwnPdbPasses()
+    {
+        var pdb = await File.ReadAllBytesAsync(Path.ChangeExtension(ThisAssembly, ".pdb"));
+
+        await Assert.That(() => SmokeTestChecks.CheckPdb(pdb, ThisQuery())).ThrowsNothing();
+    }
+
+    [Test]
+    public async Task AnotherAssemblysPdbFails()
+    {
+        // The tests compile the pipeline's sources into this assembly; Constants is a project of its own.
+        var other = Path.Combine(Path.GetDirectoryName(ThisAssembly)!, "Constants.pdb");
+        var pdb = await File.ReadAllBytesAsync(other);
+
+        await Assert.That(() => SmokeTestChecks.CheckPdb(pdb, ThisQuery()))
+            .Throws<InvalidOperationException>()
+            .WithMessageContaining("has ID", StringComparison.Ordinal);
+    }
+
+    [Test]
+    public async Task ChangedPdbFails()
+    {
+        var pdb = await File.ReadAllBytesAsync(Path.ChangeExtension(ThisAssembly, ".pdb"));
+        pdb[^1] ^= 0xFF;
+
+        await Assert.That(() => SmokeTestChecks.CheckPdb(pdb, ThisQuery()))
+            .Throws<InvalidOperationException>()
+            .WithMessageContaining("hashes to", StringComparison.Ordinal);
+    }
+
+    [Test]
+    public async Task NotAPdbFails()
+    {
+        await Assert.That(() => SmokeTestChecks.CheckPdb([1, 2, 3], ThisQuery()))
+            .Throws<InvalidOperationException>()
+            .WithMessageContaining("is not a portable PDB", StringComparison.Ordinal);
+    }
+
+    [Test]
+    public async Task OwnAssembliesAreTheOnesWithSymbols()
+    {
+        await Assert.That(SmokeTestChecks.OwnAssemblies(
+        [
+            "lib/net8.0/GitSnapshotter.dll", "lib/net8.0/GitSnapshotter.xml",
+            "tools/net11.0/any/GitSnapshotter.Console.dll", "tools/net11.0/any/LibGit2Sharp.dll", "GitSnapshotter.nuspec",
+        ])).IsEquivalentTo(["lib/net8.0/GitSnapshotter.dll", "tools/net11.0/any/GitSnapshotter.Console.dll"]);
+    }
+
+    // ---- The release ----------------------------------------------------------------------------------------------
+
+    [Test]
+    public async Task ReleaseAssetsMatchingTheirChecksumsPass()
+    {
+        var release = Path.Combine(_restore.Root, "release");
+        Directory.CreateDirectory(release);
+        await File.WriteAllTextAsync(Path.Combine(release, "a.nupkg"), "a");
+        await File.WriteAllTextAsync(
+            Path.Combine(release, "SHA256SUMS.txt"),
+            "ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb  a.nupkg\n");
+
+        await Assert.That(() => SmokeTestChecks.VerifyChecksums(release, "SHA256SUMS.txt")).ThrowsNothing();
+
+        await File.WriteAllTextAsync(Path.Combine(release, "a.nupkg"), "b");
+        await Assert.That(() => SmokeTestChecks.VerifyChecksums(release, "SHA256SUMS.txt"))
+            .Throws<InvalidOperationException>()
+            .WithMessageContaining("a.nupkg has another checksum", StringComparison.Ordinal);
     }
 }

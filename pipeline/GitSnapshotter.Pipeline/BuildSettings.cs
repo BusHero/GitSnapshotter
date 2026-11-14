@@ -63,6 +63,18 @@ public sealed class BuildSettings
     public string? SmokeTestReleaseDirectory { get; set; }
 
     /// <summary>
+    /// The symbol server <see cref="BuildTarget.SmokeTest"/> downloads our assemblies' PDBs from, in the SSQP format
+    /// (<c>&lt;server&gt;/&lt;pdb&gt;/&lt;id&gt;/&lt;pdb&gt;</c>). When empty, the symbols are not checked.
+    /// </summary>
+    public string SmokeTestSymbolServer { get; set; } = "https://symbols.nuget.org/download/symbols";
+
+    /// <summary>
+    /// The commit the release was made from. When set, <see cref="BuildTarget.SmokeTest"/> checks that both packages
+    /// were built from it (the commit in their nuspec, which the feed shows).
+    /// </summary>
+    public string? SmokeTestCommit { get; set; }
+
+    /// <summary>
     /// The release version, like <c>1.2.0</c> or <c>1.2.0-rc.1</c>. When set, the assemblies, the package and the
     /// console app get exactly this version; otherwise the package is a prerelease named after the branch. A leading
     /// <c>v</c>, as in a tag name, is dropped.

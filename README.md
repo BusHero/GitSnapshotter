@@ -48,7 +48,9 @@ the `Build` configuration section, as environment variables (`Build__PublishDire
 | `ReleaseEnvironment` | `nuget` | The GitHub environment `VerifyRelease` requires a reviewer on |
 | `SmokeTestSource` | nuget.org | Feed `SmokeTest` downloads the packages from |
 | `SmokeTestWaitMinutes` | `30` | How long `SmokeTest` waits for the feed to list the packages |
-| `SmokeTestReleaseDirectory` | none | The GitHub release's assets; when set, `SmokeTest` checks the feed's packages are the release's |
+| `SmokeTestReleaseDirectory` | none | The GitHub release's assets; when set, `SmokeTest` checks them against `SHA256SUMS.txt`, that the feed's packages and symbols are the release's, and that the console app zip runs |
+| `SmokeTestSymbolServer` | nuget.org's | Where `SmokeTest` downloads the PDBs from; empty skips the symbols |
+| `SmokeTestCommit` | none | When set, `SmokeTest` checks the packages were built from this commit |
 
 The CI workflows run the pipeline too, one target per job, so a job only sets up the machine and hands files to
 the next. Each target runs on a developer machine as well (`./build.sh --Build:Target=Test`):
@@ -57,7 +59,7 @@ the next. Each target runs on a developer machine as well (`./build.sh --Build:T
 |---|---|---|
 | `All` | Format check, compile, tests, third-party notices, console app, packages, push; on a release, the release assets (packages, console app zip, `SHA256SUMS.txt`) | `build` > ubuntu-latest |
 | `VerifyRelease` | Checks the release may go ahead and writes its description from `CHANGELOG.md`; needs `GITHUB_TOKEN` | `build` > verify |
-| `SmokeTest` | Downloads `Version` of both packages from the feed, installs and runs the tool, builds and runs an app that uses the library, checks both packages carry their third-party notices and, with `SmokeTestReleaseDirectory`, that they are the release's packages (ignoring nuget.org's signature); builds nothing | `build` > smoke-test |
+| `SmokeTest` | Checks `Version` was published and works, building nothing: from the feed, installs and runs the tool, and runs an app using the library on each framework it is built for (.NET Framework on Windows only) and the newest runtime; checks both packages' third-party notices, that they hold nothing unexpected (an assembly must be ours or covered by the notices; the library may depend only on packages its project passes on), the metadata, readme and icon the feed shows, and our PDBs on the symbol server; with the `SmokeTest...` settings above, compares all of it with the GitHub release and the commit | `build` > smoke-test (Linux, Windows, macOS) |
 | `Test` | Compile and tests | `build` > windows-latest |
 | `Compile` | Compile | `codeql` |
 | `Restore` | Restore the solution | `build` > dependency-submission |

@@ -19,10 +19,11 @@ run-name: ${{ inputs.version && format('release {0}', inputs.version) || '' }}
 #            v<version> tag) with every artifact and pushes the packages to nuget.org; the only job that can write
 #            to the repository or get a nuget.org key. It stays in this file: it never checks out or runs the
 #            repository's code, so nothing built from the repository can reach its credentials.
-#   smoke-test  downloads the published packages from nuget.org as a user would, installs and runs the tool, builds
-#            and runs an app that uses the library, checks both packages carry their third-party notices, and
-#            checks they are the packages attached to the GitHub release (SmokeTest target). Read-only: it gets no
-#            credentials beyond reading the repository.
+#   smoke-test  on Linux, Windows and macOS, downloads the published packages from nuget.org as a user would: installs
+#            and runs the tool, runs an app that uses the library on each framework it supports, checks the packages'
+#            third-party notices and contents, what nuget.org shows about them, their symbols on nuget.org's symbol
+#            server, and that they, the symbols and the console app zip are the GitHub release's and were built from
+#            the released commit (SmokeTest target). Read-only: it gets no credentials beyond reading the repository.
 on:
   push:
     branches: ['**']
@@ -281,12 +282,18 @@ jobs:
           if [[ "$PRERELEASE" == true ]]; then latest=false; fi
           gh release edit "$TAG" --draft=false --latest="$latest"
 
-  # After publish: is the release usable from nuget.org? Waits for nuget.org to list the packages (it validates and
-  # indexes them for a few minutes after the push), then checks them against the GitHub release's assets.
+  # After publish: is the release usable from nuget.org, on every OS? Waits for nuget.org to list the packages, their
+  # metadata and their symbols (it validates and indexes them for a few minutes after the push), then checks them
+  # against the GitHub release's assets and the released commit.
   smoke-test:
-    name: smoke-test
+    name: smoke-test (${{ matrix.os }})
     needs: [verify, publish]
-    runs-on: ubuntu-latest
+    strategy:
+      # Every OS reports, even when one fails.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     permissions:
       contents: read
     steps:
@@ -298,22 +305,25 @@ jobs:
         uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
+          # The library runs on .NET 8, the oldest runtime it supports, too.
+          dotnet-version: '8.0.x'
 
-      # From the published release, not this run's artifacts: what users download is what gets compared.
+      # From the published release, not this run's artifacts: what users download is what gets compared. The
+      # pipeline checks them against SHA256SUMS.txt.
       - name: 'Download GitHub release assets'
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           TAG: ${{ needs.verify.outputs.tag }}
-        run: |
-          gh release download "$TAG" --dir "$RUNNER_TEMP/release"
-          (cd "$RUNNER_TEMP/release" && sha256sum --check SHA256SUMS.txt)
+        run: gh release download "$TAG" --dir "$RUNNER_TEMP/release"
 
       - name: 'Run: pipeline (SmokeTest)'
         env:
           Build__Target: SmokeTest
           Build__Version: ${{ needs.verify.outputs.version }}
           Build__SmokeTestReleaseDirectory: ${{ runner.temp }}/release
+          Build__SmokeTestCommit: ${{ github.sha }}
         run: dotnet run --project pipeline/GitSnapshotter.Pipeline --configuration Release
 
   # Uploads the resolved package graph to GitHub's dependency graph (Dependabot alerts, Insights > Dependency graph).
