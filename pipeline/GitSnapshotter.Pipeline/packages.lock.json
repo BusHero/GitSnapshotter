@@ -40,6 +40,17 @@
           "ModularPipelines": "3.2.8"
         }
       },
+      "ModularPipelines.GitHub": {
+        "type": "Direct",
+        "requested": "[3.2.8, )",
+        "resolved": "3.2.8",
+        "contentHash": "DO/yka1LopaxS7uN/gU2BzcS3invtoeaWHNECLSgA84s59KP8OAi8fZ/alZVOZ77aOUjzWXButPFme2wUpr6Zw==",
+        "dependencies": {
+          "ModularPipelines": "3.2.8",
+          "ModularPipelines.Git": "3.2.8",
+          "Octokit": "14.0.0"
+        }
+      },
       "AsyncSemaphore": {
         "type": "Transitive",
         "resolved": "1.5.0",
@@ -313,6 +324,11 @@
         "dependencies": {
           "Microsoft.Extensions.Configuration.Binder": "10.0.6"
         }
+      },
+      "Octokit": {
+        "type": "Transitive",
+        "resolved": "14.0.0",
+        "contentHash": "jGOuTH1l+TCpJH+fwYOp7USzHDuGfN1jKbLz3J2COwyn+wL08eynvpnM6rY2qkzIEXum3PN2p2QkP3BW/p9Qcw=="
       },
       "Polly": {
         "type": "Transitive",

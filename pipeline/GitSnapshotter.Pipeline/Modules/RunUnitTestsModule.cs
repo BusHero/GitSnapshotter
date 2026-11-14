@@ -15,6 +15,7 @@ namespace GitSnapshotter.Pipeline.Modules;
 /// Runs the test suite. The exploratory LibGit2Sharp tests document library behaviour and are left out.
 /// </summary>
 [DependsOn<CompileModule>]
+[DependsOn<ConfigureGitIdentityModule>]
 public sealed class RunUnitTestsModule(IOptions<BuildSettings> settings) : Module<CommandResult>
 {
     // TUnit tree filter: /assembly/namespace/class/test[property].

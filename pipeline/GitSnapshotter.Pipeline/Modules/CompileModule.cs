@@ -11,7 +11,8 @@ namespace GitSnapshotter.Pipeline.Modules;
 
 /// <summary>Restores and builds the solution, stamped with the release version on a release build.</summary>
 // After the format check: both touch obj/, and running them together breaks the build.
-[DependsOn<VerifyFormattingModule>]
+// Optional: the Test and Compile targets leave the format check out.
+[DependsOn<VerifyFormattingModule>(Optional = true)]
 public sealed class CompileModule(IOptions<BuildSettings> settings) : Module<CommandResult>
 {
     protected override async Task<CommandResult?> ExecuteAsync(IModuleContext context, CancellationToken cancellationToken) =>
