@@ -3,7 +3,7 @@
 `gitsnapshotter` takes a snapshot of a git repository's references (HEAD, branches, remotes, tags, other refs and,
 optionally, the index and working tree) and later puts the repository back exactly as it was.
 
-Requires the .NET 11 runtime or later.
+Requires the .NET 8 runtime or later.
 
 ## Install
 

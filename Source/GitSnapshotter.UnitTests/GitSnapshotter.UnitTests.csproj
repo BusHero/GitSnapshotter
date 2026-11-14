@@ -42,11 +42,11 @@
       <ProjectReference Include="..\Constants\Constants.csproj" />
     </ItemGroup>
 
-    <!-- The console app targets .NET 11 only, so its tests run on that framework only. -->
-    <ItemGroup Condition="'$(TargetFramework)' == 'net11.0'">
+    <!-- The console app targets .NET 8 and .NET 11, so its tests run on those frameworks. -->
+    <ItemGroup Condition="'$(TargetFramework)' != 'net472'">
       <ProjectReference Include="..\GitSnapshotter.Console\GitSnapshotter.Console.csproj" />
     </ItemGroup>
-    <ItemGroup Condition="'$(TargetFramework)' != 'net11.0'">
+    <ItemGroup Condition="'$(TargetFramework)' == 'net472'">
       <Compile Remove="CliTests.cs" />
     </ItemGroup>
 

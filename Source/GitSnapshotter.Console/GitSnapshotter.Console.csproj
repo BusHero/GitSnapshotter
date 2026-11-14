@@ -10,11 +10,12 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net11.0</TargetFramework>
+    <!-- .NET 8 is the oldest supported runtime; the .NET 11 build is used where .NET 11 or later is installed. -->
+    <TargetFrameworks>net8.0;net11.0</TargetFrameworks>
     <!-- Not a library: no XML docs required on public members. -->
     <NoWarn>$(NoWarn);CS1591</NoWarn>
     <RootNamespace>GitSnapshotter.Console</RootNamespace>
-    <!-- Run on newer runtimes too, so a machine with only a later .NET can still use the tool. -->
+    <!-- Run on newer runtimes too: the net8.0 build serves .NET 8, 9 and 10, and any later runtime without its own build. -->
     <RollForward>Major</RollForward>
   </PropertyGroup>
 
