@@ -5,7 +5,7 @@
   </PropertyGroup>
 
   <ItemGroup Label="Library">
-    <PackageVersion Include="LibGit2Sharp" Version="0.31.0" />
+    <PackageVersion Include="LibGit2Sharp" Version="0.32.0" />
   </ItemGroup>
 
   <ItemGroup Label="Tests">
