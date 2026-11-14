@@ -4,12 +4,11 @@ on:
   push:
     paths:
       - 'Source/**'
-      - 'build/**'
+      - 'pipeline/**'
       - '.github/workflows/**'
       - 'global.json'
       - 'build.sh'
       - 'build.cmd'
-      - 'build.ps1'
 
 jobs:
   ubuntu-latest:
@@ -23,12 +22,10 @@ jobs:
         with:
           global-json-file: global.json
 
-      - name: 'Cache: .nuke/temp, ~/.nuget/packages'
+      - name: 'Cache: ~/.nuget/packages'
         uses: actions/cache@v4
         with:
-          path: |
-            .nuke/temp
-            ~/.nuget/packages
+          path: ~/.nuget/packages
           key: ${{ runner.os }}-${{ hashFiles('**/global.json', '**/*.csproj', '**/Directory.Packages.props') }}
       
       - name: 'Configure git credentials'
@@ -36,16 +33,14 @@ jobs:
           git config --global user.email github-actions@github.com
           git config --global user.name github-actions
       
-      - name: 'Run: Nuke'
-        id: nuke
-        run: |
-          ./build.cmd Publish Publish-Package \
-              -publish-directory publish \
-              -configuration Release \
-              -github-output "$GITHUB_OUTPUT" \
-              -github-api-key "${{ secrets.GITHUB_TOKEN }}"
-      
+      - name: 'Run: pipeline'
+        id: pipeline
+        env:
+          Build__DefaultBranch: ${{ github.event.repository.default_branch }}
+          Build__NuGetApiKey: ${{ secrets.GITHUB_TOKEN }}
+        run: dotnet run --project pipeline/GitSnapshotter.Pipeline --configuration Release
+
       - uses: actions/upload-artifact@v4
         with:
-          name: GitSnapshotter.Console_${{ steps.nuke.outputs.version }}
+          name: GitSnapshotter.Console_${{ steps.pipeline.outputs.version }}
           path: publish

@@ -1,7 +1,3 @@
-:; set -eo pipefail
-:; SCRIPT_DIR=$(cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)
-:; ${SCRIPT_DIR}/build.sh "$@"
-:; exit $?
-
-@ECHO OFF
-powershell -ExecutionPolicy ByPass -NoProfile -File "%~dp0build.ps1" %*
+@echo off
+rem Runs the build pipeline (pipeline\GitSnapshotter.Pipeline). Arguments are passed through.
+dotnet run --project "%~dp0pipeline\GitSnapshotter.Pipeline" -- %*
