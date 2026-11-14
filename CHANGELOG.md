@@ -8,6 +8,8 @@ Add each change under **Unreleased** as it is made. A release takes its GitHub r
 for its version: before releasing, rename **Unreleased** to the version (`## [1.2.0] - 2026-12-01`) and start a new,
 empty **Unreleased** section above it. A prerelease with no section of its own uses **Unreleased**.
 
+## [Unreleased]
+
 ## [0.3.0] - 2026-11-14
 
 - `gitsnapshotter` parses its command line with System.CommandLine. Each command has its own help
