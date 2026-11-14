@@ -123,6 +123,40 @@ The tool is the `GitSnapshotter.Tool` [.NET tool](https://learn.microsoft.com/do
 installs the `gitsnapshotter` command. It needs the [.NET 11 runtime](https://dotnet.microsoft.com/download) or
 later.
 
+### From NuGet
+
+Stable releases will be published to [nuget.org](https://www.nuget.org/packages/GitSnapshotter.Tool), so no feed
+setup will be needed:
+
+<Aside type="note" title="Stable releases are coming">
+  The tool has no stable release on nuget.org yet, so these commands don't work until the first one is published.
+  Until then, install a [prerelease from GitHub Packages](#prereleases-of-the-tool-from-github-packages).
+</Aside>
+
+<Tabs syncKey="tool-scope">
+  <TabItem label="Global">
+    ```sh
+    dotnet tool install --global GitSnapshotter.Tool
+    gitsnapshotter help
+    ```
+
+    The command goes in `~/.dotnet/tools` (`%USERPROFILE%\.dotnet\tools` on Windows), which the .NET SDK
+    installer puts on your `PATH`. Update with `dotnet tool update --global GitSnapshotter.Tool`.
+  </TabItem>
+  <TabItem label="Local (per repository)">
+    A local tool is pinned in `.config/dotnet-tools.json`, so everyone who clones the repository, and CI, gets the
+    same version with `dotnet tool restore`:
+
+    ```sh
+    dotnet new tool-manifest   # once, if the repository has no manifest yet
+    dotnet tool install GitSnapshotter.Tool
+    dotnet tool run gitsnapshotter help   # or: dotnet gitsnapshotter help
+    ```
+  </TabItem>
+</Tabs>
+
+### Prereleases of the tool from GitHub Packages
+
 Every push to `trunk` publishes a prerelease of the tool to GitHub Packages, next to the library. Set up the
 `BusHero` feed and its credentials as in [Prereleases from GitHub Packages](#prereleases-from-github-packages)
 (steps 1 and 2), then run these from the directory with that `nuget.config` (or pass `--configfile <path>`):
