@@ -10,7 +10,8 @@
 
     <ItemGroup>
         <PackageReference Include="AutoFixture" />
-        <PackageReference Include="TUnit" />
+        <PackageReference Include="TUnit.Assertions" />
+        <PackageReference Include="TUnit.Engine" />
     </ItemGroup>
 
     <ItemGroup>
