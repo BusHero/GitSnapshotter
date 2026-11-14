@@ -755,4 +755,15 @@ public sealed class SmokeTestTests : IDisposable
         await Assert.That(SmokeTestChecks.CheckGitHubRelease(PublishedRelease("0.4.0-rc.1", "v0.4.0-rc.1"), rc, Commit, "Notes"))
             .IsEquivalentTo(["it is marked as the latest release, though it is a prerelease"]);
     }
+
+    [Test]
+    public async Task ToolFrameworksAreTheConsoleAppBuildsInThePackage()
+    {
+        await Assert.That(SmokeTestChecks.ToolFrameworks(
+        [
+            "tools/net8.0/any/GitSnapshotter.Console.dll", "tools/net8.0/any/GitSnapshotter.dll",
+            "tools/net11.0/any/GitSnapshotter.Console.dll", "tools/net11.0/any/GitSnapshotter.Console.pdb",
+            "lib/net8.0/GitSnapshotter.Console.dll",
+        ])).IsEquivalentTo(["net11.0", "net8.0"], CollectionOrdering.Matching);
+    }
 }

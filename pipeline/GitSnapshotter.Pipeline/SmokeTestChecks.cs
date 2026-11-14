@@ -194,6 +194,16 @@ internal static class SmokeTestChecks
             .Select(e => e.Attribute("id")!.Value)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>The frameworks the tool package has a build of the console app for: its <c>tools/&lt;framework&gt;/any/</c> folders.</summary>
+    public static IReadOnlyList<string> ToolFrameworks(IEnumerable<string> entries) =>
+    [
+        .. entries
+            .Select(entry => entry.Split('/'))
+            .Where(parts => parts is ["tools", _, "any", ConsoleAssembly])
+            .Select(parts => parts[1])
+            .Order(StringComparer.Ordinal),
+    ];
+
     /// <summary>The frameworks the package has assemblies for: its <c>lib/&lt;framework&gt;/</c> folders.</summary>
     public static IReadOnlySet<string> LibFrameworks(IEnumerable<string> entries) =>
         entries

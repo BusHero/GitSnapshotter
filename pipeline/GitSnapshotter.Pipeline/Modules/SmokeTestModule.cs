@@ -25,7 +25,7 @@ namespace GitSnapshotter.Pipeline.Modules;
 /// with its own NuGet packages folder and only <see cref="BuildSettings.SmokeTestSource"/> as a feed, so nothing comes
 /// from this build or from the machine's NuGet cache. It:
 /// <list type="bullet">
-/// <item>installs the .NET tool, checks its <c>--version</c>, takes a snapshot with it, and has it put a changed
+/// <item>installs the .NET tool, checks its <c>--version</c> (and that of each framework's build in it), takes a snapshot with it, and has it put a changed
 /// repository back the way the snapshot found it;</item>
 /// <item>upgrades the tool from the previous stable version, then uninstalls it;</item>
 /// <item>builds an app that references the library, and runs it on every framework the library is built for (.NET
@@ -120,6 +120,16 @@ public sealed class SmokeTestModule(IOptions<BuildSettings> settings) : Module<s
             var libraryPackage = FindPackage(packages, LibraryId, version);
             var toolEntries = ReadEntries(toolPackage);
             var libraryEntries = ReadEntries(libraryPackage);
+
+            // dotnet tool install runs the build that best matches the newest runtime; run every other one as well,
+            // as a machine with an older runtime would.
+            foreach (var framework in ToolFrameworks(toolEntries.Keys))
+            {
+                var build = Path.Combine(Path.GetDirectoryName(toolPackage)!, "tools", framework, "any", ConsoleAssembly);
+                CheckToolVersion((await Dotnet(0, [build, "--version"])).StandardOutput, version);
+                await Dotnet(0, [build, "snapshot", repository]);
+                context.Logger.LogInformation("The tool's {Framework} build runs", framework);
+            }
 
             var frameworks = TestFrameworks(LibFrameworks(libraryEntries.Keys), currentRuntime, OperatingSystem.IsWindows());
             await Write(project, LibraryProject(version, frameworks));
