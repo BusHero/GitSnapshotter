@@ -153,7 +153,7 @@ internal static class ThirdPartyNotices
         if (licenseType == "file" && license is not null)
         {
             licenseName = $"see below (from {license} in the package)";
-            licenseText = File.ReadAllText(Path.Combine(directory, license));
+            licenseText = File.ReadAllText(PackageFile(directory, license, id, version));
         }
         else if (licenseType == "expression" && license is not null && LicenseTexts.TryGetValue(license, out var text))
         {
@@ -178,6 +178,22 @@ internal static class ThirdPartyNotices
         var copyright = Get("copyright") ?? Copyrights.GetValueOrDefault(id);
 
         return new Package(id, version, Get("projectUrl"), copyright, licenseName, licenseText, notices);
+    }
+
+    /// <summary>
+    /// Resolves a path the nuspec gives (untrusted package content) inside the package directory, so a package can't
+    /// point at a file elsewhere on the build machine and have it published in the notices.
+    /// </summary>
+    private static string PackageFile(string directory, string relativePath, string id, string version)
+    {
+        var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(directory)) + Path.DirectorySeparatorChar;
+        var path = Path.GetFullPath(Path.Combine(root, relativePath));
+
+        // Ordinal: the packages folder is case-sensitive on Linux, and a path that only matches ignoring case is outside it.
+        return path.StartsWith(root, StringComparison.Ordinal)
+            ? path
+            : throw new InvalidOperationException(
+                $"Package {id} {version} names license file '{relativePath}', which is outside the package.");
     }
 
     private static string Render(string product, List<Package> packages)
