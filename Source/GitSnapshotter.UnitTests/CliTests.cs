@@ -2,12 +2,18 @@ using GitSnapshotter.Console;
 
 namespace GitSnapshotter.UnitTests;
 
-public sealed class CliTests
+public sealed class CliTests : IDisposable
 {
     private readonly StringWriter _output = new();
     private readonly StringWriter _error = new();
 
     private int Run(params string[] args) => Cli.Run(args, _output, _error);
+
+    public void Dispose()
+    {
+        _output.Dispose();
+        _error.Dispose();
+    }
 
     [Test]
     public async Task NoArgumentsPrintsUsage()
@@ -118,7 +124,8 @@ public sealed class CliTests
         using (Assert.Multiple())
         {
             await Assert.That(exitCode).IsEqualTo(Cli.Success);
-            await Assert.That(repo.Reopen().Branches["feature"]).IsNull();
+            using var reopened = repo.Reopen();
+            await Assert.That(reopened.Branches["feature"]).IsNull();
         }
     }
 
@@ -137,7 +144,8 @@ public sealed class CliTests
         {
             await Assert.That(exitCode).IsEqualTo(Cli.Success);
             await Assert.That(_output.ToString()).Contains("- Branch feature");
-            await Assert.That(repo.Reopen().Branches["feature"]).IsNotNull();
+            using var reopened = repo.Reopen();
+            await Assert.That(reopened.Branches["feature"]).IsNotNull();
         }
     }
 
@@ -469,12 +477,12 @@ public sealed class CliTests
     [Test]
     [Arguments("not json")]
     [Arguments("null")]
-    public async Task InvalidSnapshotFileIsAnError(string content)
+    public async Task InvalidSnapshotFileIsAnError(string content, CancellationToken cancellationToken)
     {
         using var repo = GitTasks.CreateTemporaryGitRepository();
         repo.CommitFile("a.txt", "1");
         var file = GitTasks.GetTempPath() + ".json";
-        File.WriteAllText(file, content);
+        await File.WriteAllTextAsync(file, content, cancellationToken);
 
         using (Assert.Multiple())
         {

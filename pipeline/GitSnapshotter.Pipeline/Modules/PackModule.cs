@@ -21,6 +21,8 @@ public sealed class PackModule(IOptions<BuildSettings> settings) : Module<string
 {
     protected override async Task<string?> ExecuteAsync(IModuleContext context, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(context);
+
         var suffix = PackageVersion.Suffix(context, settings.Value);
         var output = Paths.PublishDirectory(context, settings.Value);
         var notices = await context.GetModule<ThirdPartyNoticesModule>();

@@ -2,12 +2,7 @@
 
     <PropertyGroup>
         <TargetFrameworks>net8.0;net11.0;net472</TargetFrameworks>
-        <LangVersion>latest</LangVersion>
-        <!-- No Polyfill here: the library's polyfills are internal and visible through InternalsVisibleTo. -->
-        <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
         <IsPackable>false</IsPackable>
-        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     </PropertyGroup>
 
     <ItemGroup>

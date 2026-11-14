@@ -1,16 +1,22 @@
 <Project>
   <PropertyGroup>
-    <!-- Every project records its full resolved package graph in packages.lock.json. -->
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
-    <!-- On CI (GitHub Actions sets CI=true), restore fails if a lock file is missing or out of date. -->
     <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
-    <!-- Keep the lock files out of the IDE's project view; NuGet still reads and writes them. -->
     <DefaultItemExcludes>$(DefaultItemExcludes);packages.lock.json</DefaultItemExcludes>
-    <!--
-      .NET Framework reference assemblies come from an explicit package on every OS (Directory.Build.targets).
-      Otherwise the SDK adds the package only where no targeting pack is installed (Linux, macOS), and the lock
-      files differ between Windows and everywhere else.
-    -->
     <AutomaticallyUseReferenceAssemblyPackages>false</AutomaticallyUseReferenceAssemblyPackages>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <CodeAnalysisTreatWarningsAsErrors>true</CodeAnalysisTreatWarningsAsErrors>
+    <MSBuildTreatWarningsAsErrors>true</MSBuildTreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <AnalysisLevel>latest-all</AnalysisLevel>
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditLevel>low</NuGetAuditLevel>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <WarningLevel>9999</WarningLevel>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
   </PropertyGroup>
 </Project>

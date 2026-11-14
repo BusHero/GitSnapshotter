@@ -18,7 +18,7 @@ namespace GitSnapshotter.Pipeline.Modules;
 public sealed class RunUnitTestsModule(IOptions<BuildSettings> settings) : Module<CommandResult>
 {
     // TUnit tree filter: /assembly/namespace/class/test[property].
-    private static readonly string Filter =
+    private const string Filter =
         $"/*/*/*/*[{TestConstants.Traits.Names.CATEGORY}!={TestConstants.Traits.Values.DISCOVERY}]";
 
     protected override async Task<CommandResult?> ExecuteAsync(IModuleContext context, CancellationToken cancellationToken) =>

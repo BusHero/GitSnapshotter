@@ -20,6 +20,8 @@ public static class GitRepository
     /// <summary>Takes a snapshot of an open repository.</summary>
     public static GitRepositorySnapshot GetSnapshot(IRepository repository, SnapshotOptions? options = null)
     {
+        ArgumentNullException.ThrowIfNull(repository);
+
         options ??= SnapshotOptions.Default;
 
         var isDetached = repository.Info.IsHeadDetached;
@@ -110,6 +112,9 @@ public static class GitRepository
         GitRepositorySnapshot snapshot,
         RestoreOptions? options = null)
     {
+        ArgumentNullException.ThrowIfNull(repository);
+        ArgumentNullException.ThrowIfNull(snapshot);
+
         options ??= RestoreOptions.Default;
 
         EnsureObjectsExist(repository, snapshot, options);
@@ -203,7 +208,7 @@ public static class GitRepository
 
         return new Remote
         {
-            Url = remote.Url,
+            Url = new Uri(remote.Url, UriKind.RelativeOrAbsolute),
             Branches = branches,
             Name = remote.Name,
             Head = head?.StartsWith(RemotesPrefix, StringComparison.Ordinal) == true
@@ -344,7 +349,7 @@ public static class GitRepository
         }
     }
 
-    private static void RestoreBranches(IRepository repository, Branch[] branches)
+    private static void RestoreBranches(IRepository repository, IReadOnlyList<Branch> branches)
     {
         var wanted = branches.ToDictionary(b => b.Name, b => b.Tip);
 
@@ -362,7 +367,7 @@ public static class GitRepository
         }
     }
 
-    private static void RestoreUpstreams(IRepository repository, Branch[] branches)
+    private static void RestoreUpstreams(IRepository repository, IReadOnlyList<Branch> branches)
     {
         foreach (var branch in branches)
         {
@@ -403,7 +408,7 @@ public static class GitRepository
         }
     }
 
-    private static void RestoreRemotes(IRepository repository, Remote[] remotes)
+    private static void RestoreRemotes(IRepository repository, IReadOnlyList<Remote> remotes)
     {
         var wanted = remotes.ToDictionary(r => r.Name);
 
@@ -420,11 +425,11 @@ public static class GitRepository
             var existing = repository.Network.Remotes[remote.Name];
             if (existing is null)
             {
-                repository.Network.Remotes.Add(remote.Name, remote.Url);
+                repository.Network.Remotes.Add(remote.Name, remote.Url.OriginalString);
             }
-            else if (existing.Url != remote.Url)
+            else if (existing.Url != remote.Url.OriginalString)
             {
-                repository.Network.Remotes.Update(remote.Name, r => r.Url = remote.Url);
+                repository.Network.Remotes.Update(remote.Name, r => r.Url = remote.Url.OriginalString);
             }
 
             RestoreRemoteTrackingBranches(repository, remote);
@@ -469,7 +474,7 @@ public static class GitRepository
         }
     }
 
-    private static void RestoreTags(IRepository repository, Tag[] tags)
+    private static void RestoreTags(IRepository repository, IReadOnlyList<Tag> tags)
     {
         var wanted = tags.ToDictionary(t => t.Name);
 

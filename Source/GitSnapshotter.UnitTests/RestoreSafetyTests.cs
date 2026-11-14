@@ -25,7 +25,8 @@ public sealed class RestoreSafetyTests
         {
             var exception = await Assert.That(restore).Throws<MissingObjectsException>();
             await Assert.That(exception!.MissingObjects).IsEquivalentTo([UnknownSha], CollectionOrdering.Matching);
-            await Assert.That(repo.Reopen().Snapshot()).IsEquivalentTo(before);
+            using var reopened = repo.Reopen();
+            await Assert.That(reopened.Snapshot()).IsEquivalentTo(before);
         }
     }
 
@@ -150,6 +151,7 @@ public sealed class RestoreSafetyTests
         repo.Branches.Remove($"feature/{suffix}");
         repo.RestoreFrom(snapshot);
 
-        await Assert.That(repo.Reopen().Snapshot()).IsEquivalentTo(snapshot);
+        using var reopened = repo.Reopen();
+        await Assert.That(reopened.Snapshot()).IsEquivalentTo(snapshot);
     }
 }

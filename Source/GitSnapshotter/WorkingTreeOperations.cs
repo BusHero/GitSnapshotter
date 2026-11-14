@@ -254,9 +254,9 @@ internal static class WorkingTreeOperations
         header.CopyTo(buffer, 0);
         content.CopyTo(buffer, header.Length);
 
-#pragma warning disable CA5350 // git object ids are SHA-1 by definition
+#pragma warning disable CA5350, CA1308 // git object ids are lowercase SHA-1 by definition
         return Convert.ToHexString(SHA1.HashData(buffer)).ToLowerInvariant();
-#pragma warning restore CA5350
+#pragma warning restore CA5350, CA1308
     }
 
     /// <summary>The target of a symbolic link, or <c>null</c> for anything else.</summary>

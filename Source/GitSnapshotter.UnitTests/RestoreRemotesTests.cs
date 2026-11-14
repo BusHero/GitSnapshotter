@@ -40,7 +40,7 @@ public sealed class RestoreRemotesTests
         using (Assert.Multiple())
         {
             await Assert.That(fresh.Network.Remotes[remoteName]).IsNull();
-            await Assert.That(fresh.Refs.Where(r => r.CanonicalName.StartsWith("refs/remotes/"))).IsEmpty();
+            await Assert.That(fresh.Refs.Where(r => r.CanonicalName.StartsWith("refs/remotes/", StringComparison.Ordinal))).IsEmpty();
         }
     }
 
@@ -70,7 +70,8 @@ public sealed class RestoreRemotesTests
         clone.Refs.Remove("refs/remotes/origin/master");
         clone.RestoreFrom(snapshot);
 
-        await Assert.That(clone.Reopen().Snapshot()).IsEquivalentTo(snapshot);
+        using var reopened = clone.Reopen();
+        await Assert.That(reopened.Snapshot()).IsEquivalentTo(snapshot);
     }
 
     [Test, AutoData]

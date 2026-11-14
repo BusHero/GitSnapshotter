@@ -176,7 +176,7 @@ internal static class Cli
 
                 values[arg] = args[++i];
             }
-            else if (arg.StartsWith('-'))
+            else if (arg is ['-', ..])
             {
                 error = $"Unknown option '{arg}'.";
                 return false;

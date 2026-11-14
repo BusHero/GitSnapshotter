@@ -28,6 +28,8 @@ public sealed class PushPackageModule(IOptions<BuildSettings> settings) : Module
 
     protected override async Task<CommandResult?> ExecuteAsync(IModuleContext context, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(context);
+
         var packageDirectory = await context.GetModule<PackModule>();
 
         return await context.DotNet().Nuget.Push(

@@ -20,4 +20,5 @@ builder.Services
     .AddModule<PackToolModule>()
     .AddModule<PushPackageModule>();
 
-await builder.Build().RunAsync();
+var pipeline = await builder.BuildAsync();
+await pipeline.RunAsync();

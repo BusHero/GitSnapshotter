@@ -24,6 +24,8 @@ public sealed class ThirdPartyNoticesModule(IOptions<BuildSettings> settings) : 
 {
     protected override async Task<ThirdPartyNoticesFiles?> ExecuteAsync(IModuleContext context, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(context);
+
         var console = Path.Combine(Paths.PublishDirectory(context, settings.Value), ThirdPartyNotices.FileName);
         var library = Path.Combine(Paths.IntermediateDirectory(Paths.Library(context)), ThirdPartyNotices.FileName);
 

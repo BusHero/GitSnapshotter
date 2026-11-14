@@ -18,9 +18,9 @@ The state of a repository's references at a point in time, plus optionally the i
 |---|---|---|
 | `Head` | `string` | *Required.* The checked-out branch's name, or the commit id when `IsHeadDetached` is `true`. |
 | `IsHeadDetached` | `bool` | Whether HEAD pointed directly at a commit rather than a branch. |
-| `Branches` | [`Branch[]`](#branch) | *Required.* Local branches, sorted by name. |
-| `Remotes` | [`Remote[]`](#remote) | *Required.* Remotes, sorted by name. |
-| `Tags` | [`Tag[]`](#tag) | *Required.* Tags, sorted by name. |
+| `Branches` | [`IReadOnlyList<Branch>`](#branch) | *Required.* Local branches, sorted by name. |
+| `Remotes` | [`IReadOnlyList<Remote>`](#remote) | *Required.* Remotes, sorted by name. |
+| `Tags` | [`IReadOnlyList<Tag>`](#tag) | *Required.* Tags, sorted by name. |
 | `References` | `Dictionary<string, string>` | Direct references outside `refs/heads`, `refs/tags` and `refs/remotes`, keyed by full name, e.g. `refs/stash`. |
 | `WorkingTree` | [`WorkingTreeState?`](#workingtreestate) | The index and working tree, or `null` if not captured. |
 
@@ -59,7 +59,7 @@ public sealed record Remote
 | Member | Type | Description |
 |---|---|---|
 | `Name` | `string` | *Required.* The remote's name, e.g. `origin`. |
-| `Url` | `string` | *Required.* The fetch URL. |
+| `Url` | `Uri` | *Required.* The fetch URL. URLs that aren't absolute URIs, such as `git@host:path`, are relative `Uri`s; `Url.OriginalString` is always the URL exactly as git has it. |
 | `Branches` | `Dictionary<string, string>` | *Required.* Remote-tracking branches, keyed by short name (e.g. `origin/main`), with the commit each points at. |
 | `Head` | `string?` | Short name of the branch `refs/remotes/<remote>/HEAD` points at, e.g. `origin/main`. |
 

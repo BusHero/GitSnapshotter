@@ -87,7 +87,7 @@ public sealed class GetSnapshotTests
 
         var snapshot = GitRepository.GetSnapshot(original.Info.WorkingDirectory);
 
-        await Assert.That(snapshot.Remotes.First(x => x.Name == remoteName).Url).IsEqualTo(remoteUrl);
+        await Assert.That(snapshot.Remotes.First(x => x.Name == remoteName).Url.OriginalString).IsEqualTo(remoteUrl);
     }
 
     [Test, AutoData]

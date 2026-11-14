@@ -30,13 +30,13 @@ public sealed record GitRepositorySnapshot
     public bool IsHeadDetached { get; init; }
 
     /// <summary>The local branches.</summary>
-    public required Branch[] Branches { get; init; }
+    public required IReadOnlyList<Branch> Branches { get; init; }
 
     /// <summary>The configured remotes and their remote-tracking branches.</summary>
-    public required Remote[] Remotes { get; init; }
+    public required IReadOnlyList<Remote> Remotes { get; init; }
 
     /// <summary>The tags.</summary>
-    public required Tag[] Tags { get; init; }
+    public required IReadOnlyList<Tag> Tags { get; init; }
 
     /// <summary>
     /// Direct references outside <c>refs/heads</c>, <c>refs/tags</c> and <c>refs/remotes</c>
@@ -101,8 +101,11 @@ public sealed record Remote
     /// </summary>
     public required Dictionary<string, string> Branches { get; init; }
 
-    /// <summary>The fetch URL.</summary>
-    public required string Url { get; init; }
+    /// <summary>
+    /// The fetch URL. Git URLs that are not absolute URIs, such as <c>git@host:path</c>, are kept as relative
+    /// <see cref="Uri"/>s; <see cref="Uri.OriginalString"/> is always the URL exactly as git has it.
+    /// </summary>
+    public required Uri Url { get; init; }
 
     /// <summary>The remote's name, e.g. <c>origin</c>.</summary>
     public required string Name { get; init; }

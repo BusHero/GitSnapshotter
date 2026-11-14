@@ -254,7 +254,8 @@ public sealed class WorkingTreeTests
         {
             await Assert.That((File.GetUnixFileMode(repo.FullPath("script.sh")) & UnixFileMode.UserExecute))
                 .IsEqualTo(UnixFileMode.UserExecute);
-            await Assert.That(repo.Reopen().SnapshotWithWorkingTree()).IsEquivalentTo(snapshot);
+            using var reopened = repo.Reopen();
+            await Assert.That(reopened.SnapshotWithWorkingTree()).IsEquivalentTo(snapshot);
         }
     }
 #endif

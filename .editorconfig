@@ -78,3 +78,19 @@ csharp_space_around_binary_operators = before_and_after
 csharp_preserve_single_line_statements = false
 csharp_preserve_single_line_blocks = true
 
+
+# Tests: test names use underscores, test classes are public for the test framework,
+# and URL-like test data is plain strings.
+[Source/GitSnapshotter.UnitTests/**.cs]
+dotnet_diagnostic.CA1515.severity = none
+dotnet_diagnostic.CA1707.severity = none
+dotnet_diagnostic.CA1054.severity = none
+dotnet_diagnostic.CA2007.severity = none
+
+# Build pipeline: a console app with no synchronization context, logging a handful of lines.
+# ModularPipelines generates public extension methods for modules, so they must stay public.
+[pipeline/**.cs]
+dotnet_diagnostic.CA2007.severity = none
+dotnet_diagnostic.CA1848.severity = none
+dotnet_diagnostic.CA1873.severity = none
+dotnet_diagnostic.CA1515.severity = none

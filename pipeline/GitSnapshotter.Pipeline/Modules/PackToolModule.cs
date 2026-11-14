@@ -20,6 +20,8 @@ public sealed class PackToolModule(IOptions<BuildSettings> settings) : Module<st
 {
     protected override async Task<string?> ExecuteAsync(IModuleContext context, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(context);
+
         var output = Paths.PublishDirectory(context, settings.Value);
         var notices = await context.GetModule<ThirdPartyNoticesModule>();
 

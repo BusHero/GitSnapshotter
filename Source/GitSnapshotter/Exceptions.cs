@@ -3,9 +3,20 @@ namespace GitSnapshotter;
 /// <summary>The base class for errors raised by GitSnapshotter.</summary>
 public abstract class GitSnapshotterException : Exception
 {
+    /// <summary>Creates the exception.</summary>
+    protected GitSnapshotterException()
+    {
+    }
+
     /// <summary>Creates the exception with a message.</summary>
     protected GitSnapshotterException(string message)
         : base(message)
+    {
+    }
+
+    /// <summary>Creates the exception with a message and the exception that caused it.</summary>
+    protected GitSnapshotterException(string message, Exception innerException)
+        : base(message, innerException)
     {
     }
 }
@@ -16,6 +27,23 @@ public abstract class GitSnapshotterException : Exception
 /// </summary>
 public sealed class MissingObjectsException : GitSnapshotterException
 {
+    /// <summary>Creates the exception.</summary>
+    public MissingObjectsException()
+    {
+    }
+
+    /// <summary>Creates the exception with a message.</summary>
+    public MissingObjectsException(string message)
+        : base(message)
+    {
+    }
+
+    /// <summary>Creates the exception with a message and the exception that caused it.</summary>
+    public MissingObjectsException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+
     /// <summary>Creates the exception for the given missing object ids.</summary>
     public MissingObjectsException(IReadOnlyList<string> missingObjects)
         : base($"The snapshot refers to objects missing from the repository: {string.Join(", ", missingObjects)}")
@@ -24,7 +52,7 @@ public sealed class MissingObjectsException : GitSnapshotterException
     }
 
     /// <summary>The ids of the missing objects.</summary>
-    public IReadOnlyList<string> MissingObjects { get; }
+    public IReadOnlyList<string> MissingObjects { get; } = [];
 }
 
 /// <summary>
@@ -33,6 +61,23 @@ public sealed class MissingObjectsException : GitSnapshotterException
 /// </summary>
 public sealed class UncommittedChangesException : GitSnapshotterException
 {
+    /// <summary>Creates the exception.</summary>
+    public UncommittedChangesException()
+    {
+    }
+
+    /// <summary>Creates the exception with a message.</summary>
+    public UncommittedChangesException(string message)
+        : base(message)
+    {
+    }
+
+    /// <summary>Creates the exception with a message and the exception that caused it.</summary>
+    public UncommittedChangesException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+
     /// <summary>Creates the exception for the given changed paths.</summary>
     public UncommittedChangesException(IReadOnlyList<string> paths)
         : base($"The working tree has uncommitted changes that the restore would overwrite: {string.Join(", ", paths)}. "
@@ -42,5 +87,5 @@ public sealed class UncommittedChangesException : GitSnapshotterException
     }
 
     /// <summary>The paths with uncommitted changes.</summary>
-    public IReadOnlyList<string> Paths { get; }
+    public IReadOnlyList<string> Paths { get; } = [];
 }

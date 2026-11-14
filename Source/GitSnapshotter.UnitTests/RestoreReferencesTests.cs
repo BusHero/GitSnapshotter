@@ -39,7 +39,8 @@ public sealed class RestoreReferencesTests
         repo.Refs.Remove("refs/custom/marker");
         repo.RestoreFrom(snapshot);
 
-        await Assert.That(repo.Reopen().Refs["refs/custom/marker"].TargetIdentifier).IsEqualTo(commit.Sha);
+        using var reopened = repo.Reopen();
+        await Assert.That(reopened.Refs["refs/custom/marker"].TargetIdentifier).IsEqualTo(commit.Sha);
     }
 
     [Test]
@@ -52,7 +53,8 @@ public sealed class RestoreReferencesTests
         repo.Refs.Add("refs/custom/marker", commit.Id);
         repo.RestoreFrom(snapshot);
 
-        await Assert.That(repo.Reopen().Refs["refs/custom/marker"]).IsNull();
+        using var reopened = repo.Reopen();
+        await Assert.That(reopened.Refs["refs/custom/marker"]).IsNull();
     }
 
     [Test]
