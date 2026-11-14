@@ -73,6 +73,7 @@ public sealed class BuildTargetsTests
     [Arguments(BuildTarget.Compile, typeof(CompileModule))]
     [Arguments(BuildTarget.Restore, typeof(RestoreModule))]
     [Arguments(BuildTarget.Docs, typeof(BuildDocsModule))]
+    [Arguments(BuildTarget.SmokeTest, typeof(SmokeTestModule))]
     public async Task SingleModuleTargets(BuildTarget target, Type module)
     {
         await Assert.That(ModulesOf(target)).IsEquivalentTo([module]);
@@ -114,6 +115,13 @@ public sealed class BuildTargetsTests
                 && type.Namespace == typeof(CompileModule).Namespace);
 
         await Assert.That(modules.Where(module => !registered.Contains(module)).Select(module => module.Name)).IsEmpty();
+    }
+
+    [Test]
+    public async Task SmokeTestBuildsNothing()
+    {
+        // It tests what was published, so it must not compile, pack or push anything of its own.
+        await Assert.That(DependenciesOf(typeof(SmokeTestModule))).IsEmpty();
     }
 
     [Test]

@@ -46,6 +46,22 @@ public sealed class BuildSettings
     [SecretValue]
     public string? NuGetApiKey { get; set; }
 
+    /// <summary>The feed <see cref="BuildTarget.SmokeTest"/> downloads the published packages from.</summary>
+    public string SmokeTestSource { get; set; } = "https://api.nuget.org/v3/index.json";
+
+    /// <summary>
+    /// How long <see cref="BuildTarget.SmokeTest"/> keeps retrying while <see cref="SmokeTestSource"/> doesn't list
+    /// the packages yet. nuget.org validates and indexes a package for several minutes after it is pushed.
+    /// </summary>
+    public int SmokeTestWaitMinutes { get; set; } = 30;
+
+    /// <summary>
+    /// A directory holding the GitHub release's assets, relative to the repository root. When set,
+    /// <see cref="BuildTarget.SmokeTest"/> also checks that the packages on <see cref="SmokeTestSource"/> are the ones
+    /// attached to the release.
+    /// </summary>
+    public string? SmokeTestReleaseDirectory { get; set; }
+
     /// <summary>
     /// The release version, like <c>1.2.0</c> or <c>1.2.0-rc.1</c>. When set, the assemblies, the package and the
     /// console app get exactly this version; otherwise the package is a prerelease named after the branch. A leading

@@ -46,6 +46,9 @@ the `Build` configuration section, as environment variables (`Build__PublishDire
 | `ReleaseDirectory` | `release` | Where a release build puts the GitHub release assets |
 | `ReleaseNotesDirectory` | `release-notes` | Where `VerifyRelease` writes the release description |
 | `ReleaseEnvironment` | `nuget` | The GitHub environment `VerifyRelease` requires a reviewer on |
+| `SmokeTestSource` | nuget.org | Feed `SmokeTest` downloads the packages from |
+| `SmokeTestWaitMinutes` | `30` | How long `SmokeTest` waits for the feed to list the packages |
+| `SmokeTestReleaseDirectory` | none | The GitHub release's assets; when set, `SmokeTest` checks the feed's packages are the release's |
 
 The CI workflows run the pipeline too, one target per job, so a job only sets up the machine and hands files to
 the next. Each target runs on a developer machine as well (`./build.sh --Build:Target=Test`):
@@ -54,6 +57,7 @@ the next. Each target runs on a developer machine as well (`./build.sh --Build:T
 |---|---|---|
 | `All` | Format check, compile, tests, third-party notices, console app, packages, push; on a release, the release assets (packages, console app zip, `SHA256SUMS.txt`) | `build` > ubuntu-latest |
 | `VerifyRelease` | Checks the release may go ahead and writes its description from `CHANGELOG.md`; needs `GITHUB_TOKEN` | `build` > verify |
+| `SmokeTest` | Downloads `Version` of both packages from the feed, installs and runs the tool, builds and runs an app that uses the library, checks both packages carry their third-party notices and, with `SmokeTestReleaseDirectory`, that they are the release's packages (ignoring nuget.org's signature); builds nothing | `build` > smoke-test |
 | `Test` | Compile and tests | `build` > windows-latest |
 | `Compile` | Compile | `codeql` |
 | `Restore` | Restore the solution | `build` > dependency-submission |

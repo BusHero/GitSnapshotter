@@ -19,6 +19,10 @@ run-name: ${{ inputs.version && format('release {0}', inputs.version) || '' }}
 #            v<version> tag) with every artifact and pushes the packages to nuget.org; the only job that can write
 #            to the repository or get a nuget.org key. It stays in this file: it never checks out or runs the
 #            repository's code, so nothing built from the repository can reach its credentials.
+#   smoke-test  downloads the published packages from nuget.org as a user would, installs and runs the tool, builds
+#            and runs an app that uses the library, checks both packages carry their third-party notices, and
+#            checks they are the packages attached to the GitHub release (SmokeTest target). Read-only: it gets no
+#            credentials beyond reading the repository.
 on:
   push:
     branches: ['**']
@@ -276,6 +280,41 @@ jobs:
           latest=true
           if [[ "$PRERELEASE" == true ]]; then latest=false; fi
           gh release edit "$TAG" --draft=false --latest="$latest"
+
+  # After publish: is the release usable from nuget.org? Waits for nuget.org to list the packages (it validates and
+  # indexes them for a few minutes after the push), then checks them against the GitHub release's assets.
+  smoke-test:
+    name: smoke-test
+    needs: [verify, publish]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: 'Setup: .NET SDK from global.json'
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      # From the published release, not this run's artifacts: what users download is what gets compared.
+      - name: 'Download GitHub release assets'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.verify.outputs.tag }}
+        run: |
+          gh release download "$TAG" --dir "$RUNNER_TEMP/release"
+          (cd "$RUNNER_TEMP/release" && sha256sum --check SHA256SUMS.txt)
+
+      - name: 'Run: pipeline (SmokeTest)'
+        env:
+          Build__Target: SmokeTest
+          Build__Version: ${{ needs.verify.outputs.version }}
+          Build__SmokeTestReleaseDirectory: ${{ runner.temp }}/release
+        run: dotnet run --project pipeline/GitSnapshotter.Pipeline --configuration Release
 
   # Uploads the resolved package graph to GitHub's dependency graph (Dependabot alerts, Insights > Dependency graph).
   dependency-submission:

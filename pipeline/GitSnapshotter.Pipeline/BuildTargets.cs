@@ -42,6 +42,10 @@ internal static class BuildTargets
                     .Add<ReleaseNotesModule>();
                 break;
 
+            case BuildTarget.SmokeTest:
+                modules.Add<SmokeTestModule>();
+                break;
+
             case BuildTarget.Test:
                 modules
                     .Add<CompileModule>()
