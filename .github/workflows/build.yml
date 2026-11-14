@@ -88,10 +88,22 @@ jobs:
           Build__NuGetApiKey: ${{ secrets.GITHUB_TOKEN }}
         run: dotnet run --project pipeline/GitSnapshotter.Pipeline --configuration Release
 
+      # PackModule and PublishConsoleModule share the publish directory; the package gets its own artifact.
       - uses: actions/upload-artifact@v7
         with:
           name: GitSnapshotter.Console_${{ steps.pipeline.outputs.version }}
-          path: publish
+          path: |
+            publish
+            !publish/*.nupkg
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: GitSnapshotter.NuGet_${{ steps.pipeline.outputs.version }}
+          path: publish/*.nupkg
+          if-no-files-found: error
+          # A .nupkg is already a zip archive.
+          compression-level: 0
+
   # Uploads the resolved package graph to GitHub's dependency graph (Dependabot alerts, Insights > Dependency graph).
   dependency-submission:
     name: dependency-submission
