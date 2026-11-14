@@ -39,6 +39,10 @@ for sha in "${shas[@]}"; do
 
     git -C "$repo_root" worktree add --detach --quiet "$worktree" "$sha"
 
+    # The solution doesn't build the pipeline, so dotnet format doesn't restore it either. Without its
+    # packages the analyzers report its unresolved references as errors.
+    dotnet restore "$worktree/pipeline/GitSnapshotter.Pipeline" --verbosity quiet
+
     echo "pre-push: checking formatting of $(git log -1 --format='%h %s' "$sha")..."
     if ! dotnet format "$worktree/Source/GitSnapshotter.slnx" --verify-no-changes; then
         echo >&2
