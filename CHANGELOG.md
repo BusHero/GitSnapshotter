@@ -10,6 +10,10 @@ empty **Unreleased** section above it. A prerelease with no section of its own u
 
 ## [Unreleased]
 
+## [0.4.0-rc.1] - 2026-11-14
+
+The library is the same as in 0.3.0.
+
 ### Changed
 
 - `gitsnapshotter` runs on .NET 8 and later; it needed .NET 11 before. The tool package carries a .NET 8 and a
@@ -68,7 +72,9 @@ no `GitSnapshotter` 0.2.0-rc.1 package.
   `restore` and `diff` commands.
 - Symbol packages (`.snupkg`) with SourceLink for the library.
 
-[Unreleased]: https://github.com/BusHero/GitSnapshotter/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/BusHero/GitSnapshotter/compare/v0.4.0-rc.1...HEAD
+[0.4.0-rc.1]: https://github.com/BusHero/GitSnapshotter/compare/v0.3.0...v0.4.0-rc.1
+[0.3.0]: https://github.com/BusHero/GitSnapshotter/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/BusHero/GitSnapshotter/compare/v0.2.0-rc.2...v0.2.0
 [0.2.0-rc.2]: https://github.com/BusHero/GitSnapshotter/compare/v0.2.0-rc.1...v0.2.0-rc.2
 [0.2.0-rc.1]: https://github.com/BusHero/GitSnapshotter/releases/tag/v0.2.0-rc.1
