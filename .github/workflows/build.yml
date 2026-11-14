@@ -1,4 +1,4 @@
-name: build
+name: Build and release
 # Releases are named after their version. Otherwise the name is empty, so GitHub uses its default: the first line of
 # the commit message on a push. (head_commit.message would be the whole message, body and all, on one line.)
 run-name: ${{ inputs.version && format('release {0}', inputs.version) || '' }}
@@ -10,16 +10,16 @@ run-name: ${{ inputs.version && format('release {0}', inputs.version) || '' }}
 # pipeline on Linux, uploads the console app and the packages as artifacts, and pushes prerelease packages to GitHub
 # Packages.
 #
-# Release: Actions > build > Run workflow, on the default branch, with the version to release (1.2.0, or 1.2.0-rc.1
+# Release: Actions > Build and release > Run workflow, on the default branch, with the version to release (1.2.0, or 1.2.0-rc.1
 # for a prerelease). The same jobs build with that version, then:
-#   verify   checks first that the version is valid and not released yet, the run is on the default branch, and the
+#   verify   (Check release) checks first that the version is valid and not released yet, the run is on the default branch, and the
 #            'nuget' environment requires a reviewer (the workflow fails closed if anyone removes that protection),
 #            and takes the release description from CHANGELOG.md (VerifyRelease target)
-#   publish  waits for a reviewer to approve the 'nuget' environment, then creates the GitHub release (and its
+#   publish  (Publish release) waits for a reviewer to approve the 'nuget' environment, then creates the GitHub release (and its
 #            v<version> tag) with every artifact and pushes the packages to nuget.org; the only job that can write
 #            to the repository or get a nuget.org key. It stays in this file: it never checks out or runs the
 #            repository's code, so nothing built from the repository can reach its credentials.
-#   smoke-test  on Linux, Windows and macOS, downloads the published packages from nuget.org as a user would: installs
+#   smoke-test  (Smoke test) on Linux, Windows and macOS, downloads the published packages from nuget.org as a user would: installs
 #            and runs the tool, runs an app that uses the library on each framework it supports, checks the packages'
 #            third-party notices and contents, what nuget.org shows about them, their symbols on nuget.org's symbol
 #            server, and that they, the symbols and the console app zip are the GitHub release's and were built from
@@ -56,7 +56,7 @@ concurrency:
 jobs:
   # Decides whether this run is a release; on a release, checks it may go ahead before anything is built.
   verify:
-    name: verify
+    name: Check release
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -110,8 +110,8 @@ jobs:
           if-no-files-found: error
 
   # .NET Framework tests only run on Windows; this job runs every test framework there.
-  windows-latest:
-    name: windows-latest
+  test:
+    name: Test on Windows
     needs: verify
     runs-on: windows-latest
     steps:
@@ -144,9 +144,9 @@ jobs:
           Build__Target: Test
         run: dotnet run --project pipeline/GitSnapshotter.Pipeline --configuration Release
 
-  ubuntu-latest:
-    name: ubuntu-latest
-    needs: [verify, windows-latest]
+  build:
+    name: Build and package
+    needs: [verify, test]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -210,8 +210,8 @@ jobs:
           if-no-files-found: error
 
   publish:
-    name: publish
-    needs: [verify, ubuntu-latest]
+    name: Publish release
+    needs: [verify, build]
     if: needs.verify.outputs.release == 'true'
     runs-on: ubuntu-latest
     # Release runs only. Waits for a required reviewer (enforced by the verify job). If the nuget.org trusted
@@ -229,7 +229,7 @@ jobs:
       GH_REPO: ${{ github.repository }}
       TAG: ${{ needs.verify.outputs.tag }}
       PRERELEASE: ${{ needs.verify.outputs.prerelease }}
-    # No checkout: this job only publishes the files the ubuntu-latest job produced.
+    # No checkout: this job only publishes the files the build job produced.
     steps:
       - uses: actions/download-artifact@v8
         with:
@@ -286,13 +286,16 @@ jobs:
   # metadata and their symbols (it validates and indexes them for a few minutes after the push), then checks them
   # against the GitHub release's assets and the released commit.
   smoke-test:
-    name: smoke-test (${{ matrix.os }})
+    name: Smoke test on ${{ matrix.name }}
     needs: [verify, publish]
     strategy:
       # Every OS reports, even when one fails.
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - { name: Linux, os: ubuntu-latest }
+          - { name: Windows, os: windows-latest }
+          - { name: macOS, os: macos-latest }
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
@@ -328,7 +331,7 @@ jobs:
 
   # Uploads the resolved package graph to GitHub's dependency graph (Dependabot alerts, Insights > Dependency graph).
   dependency-submission:
-    name: dependency-submission
+    name: Submit dependency graph
     # CI builds only; a release builds a commit that was already built on push.
     if: github.event_name == 'push'
     runs-on: ubuntu-latest

@@ -6,9 +6,9 @@
 </h1>
 
 
-[![build](https://github.com/BusHero/GitSnapshotter/actions/workflows/build.yml/badge.svg?branch=trunk)](https://github.com/BusHero/GitSnapshotter/actions/workflows/build.yml?query=branch%3Atrunk)
-[![codeql](https://github.com/BusHero/GitSnapshotter/actions/workflows/codeql.yml/badge.svg?branch=trunk)](https://github.com/BusHero/GitSnapshotter/actions/workflows/codeql.yml?query=branch%3Atrunk)
-[![docs](https://github.com/BusHero/GitSnapshotter/actions/workflows/docs.yml/badge.svg?branch=trunk)](https://github.com/BusHero/GitSnapshotter/actions/workflows/docs.yml?query=branch%3Atrunk)
+[![Build and release](https://github.com/BusHero/GitSnapshotter/actions/workflows/build.yml/badge.svg?branch=trunk)](https://github.com/BusHero/GitSnapshotter/actions/workflows/build.yml?query=branch%3Atrunk)
+[![CodeQL](https://github.com/BusHero/GitSnapshotter/actions/workflows/codeql.yml/badge.svg?branch=trunk)](https://github.com/BusHero/GitSnapshotter/actions/workflows/codeql.yml?query=branch%3Atrunk)
+[![Docs](https://github.com/BusHero/GitSnapshotter/actions/workflows/docs.yml/badge.svg?branch=trunk)](https://github.com/BusHero/GitSnapshotter/actions/workflows/docs.yml?query=branch%3Atrunk)
 [![License: MIT](https://img.shields.io/github/license/BusHero/GitSnapshotter)](LICENSE)
 
 A .NET library and command-line tool that snapshots a git repository's state (HEAD, branches, remotes, tags, other
@@ -57,13 +57,13 @@ the next. Each target runs on a developer machine as well (`./build.sh --Build:T
 
 | Target | Modules | Used by |
 |---|---|---|
-| `All` | Format check, compile, tests, third-party notices, console app, packages, push; on a release, the release assets (packages, console app zip, `SHA256SUMS.txt`) | `build` > ubuntu-latest |
-| `VerifyRelease` | Checks the release may go ahead and writes its description from `CHANGELOG.md`; needs `GITHUB_TOKEN` | `build` > verify |
-| `SmokeTest` | Checks `Version` was published and works, building nothing: from the feed, installs and runs the tool, and runs an app using the library on each framework it is built for (.NET Framework on Windows only) and the newest runtime; checks both packages' third-party notices, that they hold nothing unexpected (an assembly must be ours or covered by the notices; the library may depend only on packages its project passes on), the metadata, readme and icon the feed shows, and our PDBs on the symbol server; with the `SmokeTest...` settings above, compares all of it with the GitHub release and the commit | `build` > smoke-test (Linux, Windows, macOS) |
-| `Test` | Compile and tests | `build` > windows-latest |
-| `Compile` | Compile | `codeql` |
-| `Restore` | Restore the solution | `build` > dependency-submission |
-| `Docs` | `npm ci` and `npm run build` in `docs` | `docs` |
+| `All` | Format check, compile, tests, third-party notices, console app, packages, push; on a release, the release assets (packages, console app zip, `SHA256SUMS.txt`) | Build and release > Build and package |
+| `VerifyRelease` | Checks the release may go ahead and writes its description from `CHANGELOG.md`; needs `GITHUB_TOKEN` | Build and release > Check release |
+| `SmokeTest` | Checks `Version` was published and works, building nothing: from the feed, installs and runs the tool, and runs an app using the library on each framework it is built for (.NET Framework on Windows only) and the newest runtime; checks both packages' third-party notices, that they hold nothing unexpected (an assembly must be ours or covered by the notices; the library may depend only on packages its project passes on), the metadata, readme and icon the feed shows, and our PDBs on the symbol server; with the `SmokeTest...` settings above, compares all of it with the GitHub release and the commit | Build and release > Smoke test (Linux, Windows, macOS) |
+| `Test` | Compile and tests | Build and release > Test on Windows |
+| `Compile` | Compile | CodeQL |
+| `Restore` | Restore the solution | Build and release > Submit dependency graph |
+| `Docs` | `npm ci` and `npm run build` in `docs` | Docs |
 
 On a build server the pipeline also gives git a user name and email for the tests; on a developer machine it leaves
 the git configuration alone.
@@ -97,7 +97,7 @@ git config core.hooksPath .githooks
 
 ### Releasing
 
-Releases come from the same `build` workflow as CI builds. Start it by hand: **Actions > build > Run workflow**, on
+Releases come from the same **Build and release** workflow as CI builds. Start it by hand: **Actions > Build and release > Run workflow**, on
 `trunk`, with the version to release (`1.2.0`, or `1.2.0-rc.1` for a prerelease). With no version, the run is an
 ordinary CI build. A release builds the latest commit on `trunk` and creates the `v1.2.0` tag when the release is
 published. From a terminal:
@@ -113,13 +113,13 @@ there is one, otherwise **Unreleased**.
 
 The workflow (`.github/workflows/build.yml`) never publishes without approval:
 
-1. **verify** checks that the version is valid and has no tag yet, that the run is on the default branch, that
+1. **Check release** checks that the version is valid and has no tag yet, that the run is on the default branch, that
    `CHANGELOG.md` describes it, and that the `nuget` environment requires a reviewer. If anyone removes that protection, releases fail instead of
    publishing unattended.
-2. **windows-latest** runs the tests on Windows.
-3. **ubuntu-latest** runs the pipeline with `Build:Version` set to the version. On a release it gets no token, so the
+2. **Test on Windows** runs the tests on Windows.
+3. **Build and package** runs the pipeline with `Build:Version` set to the version. On a release it gets no token, so the
    code being built cannot publish anything.
-4. **publish** waits for a reviewer to approve the `nuget` environment. It then creates a draft GitHub release with
+4. **Publish release** waits for a reviewer to approve the `nuget` environment. It then creates a draft GitHub release with
    both NuGet packages (the `GitSnapshotter` library and the `GitSnapshotter.Tool` .NET tool), the zipped console
    app and `SHA256SUMS.txt`, pushes the packages to nuget.org, and publishes the release, which creates the tag. It
    is the only job that can write to the repository or get a nuget.org key.

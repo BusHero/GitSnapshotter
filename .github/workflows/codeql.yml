@@ -1,4 +1,4 @@
-name: codeql
+name: CodeQL
 
 # Advanced setup: C# is built manually so CodeQL sees the real compilation
 # (default setup's build-mode 'none' gave low analysis quality).
@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   analyze:
-    name: analyze (${{ matrix.language }})
+    name: Analyze ${{ matrix.name }} code
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -26,7 +26,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - language: csharp
+          - name: C#
+            language: csharp
             build-mode: manual
           - language: actions
             build-mode: none
