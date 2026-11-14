@@ -4,5 +4,7 @@
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <!-- On CI (GitHub Actions sets CI=true), restore fails if a lock file is missing or out of date. -->
     <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
+    <!-- Keep the lock files out of the IDE's project view; NuGet still reads and writes them. -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);packages.lock.json</DefaultItemExcludes>
   </PropertyGroup>
 </Project>
