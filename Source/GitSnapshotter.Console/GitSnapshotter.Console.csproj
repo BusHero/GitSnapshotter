@@ -19,6 +19,9 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>gitsnapshotter</ToolCommandName>
     <PackageId>GitSnapshotter.Tool</PackageId>
+    <!-- No .snupkg for the tool (Source/Directory.Build.props turns them on): packing a tool with IncludeSymbols
+         fails with its own .nupkg "being used by another process". The tool package ships its .pdb files anyway. -->
+    <IncludeSymbols>false</IncludeSymbols>
     <VersionPrefix>0.1.0</VersionPrefix>
     <Authors>BusHero</Authors>
     <Description>Command-line tool that takes a snapshot of a git repository's branches, tags, remotes, HEAD and (optionally) working tree, and restores it later.</Description>
