@@ -1,4 +1,5 @@
 using ModularPipelines.Attributes;
+using ModularPipelines.Models;
 
 namespace GitSnapshotter.Pipeline;
 
@@ -25,4 +26,16 @@ public sealed class BuildSettings
     /// <summary>The API key for <see cref="NuGetSource"/>. When empty, the package is not pushed.</summary>
     [SecretValue]
     public string? NuGetApiKey { get; set; }
+
+    /// <summary>
+    /// The release version, like <c>1.2.0</c> or <c>1.2.0-rc.1</c>. When set, the assemblies, the package and the
+    /// console app get exactly this version; otherwise the package is a prerelease named after the branch.
+    /// </summary>
+    public string? Version { get; set; }
+
+    /// <summary>Whether this is a release build (<see cref="Version"/> is set).</summary>
+    internal bool IsRelease => !string.IsNullOrEmpty(Version);
+
+    /// <summary>The MSBuild properties that stamp <see cref="Version"/> on a release build; none otherwise.</summary>
+    internal KeyValue[] VersionProperties => IsRelease ? [new KeyValue("Version", Version!)] : [];
 }

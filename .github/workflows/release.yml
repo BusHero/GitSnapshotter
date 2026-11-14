@@ -1,0 +1,144 @@
+name: release
+
+# Pushing a version tag releases that commit:
+#   git tag v1.2.0 && git push origin v1.2.0
+# A tag with a prerelease label (v1.2.0-rc.1) makes a GitHub prerelease and a NuGet prerelease.
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+*'
+
+permissions:
+  contents: read
+
+# One release at a time; never cancel a release half way through.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  # .NET Framework tests only run on Windows; this job runs every test framework there.
+  test:
+    name: test (windows-latest)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: 'Setup: .NET SDK from global.json'
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          dotnet-version: '8.0.x'
+
+      - name: 'Configure git credentials'
+        run: |
+          git config --global user.email github-actions@github.com
+          git config --global user.name github-actions
+
+      - name: 'Test: net472, net8.0, net11.0'
+        run: dotnet test --solution Source/GitSnapshotter.slnx --configuration Release --treenode-filter "/*/*/*/*[Category!=Discovery]"
+
+  release:
+    name: release
+    needs: test
+    runs-on: ubuntu-latest
+    # Holds NUGET_API_KEY. Add required reviewers to the environment to approve each release by hand.
+    environment:
+      name: nuget
+      url: https://www.nuget.org/packages/GitSnapshotter/${{ steps.version.outputs.version }}
+    permissions:
+      # Creates the GitHub release and uploads its assets.
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: 'Version from tag'
+        id: version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="${TAG#v}"
+          # SemVer 2.0: MAJOR.MINOR.PATCH with an optional -prerelease label.
+          if ! [[ "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]; then
+            echo "::error::Tag '$TAG' is not v<major>.<minor>.<patch>[-<prerelease>]"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [[ "$version" == *-* ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 'Setup: .NET SDK from global.json'
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          # The tests also run on .NET 8, the oldest runtime the library supports.
+          dotnet-version: '8.0.x'
+
+      - name: 'Configure git credentials'
+        run: |
+          git config --global user.email github-actions@github.com
+          git config --global user.name github-actions
+
+      # Builds, tests and packs with the release version. No API key, so the pipeline does not push:
+      # the package goes to nuget.org only after the GitHub release has its assets.
+      - name: 'Run: pipeline'
+        env:
+          Build__DefaultBranch: ${{ github.event.repository.default_branch }}
+          Build__Version: ${{ steps.version.outputs.version }}
+        run: dotnet run --project pipeline/GitSnapshotter.Pipeline --configuration Release
+
+      - name: 'Assemble release assets'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          mkdir release
+          cp publish/*.nupkg release/
+          # PackModule and PublishConsoleModule share the publish directory; zip the console app without the package.
+          (cd publish && zip -r -q "../release/GitSnapshotter.Console_${VERSION}.zip" . -x '*.nupkg')
+          (cd release && sha256sum * > SHA256SUMS.txt)
+          ls -l release
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: GitSnapshotter_${{ steps.version.outputs.version }}
+          path: release
+          if-no-files-found: error
+
+      # A draft first: if the NuGet push fails, nothing is public yet and the run can be retried.
+      - name: 'Create draft GitHub release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+        run: |
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            # A re-run: refresh the assets of the release left behind by the failed run.
+            gh release upload "$TAG" release/* --clobber
+          else
+            flags=(--draft --verify-tag --generate-notes --title "$TAG")
+            if [[ "$PRERELEASE" == true ]]; then flags+=(--prerelease); fi
+            gh release create "$TAG" "${flags[@]}" release/*
+          fi
+
+      - name: 'Push package to nuget.org'
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          if [[ -z "$NUGET_API_KEY" ]]; then
+            echo "::error::The NUGET_API_KEY secret is not set on the 'nuget' environment"
+            exit 1
+          fi
+          dotnet nuget push "release/*.nupkg" --source https://api.nuget.org/v3/index.json --api-key "$NUGET_API_KEY" --skip-duplicate
+
+      - name: 'Publish GitHub release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+        run: |
+          latest=true
+          if [[ "$PRERELEASE" == true ]]; then latest=false; fi
+          gh release edit "$TAG" --draft=false --latest="$latest"

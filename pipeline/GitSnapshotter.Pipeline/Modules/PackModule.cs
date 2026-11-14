@@ -22,8 +22,7 @@ public sealed class PackModule(IOptions<BuildSettings> settings) : Module<string
 {
     protected override async Task<string?> ExecuteAsync(IModuleContext context, CancellationToken cancellationToken)
     {
-        var branch = (context.Git().Information.BranchName ?? "local").Replace('/', '-');
-        var suffix = $"{branch}-{DateTime.UtcNow:yyyyMMddHHmmss}";
+        var suffix = settings.Value.IsRelease ? null : PrereleaseSuffix(context);
         var output = Paths.PublishDirectory(context, settings.Value);
         var notices = await context.GetModule<ThirdPartyNoticesModule>();
 
@@ -47,5 +46,11 @@ public sealed class PackModule(IOptions<BuildSettings> settings) : Module<string
                     Properties = [new KeyValue("ThirdPartyNoticesFile", thirdPartyNotices)],
                 },
                 cancellationToken: cancellationToken);
+    }
+
+    private static string PrereleaseSuffix(IModuleContext context)
+    {
+        var branch = (context.Git().Information.BranchName ?? "local").Replace('/', '-');
+        return $"{branch}-{DateTime.UtcNow:yyyyMMddHHmmss}";
     }
 }

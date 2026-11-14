@@ -38,6 +38,7 @@ The pipeline is written with [ModularPipelines](https://github.com/thomhurst/Mod
 | `DefaultBranch` | from git | Decides the `+trunk` / `+merge` version suffix |
 | `NuGetApiKey` | none | Pushes the packages (library and tool) when set; otherwise the push is skipped |
 | `NuGetSource` | GitHub Packages | Feed to push to |
+| `Version` | none | Release version (`1.2.0`, `1.2.0-rc.1`); without it the package is a branch prerelease |
 
 The pipeline also generates `THIRD-PARTY-NOTICES.txt` from each project's restore graph: one next to the console app
 in the publish directory and inside the tool package, covering every package the app ships, and one inside the
@@ -65,6 +66,24 @@ git config core.hooksPath .githooks
 | `Source/GitSnapshotter.UnitTests` | [TUnit](https://tunit.dev) tests; each test builds throwaway repositories in the temp directory |
 | `pipeline/GitSnapshotter.Pipeline` | Build pipeline (ModularPipelines) |
 | `docs` | Documentation site ([Astro](https://astro.build) + [Starlight](https://starlight.astro.build)) |
+
+### Releasing
+
+Push a version tag on the commit to release:
+
+```sh
+git tag v1.2.0
+git push origin v1.2.0
+```
+
+The `release` workflow (`.github/workflows/release.yml`) runs the tests on Windows, runs the pipeline with
+`Build:Version` set from the tag, creates a GitHub release with the NuGet package, the zipped console app and
+`SHA256SUMS.txt`, pushes the package to nuget.org, and then publishes the release. A tag with a prerelease label
+(`v1.2.0-rc.1`) makes a GitHub prerelease and a NuGet prerelease. The release stays a draft until the push to
+nuget.org succeeds, so a failed run can be re-run.
+
+It needs a nuget.org API key, scoped to push `GitSnapshotter`, saved as the `NUGET_API_KEY` secret on a `nuget`
+environment (Settings > Environments). Add required reviewers there to approve each release by hand.
 
 ## Documentation site
 
