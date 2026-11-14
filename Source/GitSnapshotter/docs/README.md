@@ -14,7 +14,7 @@ A snapshot records:
 A snapshot stores names and object ids only, so it is small and cheap to take. It can only be restored while the
 commits it refers to are still in the repository's object database.
 
-Built on [LibGit2Sharp](https://github.com/libgit2/libgit2sharp).
+Targets .NET 10. Built on [LibGit2Sharp](https://github.com/libgit2/libgit2sharp).
 
 ## Quick start
 

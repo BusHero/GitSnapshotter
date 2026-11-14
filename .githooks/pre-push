@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Runs the test suite before anything is pushed to trunk, because every push to
+# trunk publishes a prerelease NuGet package.
+#
+# Enable once per clone:   git config core.hooksPath .githooks
+# Skip in an emergency:    git push --no-verify
+#
+# The commit being pushed is tested in a clean temporary worktree, so
+# uncommitted local changes can't make a broken commit look green.
+
+set -euo pipefail
+
+protected_ref="refs/heads/trunk"
+zero_sha="0000000000000000000000000000000000000000"
+repo_root="$(git rev-parse --show-toplevel)"
+
+shas=()
+while read -r local_ref local_sha remote_ref remote_sha; do
+    if [[ "$remote_ref" == "$protected_ref" && "$local_sha" != "$zero_sha" ]]; then
+        shas+=("$local_sha")
+    fi
+done
+
+if [[ ${#shas[@]} -eq 0 ]]; then
+    exit 0
+fi
+
+for sha in "${shas[@]}"; do
+    worktree="$(mktemp -d "${TMPDIR:-/tmp}/gitsnapshotter-pre-push.XXXXXX")"
+    trap 'git -C "$repo_root" worktree remove --force "$worktree" >/dev/null 2>&1 || rm -rf "$worktree"' EXIT
+
+    echo "pre-push: testing $(git log -1 --format='%h %s' "$sha") before pushing to trunk..."
+    git -C "$repo_root" worktree add --detach --quiet "$worktree" "$sha"
+
+    if ! dotnet test "$worktree/Source/GitSnapshotter.sln" \
+            --configuration Release \
+            --filter "Category!=Discovery" \
+            --nologo \
+            --verbosity quiet; then
+        echo >&2
+        echo >&2 "pre-push: tests failed for $sha; the push to trunk was stopped."
+        echo >&2 "pre-push: fix the failure, or use 'git push --no-verify' to push anyway."
+        exit 1
+    fi
+
+    git -C "$repo_root" worktree remove --force "$worktree"
+    trap - EXIT
+done
+
+echo "pre-push: tests passed."
