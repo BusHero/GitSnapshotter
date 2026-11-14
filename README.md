@@ -5,6 +5,7 @@
   </picture>
 </h1>
 
+
 [![build](https://github.com/BusHero/GitSnapshotter/actions/workflows/build.yml/badge.svg?branch=trunk)](https://github.com/BusHero/GitSnapshotter/actions/workflows/build.yml?query=branch%3Atrunk)
 [![codeql](https://github.com/BusHero/GitSnapshotter/actions/workflows/codeql.yml/badge.svg?branch=trunk)](https://github.com/BusHero/GitSnapshotter/actions/workflows/codeql.yml?query=branch%3Atrunk)
 [![docs](https://github.com/BusHero/GitSnapshotter/actions/workflows/docs.yml/badge.svg?branch=trunk)](https://github.com/BusHero/GitSnapshotter/actions/workflows/docs.yml?query=branch%3Atrunk)
