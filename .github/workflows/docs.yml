@@ -30,7 +30,8 @@ jobs:
     name: Build site
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - name: 'Checkout: repository'
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -58,7 +59,8 @@ jobs:
           Build__Target: Docs
         run: dotnet run --project pipeline/GitSnapshotter.Pipeline --configuration Release
 
-      - uses: actions/upload-pages-artifact@v5
+      - name: 'Upload: site for GitHub Pages'
+        uses: actions/upload-pages-artifact@v5
         with:
           path: docs/dist
 
@@ -74,5 +76,6 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - id: deployment
+      - name: 'Deploy: GitHub Pages'
+        id: deployment
         uses: actions/deploy-pages@v5

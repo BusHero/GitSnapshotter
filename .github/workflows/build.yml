@@ -72,7 +72,8 @@ jobs:
         if: inputs.version == ''
         run: echo "No version given, so this is a CI build and nothing is released."
 
-      - uses: actions/checkout@v7
+      - name: 'Checkout: repository'
+        uses: actions/checkout@v7
         if: inputs.version != ''
         with:
           persist-credentials: false
@@ -102,7 +103,8 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: dotnet run --project pipeline/GitSnapshotter.Pipeline --configuration Release
 
-      - uses: actions/upload-artifact@v7
+      - name: 'Upload: release notes'
+        uses: actions/upload-artifact@v7
         if: inputs.version != ''
         with:
           name: release-notes
@@ -115,7 +117,8 @@ jobs:
     needs: verify
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v7
+      - name: 'Checkout: repository'
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -154,7 +157,8 @@ jobs:
       packages: write
     steps:
       # No token left in .git/config: the code being built cannot reach the job's credentials.
-      - uses: actions/checkout@v7
+      - name: 'Checkout: repository'
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -184,7 +188,8 @@ jobs:
 
       # PackModule and PublishConsoleModule share the publish directory; the packages (library and tool) and their
       # symbol packages get their own artifact.
-      - uses: actions/upload-artifact@v7
+      - name: 'Upload: console app'
+        uses: actions/upload-artifact@v7
         with:
           name: GitSnapshotter.Console_${{ steps.pipeline.outputs.version }}
           path: |
@@ -192,7 +197,8 @@ jobs:
             !publish/*.nupkg
             !publish/*.snupkg
 
-      - uses: actions/upload-artifact@v7
+      - name: 'Upload: NuGet packages'
+        uses: actions/upload-artifact@v7
         with:
           name: GitSnapshotter.NuGet_${{ steps.pipeline.outputs.version }}
           path: |
@@ -202,7 +208,8 @@ jobs:
           # A .nupkg (and .snupkg) is already a zip archive.
           compression-level: 0
 
-      - uses: actions/upload-artifact@v7
+      - name: 'Upload: release assets'
+        uses: actions/upload-artifact@v7
         if: needs.verify.outputs.release == 'true'
         with:
           name: GitSnapshotter_${{ needs.verify.outputs.version }}
@@ -231,13 +238,15 @@ jobs:
       PRERELEASE: ${{ needs.verify.outputs.prerelease }}
     # No checkout: this job only publishes the files the build job produced.
     steps:
-      - uses: actions/download-artifact@v8
+      - name: 'Download: release assets'
+        uses: actions/download-artifact@v8
         with:
           name: GitSnapshotter_${{ needs.verify.outputs.version }}
           path: release
 
       # Kept out of release/: everything there is attached to the release.
-      - uses: actions/download-artifact@v8
+      - name: 'Download: release notes'
+        uses: actions/download-artifact@v8
         with:
           name: release-notes
           path: release-notes
@@ -300,7 +309,8 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v7
+      - name: 'Checkout: repository'
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -338,7 +348,8 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v7
+      - name: 'Checkout: repository'
+        uses: actions/checkout@v7
 
       - name: 'Setup: .NET SDK from global.json'
         uses: actions/setup-dotnet@v6

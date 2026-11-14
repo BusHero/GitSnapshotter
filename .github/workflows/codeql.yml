@@ -32,7 +32,8 @@ jobs:
           - language: actions
             build-mode: none
     steps:
-      - uses: actions/checkout@v7
+      - name: 'Checkout: repository'
+        uses: actions/checkout@v7
 
       - name: 'Setup: .NET SDK from global.json'
         if: matrix.language == 'csharp'
