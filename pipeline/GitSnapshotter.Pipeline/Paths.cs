@@ -16,6 +16,12 @@ internal static class Paths
     public static string Console(IPipelineContext context) =>
         Path.Combine(Root(context), "Source", "GitSnapshotter.Console", "GitSnapshotter.Console.csproj");
 
+    /// <summary>A project's intermediate directory (<c>obj</c>), where restore writes the assets file.</summary>
+    public static string IntermediateDirectory(string project) => Path.Combine(Path.GetDirectoryName(project)!, "obj");
+
+    /// <summary>A project's restore graph.</summary>
+    public static string AssetsFile(string project) => Path.Combine(IntermediateDirectory(project), "project.assets.json");
+
     public static string PublishDirectory(IPipelineContext context, BuildSettings settings) =>
         Path.GetFullPath(settings.PublishDirectory, Root(context));
 }

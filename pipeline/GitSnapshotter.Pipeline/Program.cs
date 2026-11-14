@@ -13,6 +13,7 @@ builder.Services.Configure<BuildSettings>(builder.Configuration.GetSection(Build
 builder.Services
     .AddModule<CompileModule>()
     .AddModule<RunUnitTestsModule>()
+    .AddModule<ThirdPartyNoticesModule>()
     .AddModule<PackModule>()
     .AddModule<PublishConsoleModule>()
     .AddModule<PushPackageModule>();
