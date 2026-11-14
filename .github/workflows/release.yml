@@ -3,6 +3,14 @@ name: release
 # Pushing a version tag releases that commit:
 #   git tag v1.2.0 && git push origin v1.2.0
 # A tag with a prerelease label (v1.2.0-rc.1) makes a GitHub prerelease and a NuGet prerelease.
+#
+# Nothing is published on the tag push alone:
+#   verify   the tag is a version, its commit is on the default branch, and the 'nuget' environment requires a
+#            reviewer (the workflow fails closed if anyone removes that protection)
+#   test     the full test suite on Windows
+#   build    builds and packs with no write access and no publishing credentials
+#   publish  waits for a reviewer to approve the 'nuget' environment, then creates the GitHub release and pushes
+#            the packages; the only job that can write to the repository or get a nuget.org key
 on:
   push:
     tags:
@@ -16,45 +24,21 @@ concurrency:
   group: release
   cancel-in-progress: false
 
+env:
+  RELEASE_ENVIRONMENT: nuget
+
 jobs:
-  # .NET Framework tests only run on Windows; this job runs every test framework there.
-  test:
-    name: test (windows-latest)
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: 'Setup: .NET SDK from global.json'
-        uses: actions/setup-dotnet@v6
-        with:
-          global-json-file: global.json
-          dotnet-version: '8.0.x'
-
-      - name: 'Configure git credentials'
-        run: |
-          git config --global user.email github-actions@github.com
-          git config --global user.name github-actions
-
-      - name: 'Test: net472, net8.0, net11.0'
-        run: dotnet test --solution Source/GitSnapshotter.slnx --configuration Release --treenode-filter "/*/*/*/*[Category!=Discovery]"
-
-  release:
-    name: release
-    needs: test
+  verify:
+    name: verify
     runs-on: ubuntu-latest
-    # Add required reviewers to the environment to approve each release by hand. If the nuget.org trusted
-    # publishing policy names an environment, it must be this one.
-    environment:
-      name: nuget
-      url: https://www.nuget.org/packages/GitSnapshotter/${{ steps.version.outputs.version }}
     permissions:
-      # Creates the GitHub release and uploads its assets.
-      contents: write
-      # Trusted publishing: NuGet/login exchanges the workflow's OIDC token for a short-lived nuget.org API key.
-      id-token: write
+      contents: read
+      # Reads the release environment's protection rules.
+      actions: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
     steps:
-      - uses: actions/checkout@v7
-
       - name: 'Version from tag'
         id: version
         env:
@@ -73,6 +57,68 @@ jobs:
             echo "prerelease=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # A tag on a feature branch or a stray commit must not become a release.
+      - name: 'Tagged commit is on the default branch'
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" "origin/$DEFAULT_BRANCH"; then
+            echo "::error::$GITHUB_SHA is not on $DEFAULT_BRANCH; only commits on $DEFAULT_BRANCH can be released"
+            exit 1
+          fi
+
+      # The publish job's approval gate lives in the repository settings, so check here that it is still there.
+      - name: 'Release environment requires a reviewer'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! reviewers=$(gh api "repos/$GITHUB_REPOSITORY/environments/$RELEASE_ENVIRONMENT" \
+              --jq '[.protection_rules[]? | select(.type == "required_reviewers") | .reviewers[]?] | length'); then
+            echo "::error::Could not read the '$RELEASE_ENVIRONMENT' environment. Create it in Settings > Environments and add a required reviewer."
+            exit 1
+          fi
+          if [[ "$reviewers" -lt 1 ]]; then
+            echo "::error::The '$RELEASE_ENVIRONMENT' environment has no required reviewers. Add one in Settings > Environments so every release is approved by hand."
+            exit 1
+          fi
+          echo "'$RELEASE_ENVIRONMENT' requires approval from $reviewers reviewer(s)."
+
+  # .NET Framework tests only run on Windows; this job runs every test framework there.
+  test:
+    name: test (windows-latest)
+    needs: verify
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: 'Setup: .NET SDK from global.json'
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          dotnet-version: '8.0.x'
+
+      - name: 'Configure git credentials'
+        run: |
+          git config --global user.email github-actions@github.com
+          git config --global user.name github-actions
+
+      - name: 'Test: net472, net8.0, net11.0'
+        run: dotnet test --solution Source/GitSnapshotter.slnx --configuration Release --treenode-filter "/*/*/*/*[Category!=Discovery]"
+
+  # Read-only and without publishing credentials: the code being built cannot reach them.
+  build:
+    name: build
+    needs: [verify, test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
       - name: 'Setup: .NET SDK from global.json'
         uses: actions/setup-dotnet@v6
         with:
@@ -85,17 +131,16 @@ jobs:
           git config --global user.email github-actions@github.com
           git config --global user.name github-actions
 
-      # Builds, tests and packs with the release version. No API key, so the pipeline does not push:
-      # the packages go to nuget.org only after the GitHub release has its assets.
+      # Builds, tests and packs with the release version. No API key, so the pipeline does not push.
       - name: 'Run: pipeline'
         env:
           Build__DefaultBranch: ${{ github.event.repository.default_branch }}
-          Build__Version: ${{ steps.version.outputs.version }}
+          Build__Version: ${{ needs.verify.outputs.version }}
         run: dotnet run --project pipeline/GitSnapshotter.Pipeline --configuration Release
 
       - name: 'Assemble release assets'
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.verify.outputs.version }}
         run: |
           mkdir release
           cp publish/*.nupkg release/
@@ -107,16 +152,42 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         with:
-          name: GitSnapshotter_${{ steps.version.outputs.version }}
+          name: GitSnapshotter_${{ needs.verify.outputs.version }}
           path: release
           if-no-files-found: error
 
+  publish:
+    name: publish
+    needs: [verify, build]
+    runs-on: ubuntu-latest
+    # Waits for a required reviewer (enforced by the verify job). If the nuget.org trusted publishing policy names
+    # an environment, it must be this one.
+    environment:
+      name: nuget
+      url: https://www.nuget.org/packages/GitSnapshotter/${{ needs.verify.outputs.version }}
+    permissions:
+      # Creates the GitHub release and uploads its assets.
+      contents: write
+      # Trusted publishing: NuGet/login exchanges the workflow's OIDC token for a short-lived nuget.org API key.
+      id-token: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ github.ref_name }}
+      PRERELEASE: ${{ needs.verify.outputs.prerelease }}
+    # No checkout: this job only publishes the files the build job produced.
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: GitSnapshotter_${{ needs.verify.outputs.version }}
+          path: release
+
+      - name: 'Verify checksums'
+        working-directory: release
+        run: sha256sum --check SHA256SUMS.txt
+
       # A draft first: if the NuGet push fails, nothing is public yet and the run can be retried.
       - name: 'Create draft GitHub release'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
-          PRERELEASE: ${{ steps.version.outputs.prerelease }}
         run: |
           if gh release view "$TAG" > /dev/null 2>&1; then
             # A re-run: refresh the assets of the release left behind by the failed run.
@@ -141,10 +212,6 @@ jobs:
         run: dotnet nuget push "release/*.nupkg" --source https://api.nuget.org/v3/index.json --api-key "$NUGET_API_KEY" --skip-duplicate
 
       - name: 'Publish GitHub release'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
-          PRERELEASE: ${{ steps.version.outputs.prerelease }}
         run: |
           latest=true
           if [[ "$PRERELEASE" == true ]]; then latest=false; fi

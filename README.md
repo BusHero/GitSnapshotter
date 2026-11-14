@@ -76,19 +76,30 @@ git tag v1.2.0
 git push origin v1.2.0
 ```
 
-The `release` workflow (`.github/workflows/release.yml`) runs the tests on Windows, runs the pipeline with
-`Build:Version` set from the tag, creates a GitHub release with both NuGet packages (the `GitSnapshotter` library
-and the `GitSnapshotter.Tool` .NET tool), the zipped console app and `SHA256SUMS.txt`, pushes the packages to
-nuget.org, and then publishes the release. A tag with a prerelease label
-(`v1.2.0-rc.1`) makes a GitHub prerelease and a NuGet prerelease. The release stays a draft until the push to
-nuget.org succeeds, so a failed run can be re-run.
+The `release` workflow (`.github/workflows/release.yml`) never publishes on the tag push alone:
 
-The push uses nuget.org [trusted publishing](https://learn.microsoft.com/nuget/nuget-org/trusted-publishing), so
-there is no API key to store or rotate: the `NuGet/login` action exchanges the workflow's OIDC token for a
-short-lived key. It needs a trusted publishing policy on nuget.org (account > Trusted Publishing) with repository
-owner `BusHero`, repository `GitSnapshotter`, workflow file `release.yml`, and environment `nuget` or none. The job
-runs in the `nuget` environment; add required reviewers to it (Settings > Environments) to approve each release by
-hand.
+1. **verify** checks that the tag is a version, that its commit is on the default branch, and that the `nuget`
+   environment requires a reviewer. If anyone removes that protection, releases fail instead of publishing
+   unattended.
+2. **test** runs the tests on Windows.
+3. **build** runs the pipeline with `Build:Version` set from the tag. It has read-only access and no publishing
+   credentials.
+4. **publish** waits for a reviewer to approve the `nuget` environment. It then creates a draft GitHub release with
+   both NuGet packages (the `GitSnapshotter` library and the `GitSnapshotter.Tool` .NET tool), the zipped console
+   app and `SHA256SUMS.txt`, pushes the packages to nuget.org, and publishes the release. It is the only job that can
+   write to the repository or get a nuget.org key.
+
+A tag with a prerelease label (`v1.2.0-rc.1`) makes a GitHub prerelease and a NuGet prerelease. The release stays a
+draft until the push to nuget.org succeeds, so a failed run can be re-run.
+
+Setup, once:
+
+- Create a `nuget` environment (Settings > Environments) with at least one required reviewer.
+- Create a trusted publishing policy on nuget.org (account > Trusted Publishing) with repository owner `BusHero`,
+  repository `GitSnapshotter`, workflow file `release.yml` and environment `nuget`. The push uses
+  [trusted publishing](https://learn.microsoft.com/nuget/nuget-org/trusted-publishing), so there is no API key to
+  store or rotate: the `NuGet/login` action exchanges the workflow's OIDC token for a short-lived key.
+- Optionally, add a tag ruleset (Settings > Rules) so only maintainers can create `v*` tags.
 
 ## Documentation site
 
