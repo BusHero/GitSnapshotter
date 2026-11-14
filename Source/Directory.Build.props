@@ -3,8 +3,10 @@
 
   <!-- Shared by the packages built from Source: the GitSnapshotter library and the GitSnapshotter.Tool .NET tool. -->
   <PropertyGroup>
-    <!-- Release builds override this with the tag's version (Build:Version in the pipeline). -->
-    <VersionPrefix>0.1.0</VersionPrefix>
+    <!-- The version being worked towards: builds from branches are <VersionPrefix>-<branch>-<time>, and release
+         builds override it with the release version (Build:Version in the pipeline). Raise it after each stable
+         release, so branch builds sort above what is already released. -->
+    <VersionPrefix>0.2.0</VersionPrefix>
     <Authors>BusHero</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageIcon>icon.png</PackageIcon>

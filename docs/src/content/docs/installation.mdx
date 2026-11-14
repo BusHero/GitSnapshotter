@@ -102,14 +102,15 @@ GitHub Packages requires authentication even for public packages, so you need a 
 
 3. Find the build you want on the
    [package's page on GitHub](https://github.com/BusHero/GitSnapshotter/pkgs/nuget/GitSnapshotter). Builds are
-   versioned `<version>-<branch>-<timestamp>`, such as `0.1.0-trunk-20261114122606`. Add that exact version:
+   versioned `<next version>-<branch>-<timestamp>`, such as `0.2.0-trunk-20261114122606`. Add that exact version:
 
    ```sh
-   dotnet add package GitSnapshotter --version 0.1.0-trunk-20261114122606
+   dotnet add package GitSnapshotter --version 0.2.0-trunk-20261114122606
    ```
 
-   Give the version explicitly rather than using `--prerelease`. A trunk build can sort below the release candidates
-   on nuget.org, so `--prerelease` may pick a release candidate instead.
+   Give the version explicitly rather than using `--prerelease`, which picks the highest version from either feed.
+   A trunk build sorts below the release it leads up to, so once that release is on nuget.org, `--prerelease`
+   picks the release instead.
 
    To go back to releases, set the version in your project file to one from nuget.org.
 
