@@ -34,7 +34,7 @@ public sealed class RestoreUpstreamTests
         using (Assert.Multiple())
         {
             await Assert.That(fresh.Branches["master"].TrackedBranch.FriendlyName).IsEqualTo("origin/master");
-            await Assert.That(fresh.Snapshot()).IsEquivalentTo(snapshot);
+            await SnapshotAssert.AreEquivalent(fresh.Snapshot(), snapshot);
         }
     }
 

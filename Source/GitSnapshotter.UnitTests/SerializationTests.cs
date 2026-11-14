@@ -19,7 +19,7 @@ public sealed class SerializationTests
 
         var copy = GitRepositorySnapshot.FromJson(snapshot.ToJson());
 
-        await Assert.That(copy).IsEquivalentTo(snapshot);
+        await SnapshotAssert.AreEquivalent(copy, snapshot);
     }
 
     [Test]
@@ -57,7 +57,7 @@ public sealed class SerializationTests
         using (Assert.Multiple())
         {
             await Assert.That(File.Exists(file)).IsTrue();
-            await Assert.That(GitRepositorySnapshot.Load(file)).IsEquivalentTo(snapshot);
+            await SnapshotAssert.AreEquivalent(GitRepositorySnapshot.Load(file), snapshot);
         }
     }
 
@@ -74,7 +74,7 @@ public sealed class SerializationTests
         repo.RestoreFrom(GitRepositorySnapshot.Load(file));
 
         using var reopened = repo.Reopen();
-        await Assert.That(reopened.Snapshot()).IsEquivalentTo(GitRepositorySnapshot.Load(file));
+        await SnapshotAssert.AreEquivalent(reopened.Snapshot(), GitRepositorySnapshot.Load(file));
     }
 
     [Test]
