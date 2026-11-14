@@ -45,11 +45,12 @@ jobs:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
 
-      - name: 'Build: solution and pipeline'
+      # dotnet run builds the pipeline, and its Compile target builds the solution, both traced by CodeQL.
+      - name: 'Build: pipeline and solution'
         if: matrix.build-mode == 'manual'
-        run: |
-          dotnet build Source/GitSnapshotter.slnx --configuration Release
-          dotnet build pipeline/GitSnapshotter.Pipeline --configuration Release
+        env:
+          Build__Target: Compile
+        run: dotnet run --project pipeline/GitSnapshotter.Pipeline --configuration Release
 
       - name: 'Analyze: CodeQL'
         uses: github/codeql-action/analyze@v4

@@ -34,11 +34,7 @@ public sealed class PublishConsoleModule(IOptions<BuildSettings> settings) : Mod
 
         var version = settings.Value.IsRelease ? settings.Value.Version! : BuildVersion(context);
 
-        var githubOutput = Environment.GetEnvironmentVariable("GITHUB_OUTPUT");
-        if (!string.IsNullOrEmpty(githubOutput))
-        {
-            await File.AppendAllTextAsync(githubOutput, $"version={version}\n", cancellationToken);
-        }
+        await GitHubActions.SetOutputAsync("version", version, cancellationToken);
 
         return version;
     }

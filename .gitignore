@@ -483,3 +483,6 @@ $RECYCLE.BIN/
 # Vim temporary swap files
 *.swp
 
+
+# Release description written by the pipeline (VerifyRelease target)
+release-notes/

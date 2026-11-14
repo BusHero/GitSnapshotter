@@ -6,11 +6,15 @@ on:
     paths:
       - 'docs/**'
       - 'assets/logo/**'
+      - 'pipeline/**'
+      - 'global.json'
       - '.github/workflows/docs.yml'
   pull_request:
     paths:
       - 'docs/**'
       - 'assets/logo/**'
+      - 'pipeline/**'
+      - 'global.json'
       - '.github/workflows/docs.yml'
   workflow_dispatch:
 
@@ -24,11 +28,10 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: docs
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: 'Setup: Node.js'
         uses: actions/setup-node@v7
@@ -37,11 +40,22 @@ jobs:
           cache: npm
           cache-dependency-path: docs/package-lock.json
 
-      - name: 'Install dependencies'
-        run: npm ci
+      - name: 'Setup: .NET SDK from global.json'
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
 
-      - name: 'Build site'
-        run: npm run build
+      - name: 'Cache: ~/.nuget/packages'
+        uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-${{ hashFiles('**/global.json', '**/packages.lock.json') }}
+
+      # npm ci and npm run build in docs/, into docs/dist.
+      - name: 'Run: pipeline (Docs)'
+        env:
+          Build__Target: Docs
+        run: dotnet run --project pipeline/GitSnapshotter.Pipeline --configuration Release
 
       - uses: actions/upload-pages-artifact@v5
         with:

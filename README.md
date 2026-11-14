@@ -34,12 +34,31 @@ The pipeline is written with [ModularPipelines](https://github.com/thomhurst/Mod
 
 | Setting | Default | Purpose |
 |---|---|---|
+| `Target` | `All` | Which modules run, see below |
 | `Configuration` | `Release` | Build configuration |
 | `PublishDirectory` | `publish` | Where the packages and the console app go |
 | `DefaultBranch` | from git | Decides the `+trunk` / `+merge` version suffix |
 | `NuGetApiKey` | none | Pushes the packages (library and tool) when set; otherwise the push is skipped |
 | `NuGetSource` | GitHub Packages | Feed to push to |
 | `Version` | none | Release version (`1.2.0`, `1.2.0-rc.1`); without it the packages are branch prereleases |
+| `ReleaseDirectory` | `release` | Where a release build puts the GitHub release assets |
+| `ReleaseNotesDirectory` | `release-notes` | Where `VerifyRelease` writes the release description |
+| `ReleaseEnvironment` | `nuget` | The GitHub environment `VerifyRelease` requires a reviewer on |
+
+The CI workflows run the pipeline too, one target per job, so a job only sets up the machine and hands files to
+the next. Each target runs on a developer machine as well (`./build.sh --Build:Target=Test`):
+
+| Target | Modules | Used by |
+|---|---|---|
+| `All` | Format check, compile, tests, third-party notices, console app, packages, push; on a release, the release assets (packages, console app zip, `SHA256SUMS.txt`) | `build` > ubuntu-latest |
+| `VerifyRelease` | Checks the release may go ahead and writes its description from `CHANGELOG.md`; needs `GITHUB_TOKEN` | `build` > verify |
+| `Test` | Compile and tests | `build` > windows-latest |
+| `Compile` | Compile | `codeql` |
+| `Restore` | Restore the solution | `build` > dependency-submission |
+| `Docs` | `npm ci` and `npm run build` in `docs` | `docs` |
+
+On a build server the pipeline also gives git a user name and email for the tests; on a developer machine it leaves
+the git configuration alone.
 
 The pipeline also generates `THIRD-PARTY-NOTICES.txt` from each project's restore graph: one next to the console app
 in the publish directory and inside the tool package, covering every package the app ships, and one inside the
