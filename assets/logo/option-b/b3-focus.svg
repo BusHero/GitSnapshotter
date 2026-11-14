@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256"><title>GitSnapshotter</title><rect width="256" height="256" rx="56" fill="#0F172A"/><g fill="none" stroke="#475569" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
+<path d="M40 84V52a12 12 0 0 1 12-12h32"/><path d="M172 40h32a12 12 0 0 1 12 12v32"/>
+<path d="M216 172v32a12 12 0 0 1-12 12h-32"/><path d="M84 216h-32a12 12 0 0 1-12-12v-32"/></g>
+<g fill="none" stroke="#38BDF8" stroke-width="11" stroke-linecap="round"><path d="M98 196V96"/><path d="M98 164c0-30 56-30 56-60"/></g>
+<g fill="#0F172A" stroke="#38BDF8" stroke-width="10"><circle cx="98" cy="196" r="12"/><circle cx="98" cy="96" r="12"/></g>
+<g fill="none" stroke="#F472B6" stroke-width="6" stroke-linecap="round"><circle cx="154" cy="96" r="30" stroke-dasharray="20 11.4" transform="rotate(-36 154 96)"/></g>
+<circle cx="154" cy="96" r="14" fill="#F472B6"/></svg>
