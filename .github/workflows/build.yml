@@ -287,6 +287,14 @@ jobs:
         env:
           VERSION: ${{ needs.verify.outputs.version }}
         run: |
+          # Exactly the packages being released, at the release version: pushing to nuget.org can't be undone.
+          expected="GitSnapshotter.${VERSION}.nupkg GitSnapshotter.Tool.${VERSION}.nupkg"
+          actual=$(cd publish && ls *.nupkg | sort | xargs)
+          if [[ "$actual" != "$(xargs -n1 <<< "$expected" | sort | xargs)" ]]; then
+            echo "::error::Expected exactly: $expected. The pipeline produced: $actual"
+            exit 1
+          fi
+
           mkdir release
           cp publish/*.nupkg publish/*.snupkg release/
           (cd publish && zip -r -q "../release/GitSnapshotter.Console_${VERSION}.zip" . -x '*.nupkg' '*.snupkg')

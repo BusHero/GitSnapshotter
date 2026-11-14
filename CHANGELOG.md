@@ -10,9 +10,16 @@ empty **Unreleased** section above it. A prerelease with no section of its own u
 
 ## [Unreleased]
 
+### Fixed
+
+- Releases pack the library and the tool at the release version. 0.2.0-rc.1 packed the library as 0.1.0, so only
+  `GitSnapshotter.Tool` was published at 0.2.0-rc.1.
+
 ## [0.2.0-rc.1] - 2026-11-14
 
-The first release on nuget.org.
+The first release made by the release workflow, and the first with a changelog. Only `GitSnapshotter.Tool` was
+published at this version: a packaging error built the library as 0.1.0, which was already on nuget.org, so there is
+no `GitSnapshotter` 0.2.0-rc.1 package.
 
 ### Added
 
