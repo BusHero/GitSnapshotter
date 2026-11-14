@@ -29,6 +29,9 @@ internal static class ThirdPartyNotices
     {
         // https://github.com/SimonCropp/Polyfill/blob/main/license.txt
         ["Polyfill"] = "Copyright (c) Simon Cropp",
+
+        // libgit2/libgit2.license.txt in the package (libgit2's COPYING): "libgit2 is Copyright (C) the libgit2 contributors".
+        ["LibGit2Sharp.NativeBinaries"] = "Copyright (C) the libgit2 contributors",
     };
 
     /// <summary>License texts for license expressions whose packages don't include a license file.</summary>
