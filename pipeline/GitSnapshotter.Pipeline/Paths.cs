@@ -8,7 +8,7 @@ internal static class Paths
     public static string Root(IPipelineContext context) => context.Git().RootDirectory.Path;
 
     public static string Solution(IPipelineContext context) =>
-        Path.Combine(Root(context), "Source", "GitSnapshotter.sln");
+        Path.Combine(Root(context), "Source", "GitSnapshotter.slnx");
 
     public static string Library(IPipelineContext context) =>
         Path.Combine(Root(context), "Source", "GitSnapshotter", "GitSnapshotter.csproj");

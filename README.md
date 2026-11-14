@@ -11,7 +11,7 @@ Requires the .NET 10 SDK (see `global.json`).
 
 ```sh
 ./build.sh                 # run the build pipeline: build, test, pack, publish the console app
-dotnet test Source/GitSnapshotter.sln
+dotnet test Source/GitSnapshotter.slnx
 ```
 
 The pipeline is written with [ModularPipelines](https://github.com/thomhurst/ModularPipelines) in

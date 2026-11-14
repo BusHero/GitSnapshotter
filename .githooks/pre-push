@@ -32,7 +32,7 @@ for sha in "${shas[@]}"; do
     echo "pre-push: testing $(git log -1 --format='%h %s' "$sha") before pushing to trunk..."
     git -C "$repo_root" worktree add --detach --quiet "$worktree" "$sha"
 
-    if ! dotnet test "$worktree/Source/GitSnapshotter.sln" \
+    if ! dotnet test "$worktree/Source/GitSnapshotter.slnx" \
             --configuration Release \
             --filter "Category!=Discovery" \
             --nologo \
