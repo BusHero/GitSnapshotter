@@ -19,7 +19,6 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>gitsnapshotter</ToolCommandName>
     <PackageId>GitSnapshotter.Tool</PackageId>
-    <VersionPrefix>0.1.0</VersionPrefix>
     <Authors>BusHero</Authors>
     <Description>Command-line tool that takes a snapshot of a git repository's branches, tags, remotes, HEAD and (optionally) working tree, and restores it later.</Description>
     <PackageTags>git;snapshot;restore;cli;dotnet-tool</PackageTags>
