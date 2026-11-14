@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 
 
 namespace GitSnapshotter.UnitTests;
@@ -19,7 +19,29 @@ public sealed class SerializationTests
 
         var copy = GitRepositorySnapshot.FromJson(snapshot.ToJson());
 
-        await Assert.That(copy).IsEquivalentTo(snapshot);
+        await SnapshotAssert.AreEquivalent(copy, snapshot);
+    }
+
+    [Test]
+    [Arguments("git@github.com:owner/repo.git")]
+    [Arguments("https://github.com/owner/repo.git")]
+    [Arguments("ssh://git@example.com:2222/repo.git")]
+    [Arguments(@"C:\repos\origin")]
+    [Arguments("../origin")]
+    public async Task RemoteUrlRoundTripsUnchanged(string url)
+    {
+        using var repo = GitTasks.CreateTemporaryGitRepository();
+        repo.CommitFile("a.txt", "1");
+        repo.Network.Remotes.Add("origin", url);
+        var snapshot = repo.Snapshot();
+
+        var copy = GitRepositorySnapshot.FromJson(snapshot.ToJson());
+
+        using (Assert.Multiple())
+        {
+            await Assert.That(snapshot.Remotes[0].Url.OriginalString).IsEqualTo(url);
+            await Assert.That(copy.Remotes[0].Url.OriginalString).IsEqualTo(url);
+        }
     }
 
     [Test]
@@ -35,7 +57,7 @@ public sealed class SerializationTests
         using (Assert.Multiple())
         {
             await Assert.That(File.Exists(file)).IsTrue();
-            await Assert.That(GitRepositorySnapshot.Load(file)).IsEquivalentTo(snapshot);
+            await SnapshotAssert.AreEquivalent(GitRepositorySnapshot.Load(file), snapshot);
         }
     }
 
@@ -51,7 +73,8 @@ public sealed class SerializationTests
         repo.AddTag("v1");
         repo.RestoreFrom(GitRepositorySnapshot.Load(file));
 
-        await Assert.That(repo.Reopen().Snapshot()).IsEquivalentTo(GitRepositorySnapshot.Load(file));
+        using var reopened = repo.Reopen();
+        await SnapshotAssert.AreEquivalent(reopened.Snapshot(), GitRepositorySnapshot.Load(file));
     }
 
     [Test]

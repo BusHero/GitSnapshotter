@@ -10,7 +10,10 @@ using ModularPipelines.Modules;
 
 namespace GitSnapshotter.Pipeline.Modules;
 
-/// <summary>Pushes the package once the tests have passed. Skipped when no API key is configured.</summary>
+/// <summary>
+/// Pushes the packages (the library and the .NET tool) once the tests have passed. Skipped when no API key is
+/// configured.
+/// </summary>
 [DependsOn<PackModule>]
 [DependsOn<RunUnitTestsModule>]
 public sealed class PushPackageModule(IOptions<BuildSettings> settings) : Module<CommandResult>
@@ -24,6 +27,8 @@ public sealed class PushPackageModule(IOptions<BuildSettings> settings) : Module
 
     protected override async Task<CommandResult?> ExecuteAsync(IModuleContext context, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(context);
+
         var packageDirectory = await context.GetModule<PackModule>();
 
         return await context.DotNet().Nuget.Push(
@@ -33,6 +38,8 @@ public sealed class PushPackageModule(IOptions<BuildSettings> settings) : Module
                 Source = settings.Value.NuGetSource,
                 ApiKey = settings.Value.NuGetApiKey,
                 SkipDuplicate = true,
+                // GitHub Packages has no symbol server; the .snupkg files go to nuget.org with releases.
+                NoSymbols = true,
             },
             cancellationToken: cancellationToken);
     }

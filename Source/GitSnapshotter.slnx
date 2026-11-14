@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/Solution/">
+    <File Path="../.editorconfig" />
     <File Path="../.githooks/pre-push" />
     <File Path="../.github/workflows/build.yml" />
     <File Path="../.gitignore" />

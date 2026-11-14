@@ -1,4 +1,4 @@
-﻿using LibGit2Sharp;
+using LibGit2Sharp;
 
 namespace GitSnapshotter.UnitTests;
 
@@ -18,7 +18,7 @@ public sealed class RestoreBranchesTests
         GitRepository.Restore(repo.Info.WorkingDirectory, originalSnapshot);
         var newSnapshot = GitRepository.GetSnapshot(repo.Info.WorkingDirectory);
 
-        await Assert.That(newSnapshot).IsEquivalentTo(originalSnapshot);
+        await SnapshotAssert.AreEquivalent(newSnapshot, originalSnapshot);
     }
 
     [Test, AutoData]
@@ -37,7 +37,7 @@ public sealed class RestoreBranchesTests
         GitRepository.Restore(repo.Info.WorkingDirectory, originalSnapshot);
         var newSnapshot = GitRepository.GetSnapshot(repo.Info.WorkingDirectory);
 
-        await Assert.That(newSnapshot).IsEquivalentTo(originalSnapshot);
+        await SnapshotAssert.AreEquivalent(newSnapshot, originalSnapshot);
     }
 
     [Test, AutoData]
@@ -56,7 +56,7 @@ public sealed class RestoreBranchesTests
         GitRepository.Restore(repo.Info.WorkingDirectory, originalSnapshot);
         var newSnapshot = GitRepository.GetSnapshot(repo.Info.WorkingDirectory);
 
-        await Assert.That(newSnapshot).IsEquivalentTo(originalSnapshot);
+        await SnapshotAssert.AreEquivalent(newSnapshot, originalSnapshot);
     }
 
     [Test, AutoData]
@@ -75,7 +75,7 @@ public sealed class RestoreBranchesTests
         GitRepository.Restore(repo.Info.WorkingDirectory, originalSnapshot);
         var newSnapshot = GitRepository.GetSnapshot(repo.Info.WorkingDirectory);
 
-        await Assert.That(newSnapshot).IsEquivalentTo(originalSnapshot);
+        await SnapshotAssert.AreEquivalent(newSnapshot, originalSnapshot);
     }
 
     [Test]
@@ -89,9 +89,9 @@ public sealed class RestoreBranchesTests
         GitRepository.Restore(repo.Info.WorkingDirectory, originalSnapshot);
         var newSnapshot = GitRepository.GetSnapshot(repo.Info.WorkingDirectory);
 
-        await Assert.That(newSnapshot).IsEquivalentTo(originalSnapshot);
+        await SnapshotAssert.AreEquivalent(newSnapshot, originalSnapshot);
     }
-    
+
     [Test, AutoData]
     public async Task RestoreTip(string branchName)
     {
@@ -106,7 +106,7 @@ public sealed class RestoreBranchesTests
 
         GitRepository.Restore(repo.Info.WorkingDirectory, originalSnapshot);
         var newSnapshot = GitRepository.GetSnapshot(repo.Info.WorkingDirectory);
-        
-        await Assert.That(newSnapshot).IsEquivalentTo(originalSnapshot);
+
+        await SnapshotAssert.AreEquivalent(newSnapshot, originalSnapshot);
     }
 }

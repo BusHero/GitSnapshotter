@@ -1,4 +1,4 @@
-﻿using LibGit2Sharp;
+using LibGit2Sharp;
 
 namespace GitSnapshotter.UnitTests;
 
@@ -17,7 +17,7 @@ public sealed class RestoreHeadTests
         GitRepository.Restore(repo.Info.WorkingDirectory, originalSnapshot);
         var newSnapshot = GitRepository.GetSnapshot(repo.Info.WorkingDirectory);
 
-        await Assert.That(newSnapshot).IsEquivalentTo(originalSnapshot);
+        await SnapshotAssert.AreEquivalent(newSnapshot, originalSnapshot);
     }
 
     [Test]
@@ -63,7 +63,7 @@ public sealed class RestoreHeadTests
             await Assert.That(fresh.Info.IsHeadDetached).IsTrue();
             await Assert.That(fresh.Head.Tip.Sha).IsEqualTo(first.Sha);
             await Assert.That(fresh.ReadFile("a.txt")).IsEqualTo("1");
-            await Assert.That(fresh.Snapshot()).IsEquivalentTo(snapshot);
+            await SnapshotAssert.AreEquivalent(fresh.Snapshot(), snapshot);
         }
     }
 
@@ -106,7 +106,7 @@ public sealed class RestoreHeadTests
             await Assert.That(fresh.Head.FriendlyName).IsEqualTo("master");
             await Assert.That(fresh.FileExists("b.txt")).IsFalse();
             await Assert.That(fresh.IsClean()).IsTrue();
-            await Assert.That(fresh.Snapshot()).IsEquivalentTo(snapshot);
+            await SnapshotAssert.AreEquivalent(fresh.Snapshot(), snapshot);
         }
     }
 
@@ -251,7 +251,7 @@ public sealed class RestoreHeadTests
             await Assert.That(fresh.Info.IsHeadUnborn).IsTrue();
             await Assert.That(fresh.Branches).IsEmpty();
             await Assert.That(fresh.FileExists("a.txt")).IsFalse();
-            await Assert.That(fresh.Snapshot()).IsEquivalentTo(snapshot);
+            await SnapshotAssert.AreEquivalent(fresh.Snapshot(), snapshot);
         }
     }
 }

@@ -1,0 +1,213 @@
+---
+title: Installation
+description: Add the GitSnapshotter package to a project, or get the command-line tool.
+---
+
+import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+
+## The library
+
+The `GitSnapshotter` package targets `net8.0` and `net472`, so it works in projects for .NET 8 or later and
+.NET Framework 4.7.2 or later. Its only dependency is LibGit2Sharp, which brings the native libgit2 binaries for
+Windows, macOS and Linux.
+
+### From nuget.org
+
+Releases are published to [nuget.org](https://www.nuget.org/packages/GitSnapshotter), so no setup is needed:
+
+<Tabs syncKey="package-manager">
+  <TabItem label=".NET CLI">
+    ```sh
+    dotnet add package GitSnapshotter
+    ```
+  </TabItem>
+  <TabItem label="PackageReference">
+    ```xml title="MyProject.csproj"
+    <ItemGroup>
+      <PackageReference Include="GitSnapshotter" Version="x.y.z" />
+    </ItemGroup>
+    ```
+
+    Replace `x.y.z` with the [latest version](https://www.nuget.org/packages/GitSnapshotter).
+  </TabItem>
+  <TabItem label="Central versions">
+    With `Directory.Packages.props`, put the version there and leave it out of the project:
+
+    ```xml title="Directory.Packages.props"
+    <ItemGroup>
+      <PackageVersion Include="GitSnapshotter" Version="x.y.z" />
+    </ItemGroup>
+    ```
+
+    ```xml title="MyProject.csproj"
+    <ItemGroup>
+      <PackageReference Include="GitSnapshotter" />
+    </ItemGroup>
+    ```
+  </TabItem>
+  <TabItem label="PM Console">
+    ```powershell
+    Install-Package GitSnapshotter
+    ```
+  </TabItem>
+</Tabs>
+
+Release candidates (versions like `0.2.0-rc.1`) are published to nuget.org too. The commands above pick the latest
+stable version; for the latest release candidate, add `--prerelease` (`-IncludePrerelease` in the PM Console), or
+put its version in the project file. Every release is also on the
+[GitHub releases page](https://github.com/BusHero/GitSnapshotter/releases), with its `.nupkg` attached and its
+changes listed.
+
+### Builds from trunk (GitHub Packages)
+
+Every push to `trunk` publishes a build to **GitHub Packages**, so you can try changes before they are released.
+GitHub Packages requires authentication even for public packages, so you need a GitHub personal access token
+(classic) with the `read:packages` scope.
+
+<Steps>
+
+1. Add a `nuget.config` next to your solution that adds the feed and reads the credentials from environment
+   variables, so no secret is committed. nuget.org stays available alongside it for your other packages:
+   ```xml title="nuget.config"
+   <?xml version="1.0" encoding="utf-8"?>
+   <configuration>
+     <packageSources>
+       <add key="BusHero" value="https://nuget.pkg.github.com/BusHero/index.json" />
+     </packageSources>
+     <packageSourceCredentials>
+       <BusHero>
+         <add key="Username" value="%GITHUB_USERNAME%" />
+         <add key="ClearTextPassword" value="%GITHUB_TOKEN%" />
+       </BusHero>
+     </packageSourceCredentials>
+   </configuration>
+   ```
+
+2. Set the two variables in your shell:
+
+   <Tabs syncKey="shell">
+     <TabItem label="bash / zsh">
+       ```sh
+       export GITHUB_USERNAME=<your-github-user>
+       export GITHUB_TOKEN=<token-with-read:packages>
+       ```
+     </TabItem>
+     <TabItem label="PowerShell">
+       ```powershell
+       $env:GITHUB_USERNAME = "<your-github-user>"
+       $env:GITHUB_TOKEN = "<token-with-read:packages>"
+       ```
+     </TabItem>
+   </Tabs>
+
+3. Find the build you want on the
+   [package's page on GitHub](https://github.com/BusHero/GitSnapshotter/pkgs/nuget/GitSnapshotter). Builds are
+   versioned `<next version>-<branch>-<timestamp>`, such as `0.2.0-trunk-20261114122606`. Add that exact version:
+
+   ```sh
+   dotnet add package GitSnapshotter --version 0.2.0-trunk-20261114122606
+   ```
+
+   Give the version explicitly rather than using `--prerelease`, which picks the highest version from either feed.
+   A trunk build sorts below the release it leads up to, so once that release is on nuget.org, `--prerelease`
+   picks the release instead.
+
+   To go back to releases, set the version in your project file to one from nuget.org.
+
+</Steps>
+
+<Aside type="tip" title="In GitHub Actions">
+  Set `GITHUB_USERNAME` to `${{ github.actor }}` and `GITHUB_TOKEN` to `${{ secrets.GITHUB_TOKEN }}`, and give the
+  job `packages: read` permission. If the workflow is in a different repository, the package's settings on GitHub
+  must also grant that repository access.
+</Aside>
+
+<Aside type="note" title="Package source mapping">
+  If your `nuget.config` uses `<packageSourceMapping>`, add a `<package pattern="GitSnapshotter" />` entry under
+  both `nuget.org` and `BusHero`, so releases can come from one and trunk builds from the other.
+</Aside>
+
+## The command-line tool
+
+The tool is the `GitSnapshotter.Tool` [.NET tool](https://learn.microsoft.com/dotnet/core/tools/global-tools), and
+installs the `gitsnapshotter` command. It needs the [.NET 11 runtime](https://dotnet.microsoft.com/download) or
+later.
+
+### From nuget.org
+
+Releases are published to [nuget.org](https://www.nuget.org/packages/GitSnapshotter.Tool), so no feed setup is
+needed. These commands install the latest stable version; add `--prerelease` for the latest release candidate:
+
+<Tabs syncKey="tool-scope">
+  <TabItem label="Global">
+    ```sh
+    dotnet tool install --global GitSnapshotter.Tool
+    gitsnapshotter help
+    ```
+
+    The command goes in `~/.dotnet/tools` (`%USERPROFILE%\.dotnet\tools` on Windows), which the .NET SDK
+    installer puts on your `PATH`. Update with `dotnet tool update --global GitSnapshotter.Tool`.
+  </TabItem>
+  <TabItem label="Local (per repository)">
+    A local tool is pinned in `.config/dotnet-tools.json`, so everyone who clones the repository, and CI, gets the
+    same version with `dotnet tool restore`:
+
+    ```sh
+    dotnet new tool-manifest   # once, if the repository has no manifest yet
+    dotnet tool install GitSnapshotter.Tool
+    dotnet tool run gitsnapshotter help   # or: dotnet gitsnapshotter help
+    ```
+  </TabItem>
+</Tabs>
+
+Each [GitHub release](https://github.com/BusHero/GitSnapshotter/releases) also has the tool's `.nupkg`, and the
+app itself as a zip (`GitSnapshotter.Console_<version>.zip`) that runs with `dotnet GitSnapshotter.Console.dll`.
+
+### Builds of the tool from trunk (GitHub Packages)
+
+Every push to `trunk` publishes a build of the tool to GitHub Packages, next to the library. Set up the `BusHero`
+feed and its credentials as in [Builds from trunk](#builds-from-trunk-github-packages) (steps 1 and 2). Pick the
+exact version from the [tool's page on GitHub](https://github.com/BusHero/GitSnapshotter/pkgs/nuget/GitSnapshotter.Tool),
+for the same reason as for the library, and run these from the directory with that `nuget.config` (or pass
+`--configfile <path>`):
+
+<Tabs syncKey="tool-scope">
+  <TabItem label="Global">
+    ```sh
+    dotnet tool install --global GitSnapshotter.Tool --version <version>
+    gitsnapshotter help
+    ```
+
+    The command goes in `~/.dotnet/tools` (`%USERPROFILE%\.dotnet\tools` on Windows), which the .NET SDK
+    installer puts on your `PATH`. Move to another build with
+    `dotnet tool update --global GitSnapshotter.Tool --version <version>`.
+  </TabItem>
+  <TabItem label="Local (per repository)">
+    A local tool is pinned in `.config/dotnet-tools.json`, so everyone who clones the repository, and CI, gets the
+    same version with `dotnet tool restore`:
+
+    ```sh
+    dotnet new tool-manifest   # once, if the repository has no manifest yet
+    dotnet tool install GitSnapshotter.Tool --version <version>
+    dotnet tool run gitsnapshotter help   # or: dotnet gitsnapshotter help
+    ```
+  </TabItem>
+  <TabItem label="Run from source">
+    With the .NET 11 SDK installed:
+
+    ```sh
+    git clone https://github.com/BusHero/GitSnapshotter.git
+    cd GitSnapshotter
+    dotnet run --project Source/GitSnapshotter.Console -- help
+    ```
+
+    `./build.sh` (or `build.cmd` on Windows) also packs the tool into `./publish`. Install that build with the
+    version from its file name, `GitSnapshotter.Tool.<version>.nupkg`:
+    `dotnet tool install --global GitSnapshotter.Tool --version <version> --add-source ./publish`.
+  </TabItem>
+</Tabs>
+
+<Aside type="tip" title="In GitHub Actions">
+  Install the tool in a step before you use it, with `GITHUB_USERNAME` and `GITHUB_TOKEN` set and `packages: read`
+  permission as for the library. `actions/setup-dotnet` puts `~/.dotnet/tools` on the `PATH`, so a global tool runs as `gitsnapshotter`.
+</Aside>

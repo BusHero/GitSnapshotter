@@ -1,4 +1,4 @@
-﻿using LibGit2Sharp;
+using LibGit2Sharp;
 
 namespace GitSnapshotter.UnitTests;
 
@@ -17,7 +17,7 @@ public sealed class RestoreTagsTests
         GitRepository.Restore(repository.Info.WorkingDirectory, originalSnapshot);
 
         var newSnapshot = GitRepository.GetSnapshot(repository.Info.WorkingDirectory);
-        await Assert.That(newSnapshot).IsEquivalentTo(originalSnapshot);
+        await SnapshotAssert.AreEquivalent(newSnapshot, originalSnapshot);
     }
 
     [Test, AutoData]
@@ -34,7 +34,7 @@ public sealed class RestoreTagsTests
         GitRepository.Restore(repository.Info.WorkingDirectory, originalSnapshot);
 
         var newSnapshot = GitRepository.GetSnapshot(repository.Info.WorkingDirectory);
-        await Assert.That(newSnapshot).IsEquivalentTo(originalSnapshot);
+        await SnapshotAssert.AreEquivalent(newSnapshot, originalSnapshot);
     }
 
     [Test, AutoData]
@@ -49,7 +49,7 @@ public sealed class RestoreTagsTests
         GitRepository.Restore(repository.Info.WorkingDirectory, originalSnapshot);
 
         var newSnapshot = GitRepository.GetSnapshot(repository.Info.WorkingDirectory);
-        await Assert.That(newSnapshot).IsEquivalentTo(originalSnapshot);
+        await SnapshotAssert.AreEquivalent(newSnapshot, originalSnapshot);
     }
 
     [Test, AutoData]
@@ -67,7 +67,7 @@ public sealed class RestoreTagsTests
         GitRepository.Restore(repository.Info.WorkingDirectory, originalSnapshot);
 
         var newSnapshot = GitRepository.GetSnapshot(repository.Info.WorkingDirectory);
-        await Assert.That(newSnapshot).IsEquivalentTo(originalSnapshot);
+        await SnapshotAssert.AreEquivalent(newSnapshot, originalSnapshot);
     }
 
     [Test, AutoData]
@@ -91,7 +91,7 @@ public sealed class RestoreTagsTests
             await Assert.That(repository.Tags[tag1].Target.Sha).IsEqualTo(first.Sha);
             await Assert.That(repository.Tags[tag2].Target.Sha).IsEqualTo(first.Sha);
             await Assert.That(repository.Tags[tag3].Target.Sha).IsEqualTo(first.Sha);
-            await Assert.That(repository.Snapshot()).IsEquivalentTo(snapshot);
+            await SnapshotAssert.AreEquivalent(repository.Snapshot(), snapshot);
         }
     }
 
@@ -108,7 +108,7 @@ public sealed class RestoreTagsTests
         repository.MoveTag(moved, second);
         repository.RestoreFrom(snapshot);
 
-        await Assert.That(repository.Snapshot()).IsEquivalentTo(snapshot);
+        await SnapshotAssert.AreEquivalent(repository.Snapshot(), snapshot);
     }
 
     [Test, AutoData]
@@ -130,7 +130,7 @@ public sealed class RestoreTagsTests
         using (Assert.Multiple())
         {
             await Assert.That(repository.Tags[tagName].Annotation.Sha).IsEqualTo(originalAnnotation);
-            await Assert.That(repository.Snapshot()).IsEquivalentTo(snapshot);
+            await SnapshotAssert.AreEquivalent(repository.Snapshot(), snapshot);
         }
     }
 
@@ -173,7 +173,7 @@ public sealed class RestoreTagsTests
         using (Assert.Multiple())
         {
             await Assert.That(repository.Tags[tagName].IsAnnotated).IsFalse();
-            await Assert.That(repository.Snapshot()).IsEquivalentTo(snapshot);
+            await SnapshotAssert.AreEquivalent(repository.Snapshot(), snapshot);
         }
     }
 
@@ -189,7 +189,7 @@ public sealed class RestoreTagsTests
         repository.AddTag(tagName);
         repository.RestoreFrom(snapshot);
 
-        await Assert.That(repository.Snapshot()).IsEquivalentTo(snapshot);
+        await SnapshotAssert.AreEquivalent(repository.Snapshot(), snapshot);
     }
 
     [Test, AutoData]

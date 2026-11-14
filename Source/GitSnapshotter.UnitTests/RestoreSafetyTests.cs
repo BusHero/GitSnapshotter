@@ -1,4 +1,4 @@
-﻿using LibGit2Sharp;
+using LibGit2Sharp;
 
 namespace GitSnapshotter.UnitTests;
 
@@ -25,7 +25,8 @@ public sealed class RestoreSafetyTests
         {
             var exception = await Assert.That(restore).Throws<MissingObjectsException>();
             await Assert.That(exception!.MissingObjects).IsEquivalentTo([UnknownSha], CollectionOrdering.Matching);
-            await Assert.That(repo.Reopen().Snapshot()).IsEquivalentTo(before);
+            using var reopened = repo.Reopen();
+            await SnapshotAssert.AreEquivalent(reopened.Snapshot(), before);
         }
     }
 
@@ -136,7 +137,7 @@ public sealed class RestoreSafetyTests
         repo.AddBranch("feature");
         GitRepository.Restore(repo, snapshot);
 
-        await Assert.That(GitRepository.GetSnapshot(repo)).IsEquivalentTo(snapshot);
+        await SnapshotAssert.AreEquivalent(GitRepository.GetSnapshot(repo), snapshot);
     }
 
     [Test, AutoData]
@@ -150,6 +151,7 @@ public sealed class RestoreSafetyTests
         repo.Branches.Remove($"feature/{suffix}");
         repo.RestoreFrom(snapshot);
 
-        await Assert.That(repo.Reopen().Snapshot()).IsEquivalentTo(snapshot);
+        using var reopened = repo.Reopen();
+        await SnapshotAssert.AreEquivalent(reopened.Snapshot(), snapshot);
     }
 }

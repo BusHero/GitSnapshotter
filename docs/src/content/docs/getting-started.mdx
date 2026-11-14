@@ -1,0 +1,107 @@
+---
+title: Getting started
+description: Take your first snapshot and restore it, from C# or from the command line.
+---
+
+import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+
+This walk-through takes a snapshot, makes a mess of the repository, and restores it. Follow it in C# or in a
+shell; the steps are the same. Install the [package or the tool](/GitSnapshotter/installation/) first.
+
+<Aside type="caution">
+  Restoring deletes branches, tags and remotes that weren't in the snapshot, and can reset the working tree.
+  Try this in a scratch clone first.
+</Aside>
+
+<Steps>
+
+1. **Take a snapshot.**
+
+   <Tabs syncKey="interface">
+     <TabItem label="C#">
+       ```csharp
+       using GitSnapshotter;
+
+       const string path = "/path/to/repo";
+       var snapshot = GitRepository.GetSnapshot(path);
+       ```
+     </TabItem>
+     <TabItem label="Command line">
+       ```sh
+       cd /path/to/repo
+       gitsnapshotter snapshot . --output ../before.json
+       ```
+
+       Keep the file outside the repository, or it shows up as an untracked file.
+     </TabItem>
+   </Tabs>
+
+2. **Change the repository.** For example:
+
+   ```sh
+   git checkout -b experiment
+   git commit --allow-empty -m "try something"
+   git branch -f feature HEAD
+   git tag -d v1.0
+   ```
+
+3. **See what changed.**
+
+   <Tabs syncKey="interface">
+     <TabItem label="C#">
+       ```csharp
+       var now = GitRepository.GetSnapshot(path);
+       Console.WriteLine(SnapshotDiff.Compare(snapshot, now));
+       ```
+     </TabItem>
+     <TabItem label="Command line">
+       ```sh
+       gitsnapshotter diff . ../before.json
+       ```
+     </TabItem>
+   </Tabs>
+
+   ```text
+   ~ Head HEAD main -> experiment
+   ~ Branch feature b803aa0e577d422308d789b5a64ec784def50469 -> 7bb0b8d12decfd8d9f6deb827c519008c80dcf4c
+   + Branch experiment 7bb0b8d12decfd8d9f6deb827c519008c80dcf4c
+   - Tag v1.0 b803aa0e577d422308d789b5a64ec784def50469 (annotation 2fd9fb7f8beecc53171b02184a760937711b3b70)
+   ```
+
+4. **Restore.**
+
+   <Tabs syncKey="interface">
+     <TabItem label="C#">
+       ```csharp
+       GitRepository.Restore(path, snapshot);
+       ```
+     </TabItem>
+     <TabItem label="Command line">
+       ```sh
+       gitsnapshotter restore . ../before.json
+       ```
+     </TabItem>
+   </Tabs>
+
+   `main` is checked out again, `feature` is back where it was, `experiment` is gone and `v1.0` is back with its
+   original annotation.
+
+</Steps>
+
+## Restore automatically
+
+In C#, `GitRepository.Preserve` takes a snapshot now and restores it when the returned scope is disposed:
+
+```csharp
+using (GitRepository.Preserve(path))
+{
+    // anything done to the repository in here is undone on dispose
+}
+```
+
+## Next steps
+
+- [Taking snapshots](/GitSnapshotter/library/taking-snapshots/) and [Restoring](/GitSnapshotter/library/restoring/)
+  cover the library in depth.
+- [Testing](/GitSnapshotter/library/testing/) shows how to use `Preserve` with xUnit, NUnit, MSTest and TUnit.
+- [Command line](/GitSnapshotter/cli/overview/) documents every command and option.

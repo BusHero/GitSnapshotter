@@ -1,7 +1,24 @@
 name: build
+# Releases are named after their version. Otherwise the name is empty, so GitHub uses its default: the first line of
+# the commit message on a push. (head_commit.message would be the whole message, body and all, on one line.)
+run-name: ${{ inputs.version && format('release {0}', inputs.version) || '' }}
 
+# One workflow for CI builds and releases.
+#
+# CI build: every push to a branch that touches the code, or Run workflow with no version. Tests on Windows, runs the
+# pipeline on Linux, uploads the console app and the packages as artifacts, and pushes prerelease packages to GitHub
+# Packages.
+#
+# Release: Actions > build > Run workflow, on the default branch, with the version to release (1.2.0, or 1.2.0-rc.1
+# for a prerelease). The same jobs build with that version, then:
+#   verify   checks first that the version is valid and not released yet, the run is on the default branch, and the
+#            'nuget' environment requires a reviewer (the workflow fails closed if anyone removes that protection)
+#   publish  waits for a reviewer to approve the 'nuget' environment, then creates the GitHub release (and its
+#            v<version> tag) with every artifact and pushes the packages to nuget.org; the only job that can write
+#            to the repository or get a nuget.org key
 on:
   push:
+    branches: ['**']
     paths:
       - 'Source/**'
       - 'pipeline/**'
@@ -12,18 +29,169 @@ on:
       - 'Directory.Packages.props'
       - 'build.sh'
       - 'build.cmd'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, like 1.2.0 or 1.2.0-rc.1. Leave empty for a CI build.'
+        required: false
+        type: string
 
 # Least privilege by default; jobs that need more ask for it explicitly.
 permissions:
   contents: read
 
+# One release at a time, never cancelled half way through; CI builds are not limited.
+concurrency:
+  group: ${{ inputs.version && 'release' || format('build-{0}', github.run_id) }}
+  cancel-in-progress: false
+
+env:
+  RELEASE_ENVIRONMENT: nuget
+
 jobs:
+  # Decides whether this run is a release; on a release, checks it may go ahead before anything is built.
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Reads the release environment's protection rules.
+      actions: read
+    outputs:
+      release: ${{ inputs.version != '' }}
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+    steps:
+      - name: 'Check version'
+        if: inputs.version != ''
+        id: version
+        env:
+          # Through the environment, never interpolated into the script: the input is free text.
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          version="${INPUT_VERSION#v}"
+          # SemVer 2.0: MAJOR.MINOR.PATCH with an optional -prerelease label.
+          if ! [[ "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]; then
+            echo "::error::'$INPUT_VERSION' is not <major>.<minor>.<patch>[-<prerelease>]"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          if [[ "$version" == *-* ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # A run started on a feature branch must not become a release.
+      - name: 'Run is on the default branch'
+        if: inputs.version != ''
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          if [[ "$GITHUB_REF" != "refs/heads/$DEFAULT_BRANCH" ]]; then
+            echo "::error::Started on $GITHUB_REF; run the release workflow on $DEFAULT_BRANCH"
+            exit 1
+          fi
+
+      # Each version is released once. A re-run of this run finds its own tag on the same commit and goes on.
+      - name: 'Version is not released yet'
+        if: inputs.version != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if commit=$(gh api "repos/$GITHUB_REPOSITORY/commits/refs/tags/$TAG" --jq .sha 2> /dev/null); then
+            if [[ "$commit" != "$GITHUB_SHA" ]]; then
+              echo "::error::$TAG already exists on $commit; pick a new version"
+              exit 1
+            fi
+            echo "$TAG already points at $GITHUB_SHA: continuing an earlier attempt."
+          fi
+
+      # The publish job's approval gate lives in the repository settings, so check here that it is still there.
+      - name: 'Release environment requires a reviewer'
+        if: inputs.version != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! reviewers=$(gh api "repos/$GITHUB_REPOSITORY/environments/$RELEASE_ENVIRONMENT" \
+              --jq '[.protection_rules[]? | select(.type == "required_reviewers") | .reviewers[]?] | length'); then
+            echo "::error::Could not read the '$RELEASE_ENVIRONMENT' environment. Create it in Settings > Environments and add a required reviewer."
+            exit 1
+          fi
+          if [[ "$reviewers" -lt 1 ]]; then
+            echo "::error::The '$RELEASE_ENVIRONMENT' environment has no required reviewers. Add one in Settings > Environments so every release is approved by hand."
+            exit 1
+          fi
+          echo "'$RELEASE_ENVIRONMENT' requires approval from $reviewers reviewer(s)."
+
+      - uses: actions/checkout@v7
+        if: inputs.version != ''
+        with:
+          persist-credentials: false
+          sparse-checkout: CHANGELOG.md
+          sparse-checkout-cone-mode: false
+
+      # The GitHub release description is the CHANGELOG.md section for the version. A prerelease with no section of
+      # its own uses Unreleased; a stable release must have its own section.
+      - name: 'Release notes from CHANGELOG.md'
+        if: inputs.version != ''
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+        run: |
+          # The lines under "## [<name>]", up to the next section or the link definitions, without blank lines at
+          # either end.
+          section() {
+            awk -v heading="## [$1]" '
+              found && (/^## / || /^\[[^]]+\]: /) { exit }
+              found { print }
+              index($0, heading) == 1 { found = 1 }
+            ' CHANGELOG.md | sed -e '/./,$!d' | tac | sed -e '/./,$!d' | tac
+          }
+
+          from="$VERSION"
+          notes=$(section "$VERSION")
+          if [[ -z "$notes" && "$PRERELEASE" == true ]]; then
+            from=Unreleased
+            notes=$(section Unreleased)
+          fi
+          if [[ -z "$notes" ]]; then
+            if [[ "$PRERELEASE" == true ]]; then
+              echo "::error::CHANGELOG.md has nothing under '## [$VERSION]' or '## [Unreleased]' to describe this release"
+            else
+              echo "::error::CHANGELOG.md has no '## [$VERSION]' section. Rename Unreleased to it before releasing."
+            fi
+            exit 1
+          fi
+
+          mkdir release-notes
+          printf '%s\n' "$notes" > release-notes/release-notes.md
+          echo "Release description, from the '$from' section of CHANGELOG.md:"
+          cat release-notes/release-notes.md
+
+      - uses: actions/upload-artifact@v7
+        if: inputs.version != ''
+        with:
+          name: release-notes
+          path: release-notes
+          if-no-files-found: error
+
+      - name: 'CI build'
+        if: inputs.version == ''
+        run: echo "No version given, so this is a CI build and nothing is released."
+
   # .NET Framework tests only run on Windows; this job runs every test framework there.
   windows-latest:
     name: windows-latest
+    needs: verify
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: 'Setup: .NET SDK from global.json'
         uses: actions/setup-dotnet@v6
@@ -49,19 +217,22 @@ jobs:
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env['ACTIONS_RUNTIME_TOKEN']);
             core.exportVariable('ACTIONS_RESULTS_URL', process.env['ACTIONS_RESULTS_URL']);
 
-      - name: 'Test: net472, net8.0, net10.0'
+      - name: 'Test: net472, net8.0, net11.0'
         run: dotnet test --solution Source/GitSnapshotter.slnx --configuration Release --treenode-filter "/*/*/*/*[Category!=Discovery]"
 
   ubuntu-latest:
     name: ubuntu-latest
-    needs: windows-latest
+    needs: [verify, windows-latest]
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      # The pipeline pushes the package to GitHub Packages with GITHUB_TOKEN.
+      # CI builds push prerelease packages to GitHub Packages with GITHUB_TOKEN. Release builds get no token.
       packages: write
     steps:
+      # No token left in .git/config: the code being built cannot reach the job's credentials.
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: 'Setup: .NET SDK from global.json'
         uses: actions/setup-dotnet@v6
@@ -75,26 +246,146 @@ jobs:
         with:
           path: ~/.nuget/packages
           key: ${{ runner.os }}-${{ hashFiles('**/global.json', '**/packages.lock.json') }}
-      
+
       - name: 'Configure git credentials'
         run: |
           git config --global user.email github-actions@github.com
           git config --global user.name github-actions
-      
+
+      # CI build: a branch prerelease, pushed to GitHub Packages. Release: the release version, not pushed here;
+      # the publish job pushes it to nuget.org after approval.
       - name: 'Run: pipeline'
         id: pipeline
         env:
           Build__DefaultBranch: ${{ github.event.repository.default_branch }}
-          Build__NuGetApiKey: ${{ secrets.GITHUB_TOKEN }}
+          Build__Version: ${{ needs.verify.outputs.version }}
+          Build__NuGetApiKey: ${{ needs.verify.outputs.release != 'true' && secrets.GITHUB_TOKEN || '' }}
         run: dotnet run --project pipeline/GitSnapshotter.Pipeline --configuration Release
 
+      # PackModule and PublishConsoleModule share the publish directory; the packages (library and tool) and their
+      # symbol packages get their own artifact.
       - uses: actions/upload-artifact@v7
         with:
           name: GitSnapshotter.Console_${{ steps.pipeline.outputs.version }}
-          path: publish
+          path: |
+            publish
+            !publish/*.nupkg
+            !publish/*.snupkg
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: GitSnapshotter.NuGet_${{ steps.pipeline.outputs.version }}
+          path: |
+            publish/*.nupkg
+            publish/*.snupkg
+          if-no-files-found: error
+          # A .nupkg (and .snupkg) is already a zip archive.
+          compression-level: 0
+
+      - name: 'Assemble release assets'
+        if: needs.verify.outputs.release == 'true'
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          # Exactly the packages being released, at the release version: pushing to nuget.org can't be undone.
+          expected="GitSnapshotter.${VERSION}.nupkg GitSnapshotter.Tool.${VERSION}.nupkg"
+          actual=$(cd publish && ls *.nupkg | sort | xargs)
+          if [[ "$actual" != "$(xargs -n1 <<< "$expected" | sort | xargs)" ]]; then
+            echo "::error::Expected exactly: $expected. The pipeline produced: $actual"
+            exit 1
+          fi
+
+          mkdir release
+          cp publish/*.nupkg publish/*.snupkg release/
+          (cd publish && zip -r -q "../release/GitSnapshotter.Console_${VERSION}.zip" . -x '*.nupkg' '*.snupkg')
+          (cd release && sha256sum * > SHA256SUMS.txt)
+          ls -l release
+
+      - uses: actions/upload-artifact@v7
+        if: needs.verify.outputs.release == 'true'
+        with:
+          name: GitSnapshotter_${{ needs.verify.outputs.version }}
+          path: release
+          if-no-files-found: error
+
+  publish:
+    name: publish
+    needs: [verify, ubuntu-latest]
+    if: needs.verify.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    # Release runs only. Waits for a required reviewer (enforced by the verify job). If the nuget.org trusted
+    # publishing policy names an environment, it must be this one.
+    environment:
+      name: nuget
+      url: https://www.nuget.org/packages/GitSnapshotter/${{ needs.verify.outputs.version }}
+    permissions:
+      # Creates the GitHub release and uploads its assets.
+      contents: write
+      # Trusted publishing: NuGet/login exchanges the workflow's OIDC token for a short-lived nuget.org API key.
+      id-token: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ needs.verify.outputs.tag }}
+      PRERELEASE: ${{ needs.verify.outputs.prerelease }}
+    # No checkout: this job only publishes the files the ubuntu-latest job produced.
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: GitSnapshotter_${{ needs.verify.outputs.version }}
+          path: release
+
+      # Kept out of release/: everything there is attached to the release.
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-notes
+          path: release-notes
+
+      - name: 'Verify checksums'
+        working-directory: release
+        run: sha256sum --check SHA256SUMS.txt
+
+      # A draft first: if the NuGet push fails, nothing is public yet and the run can be retried. A draft has no git
+      # tag yet; GitHub creates the tag on the released commit when the release is published. The description is
+      # the version's CHANGELOG.md section, from the verify job.
+      - name: 'Create draft GitHub release'
+        run: |
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            # A draft left behind by a failed run (verify rejects a published one): point it at this commit and
+            # refresh its description and assets.
+            gh release edit "$TAG" --target "$GITHUB_SHA" --notes-file release-notes/release-notes.md
+            gh release upload "$TAG" release/* --clobber
+          else
+            flags=(--draft --target "$GITHUB_SHA" --notes-file release-notes/release-notes.md --title "$TAG")
+            if [[ "$PRERELEASE" == true ]]; then flags+=(--prerelease); fi
+            gh release create "$TAG" "${flags[@]}" release/*
+          fi
+
+      # Right before the push: the key it returns is short-lived. Needs a trusted publishing policy on nuget.org
+      # for this repository and workflow file (build.yml), owned by this user.
+      - name: 'Log in to nuget.org (trusted publishing)'
+        id: nuget-login
+        uses: NuGet/login@v1
+        with:
+          user: bus1hero
+
+      # dotnet nuget push also pushes each package's .snupkg from the same folder to nuget.org's symbol server.
+      - name: 'Push packages to nuget.org'
+        env:
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+        run: dotnet nuget push "release/*.nupkg" --source https://api.nuget.org/v3/index.json --api-key "$NUGET_API_KEY" --skip-duplicate
+
+      - name: 'Publish GitHub release'
+        run: |
+          latest=true
+          if [[ "$PRERELEASE" == true ]]; then latest=false; fi
+          gh release edit "$TAG" --draft=false --latest="$latest"
+
   # Uploads the resolved package graph to GitHub's dependency graph (Dependabot alerts, Insights > Dependency graph).
   dependency-submission:
     name: dependency-submission
+    # CI builds only; a release builds a commit that was already built on push.
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: write

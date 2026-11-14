@@ -1,4 +1,4 @@
-﻿using LibGit2Sharp;
+using LibGit2Sharp;
 
 namespace GitSnapshotter.UnitTests;
 
@@ -65,7 +65,7 @@ public sealed class WorkingTreeTests
         using (Assert.Multiple())
         {
             await Assert.That(fresh.ReadFile("a.txt")).IsEqualTo("work in progress");
-            await Assert.That(fresh.SnapshotWithWorkingTree()).IsEquivalentTo(snapshot);
+            await SnapshotAssert.AreEquivalent(fresh.SnapshotWithWorkingTree(), snapshot);
         }
     }
 
@@ -86,7 +86,7 @@ public sealed class WorkingTreeTests
         {
             await Assert.That(fresh.ReadFile("a.txt")).IsEqualTo("work in progress");
             await Assert.That(fresh.RetrieveStatus("a.txt")).IsEqualTo(FileStatus.ModifiedInWorkdir);
-            await Assert.That(fresh.SnapshotWithWorkingTree()).IsEquivalentTo(snapshot);
+            await SnapshotAssert.AreEquivalent(fresh.SnapshotWithWorkingTree(), snapshot);
         }
     }
 
@@ -254,7 +254,8 @@ public sealed class WorkingTreeTests
         {
             await Assert.That((File.GetUnixFileMode(repo.FullPath("script.sh")) & UnixFileMode.UserExecute))
                 .IsEqualTo(UnixFileMode.UserExecute);
-            await Assert.That(repo.Reopen().SnapshotWithWorkingTree()).IsEquivalentTo(snapshot);
+            using var reopened = repo.Reopen();
+            await SnapshotAssert.AreEquivalent(reopened.SnapshotWithWorkingTree(), snapshot);
         }
     }
 #endif

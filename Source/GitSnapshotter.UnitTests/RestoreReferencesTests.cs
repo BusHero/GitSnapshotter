@@ -1,4 +1,4 @@
-﻿using LibGit2Sharp;
+using LibGit2Sharp;
 
 namespace GitSnapshotter.UnitTests;
 
@@ -39,7 +39,8 @@ public sealed class RestoreReferencesTests
         repo.Refs.Remove("refs/custom/marker");
         repo.RestoreFrom(snapshot);
 
-        await Assert.That(repo.Reopen().Refs["refs/custom/marker"].TargetIdentifier).IsEqualTo(commit.Sha);
+        using var reopened = repo.Reopen();
+        await Assert.That(reopened.Refs["refs/custom/marker"].TargetIdentifier).IsEqualTo(commit.Sha);
     }
 
     [Test]
@@ -52,7 +53,8 @@ public sealed class RestoreReferencesTests
         repo.Refs.Add("refs/custom/marker", commit.Id);
         repo.RestoreFrom(snapshot);
 
-        await Assert.That(repo.Reopen().Refs["refs/custom/marker"]).IsNull();
+        using var reopened = repo.Reopen();
+        await Assert.That(reopened.Refs["refs/custom/marker"]).IsNull();
     }
 
     [Test]
@@ -72,7 +74,7 @@ public sealed class RestoreReferencesTests
         using (Assert.Multiple())
         {
             await Assert.That(fresh.Refs["refs/stash"].TargetIdentifier).IsEqualTo(stash.WorkTree.Sha);
-            await Assert.That(fresh.Snapshot()).IsEquivalentTo(snapshot);
+            await SnapshotAssert.AreEquivalent(fresh.Snapshot(), snapshot);
         }
     }
 

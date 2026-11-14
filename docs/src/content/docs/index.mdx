@@ -1,0 +1,69 @@
+---
+title: GitSnapshotter
+description: Snapshot a git repository's references and working tree, and put it back exactly as it was.
+template: splash
+hero:
+  tagline: Take a snapshot of a git repository's HEAD, branches, remotes, tags and working tree — and restore it later, exactly as it was.
+  image:
+    file: ../../../../assets/logo/icon.svg
+    alt: GitSnapshotter logo
+  actions:
+    - text: Get started
+      link: /GitSnapshotter/getting-started/
+      icon: right-arrow
+    - text: View on GitHub
+      link: https://github.com/BusHero/GitSnapshotter
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid, LinkCard, Tabs, TabItem } from '@astrojs/starlight/components';
+
+<CardGrid stagger>
+  <Card title="Small and cheap" icon="rocket">
+    A snapshot stores names and object ids only, so taking one is fast and the JSON is tiny.
+  </Card>
+  <Card title="Safe restores" icon="approve-check">
+    `Restore` checks everything first. Missing objects or uncommitted changes stop it before anything is touched.
+  </Card>
+  <Card title="Made for tests" icon="puzzle">
+    Wrap a test in `GitRepository.Preserve(path)` and every change to the repository is undone on dispose.
+  </Card>
+  <Card title="Library and CLI" icon="seti:shell">
+    Use the `GitSnapshotter` package from .NET, or the `gitsnapshotter` tool from a shell script.
+  </Card>
+</CardGrid>
+
+## At a glance
+
+<Tabs syncKey="interface">
+  <TabItem label="C#">
+    ```csharp
+    using GitSnapshotter;
+
+    var snapshot = GitRepository.GetSnapshot(path);
+
+    // rebase, delete branches, move tags, add remotes...
+
+    GitRepository.Restore(path, snapshot);
+    ```
+  </TabItem>
+  <TabItem label="Command line">
+    ```sh
+    gitsnapshotter snapshot . -o before.json
+
+    # rebase, delete branches, move tags, add remotes...
+
+    gitsnapshotter restore . before.json
+    ```
+  </TabItem>
+</Tabs>
+
+## Where to next
+
+<CardGrid>
+  <LinkCard title="Introduction" description="What a snapshot records and when to use one." href="/GitSnapshotter/introduction/" />
+  <LinkCard title="Use it in tests" description="Undo every change a test makes to a real repository." href="/GitSnapshotter/library/testing/" />
+  <LinkCard title="Command line" description="Snapshot, restore and diff from a shell." href="/GitSnapshotter/cli/overview/" />
+  <LinkCard title="How it works" description="What restore does, step by step, and why it is safe." href="/GitSnapshotter/concepts/how-it-works/" />
+</CardGrid>

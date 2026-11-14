@@ -1,4 +1,4 @@
-﻿using Constants;
+using Constants;
 
 
 using LibGit2Sharp;

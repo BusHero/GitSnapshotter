@@ -1,4 +1,4 @@
-﻿namespace GitSnapshotter.UnitTests;
+namespace GitSnapshotter.UnitTests;
 
 public sealed class RemoveBranchesTests
 {
@@ -15,9 +15,9 @@ public sealed class RemoveBranchesTests
         GitRepository.Restore(repo.Info.WorkingDirectory, originalSnapshot);
         var newSnapshot = GitRepository.GetSnapshot(repo.Info.WorkingDirectory);
 
-        await Assert.That(newSnapshot).IsEquivalentTo(originalSnapshot);
+        await SnapshotAssert.AreEquivalent(newSnapshot, originalSnapshot);
     }
-    
+
     [Test, AutoData]
     public async Task RemoveSeveralBranches(string branchName1, string branchName2)
     {
@@ -32,6 +32,6 @@ public sealed class RemoveBranchesTests
         GitRepository.Restore(repo.Info.WorkingDirectory, originalSnapshot);
         var newSnapshot = GitRepository.GetSnapshot(repo.Info.WorkingDirectory);
 
-        await Assert.That(newSnapshot).IsEquivalentTo(originalSnapshot);
+        await SnapshotAssert.AreEquivalent(newSnapshot, originalSnapshot);
     }
 }

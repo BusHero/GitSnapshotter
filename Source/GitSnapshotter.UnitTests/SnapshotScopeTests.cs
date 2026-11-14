@@ -1,4 +1,4 @@
-﻿namespace GitSnapshotter.UnitTests;
+namespace GitSnapshotter.UnitTests;
 
 public sealed class SnapshotScopeTests
 {
@@ -19,7 +19,7 @@ public sealed class SnapshotScopeTests
         using var fresh = repo.Reopen();
         using (Assert.Multiple())
         {
-            await Assert.That(fresh.Snapshot()).IsEquivalentTo(before);
+            await SnapshotAssert.AreEquivalent(fresh.Snapshot(), before);
             await Assert.That(fresh.ReadFile("a.txt")).IsEqualTo("1");
         }
     }
@@ -32,7 +32,7 @@ public sealed class SnapshotScopeTests
 
         using var scope = GitRepository.Preserve(repo.Info.WorkingDirectory);
 
-        await Assert.That(scope.Snapshot).IsEquivalentTo(repo.Snapshot());
+        await SnapshotAssert.AreEquivalent(scope.Snapshot, repo.Snapshot());
     }
 
     [Test, AutoData]

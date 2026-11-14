@@ -81,6 +81,9 @@ public sealed record SnapshotDiff
     /// </summary>
     public static SnapshotDiff Compare(GitRepositorySnapshot before, GitRepositorySnapshot after)
     {
+        ArgumentNullException.ThrowIfNull(before);
+        ArgumentNullException.ThrowIfNull(after);
+
         var changes = new List<SnapshotChange>();
 
         if (HeadValue(before) != HeadValue(after))
@@ -97,8 +100,8 @@ public sealed record SnapshotDiff
             UpstreamValues(after));
 
         Compare(changes, ChangeCategory.Remote,
-            before.Remotes.ToDictionary(r => r.Name, r => r.Url),
-            after.Remotes.ToDictionary(r => r.Name, r => r.Url));
+            before.Remotes.ToDictionary(r => r.Name, r => r.Url.OriginalString),
+            after.Remotes.ToDictionary(r => r.Name, r => r.Url.OriginalString));
 
         Compare(changes, ChangeCategory.RemoteBranch,
             RemoteBranchValues(before),
@@ -175,8 +178,8 @@ public sealed record SnapshotDiff
     private static void Compare(
         List<SnapshotChange> changes,
         ChangeCategory category,
-        IReadOnlyDictionary<string, string> before,
-        IReadOnlyDictionary<string, string> after)
+        Dictionary<string, string> before,
+        Dictionary<string, string> after)
     {
         foreach (var (name, value) in before.OrderBy(x => x.Key, StringComparer.Ordinal))
         {

@@ -13,14 +13,14 @@ internal static class Cli
 
     public const string Usage = """
         Usage:
-          GitSnapshotter.Console snapshot <repository> [--output <file>] [--include-working-tree]
+          gitsnapshotter snapshot <repository> [--output <file>] [--include-working-tree]
               Take a snapshot. Prints JSON, or writes it to <file>.
-          GitSnapshotter.Console restore <repository> <snapshot-file> [--force] [--dry-run]
+          gitsnapshotter restore <repository> <snapshot-file> [--force] [--dry-run]
               Restore a snapshot. --force overwrites uncommitted changes;
               --dry-run only lists what would change.
-          GitSnapshotter.Console diff <repository> <snapshot-file>
+          gitsnapshotter diff <repository> <snapshot-file>
               List what changed in the repository since the snapshot was taken.
-          GitSnapshotter.Console help
+          gitsnapshotter help
               Show this message.
         """;
 
@@ -176,7 +176,7 @@ internal static class Cli
 
                 values[arg] = args[++i];
             }
-            else if (arg.StartsWith('-'))
+            else if (arg is ['-', ..])
             {
                 error = $"Unknown option '{arg}'.";
                 return false;
