@@ -11,6 +11,19 @@ The `GitSnapshotter` package targets `net8.0` and `net472`, so it works in proje
 .NET Framework 4.7.2 or later. Its only dependency is LibGit2Sharp, which brings the native libgit2 binaries for
 Windows, macOS and Linux.
 
+<Aside type="caution" title=".NET Framework apps">
+  An SDK-style .NET Framework app gets the `win-x86` runtime identifier by default, and then fails to load libgit2
+  (`BadImageFormatException` from `LibGit2Sharp.Core.NativeMethods`). Build it for 64-bit Windows instead:
+
+  ```xml title="MyApp.csproj"
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net472'">
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+  </PropertyGroup>
+  ```
+
+  Apps for .NET 8 and later need nothing of the kind.
+</Aside>
+
 ### From nuget.org
 
 Releases are published to [nuget.org](https://www.nuget.org/packages/GitSnapshotter), so no setup is needed:
@@ -24,19 +37,20 @@ Releases are published to [nuget.org](https://www.nuget.org/packages/GitSnapshot
   <TabItem label="PackageReference">
     ```xml title="MyProject.csproj"
     <ItemGroup>
-      <PackageReference Include="GitSnapshotter" Version="0.2.0" />
+      <PackageReference Include="GitSnapshotter" Version="<version>" />
     </ItemGroup>
     ```
 
-    `0.2.0` is the latest version at the time of writing; check [nuget.org](https://www.nuget.org/packages/GitSnapshotter)
-    for newer ones.
+    Put the version you want in place of `<version>`. The latest is
+    ![the latest version on nuget.org](https://img.shields.io/nuget/v/GitSnapshotter) (see
+    [nuget.org](https://www.nuget.org/packages/GitSnapshotter)).
   </TabItem>
   <TabItem label="Central versions">
     With `Directory.Packages.props`, put the version there and leave it out of the project:
 
     ```xml title="Directory.Packages.props"
     <ItemGroup>
-      <PackageVersion Include="GitSnapshotter" Version="0.2.0" />
+      <PackageVersion Include="GitSnapshotter" Version="<version>" />
     </ItemGroup>
     ```
 
@@ -53,7 +67,7 @@ Releases are published to [nuget.org](https://www.nuget.org/packages/GitSnapshot
   </TabItem>
 </Tabs>
 
-Release candidates (versions like `0.2.0-rc.2`) are published to nuget.org too. The commands above pick the latest
+Release candidates (versions like `0.4.0-rc.1`) are published to nuget.org too. The commands above pick the latest
 stable version; for the latest release candidate, add `--prerelease` (`-IncludePrerelease` in the PM Console), or
 put its version in the project file. Every release is also on the
 [GitHub releases page](https://github.com/BusHero/GitSnapshotter/releases), with its `.nupkg` attached and its
@@ -103,10 +117,10 @@ GitHub Packages requires authentication even for public packages, so you need a 
 
 3. Find the build you want on the
    [package's page on GitHub](https://github.com/BusHero/GitSnapshotter/pkgs/nuget/GitSnapshotter). Builds are
-   versioned `<next version>-<branch>-<timestamp>`, such as `0.3.0-trunk-20261114130000`. Add that exact version:
+   versioned `<next version>-<branch>-<timestamp>`, such as `0.4.0-trunk-20261115060000`. Add that exact version:
 
    ```sh
-   dotnet add package GitSnapshotter --version 0.3.0-trunk-20261114130000
+   dotnet add package GitSnapshotter --version 0.4.0-trunk-20261115060000
    ```
 
    Give the version explicitly rather than using `--prerelease`, which picks the highest version from either feed.
@@ -131,8 +145,10 @@ GitHub Packages requires authentication even for public packages, so you need a 
 ## The command-line tool
 
 The tool is the `GitSnapshotter.Tool` [.NET tool](https://learn.microsoft.com/dotnet/core/tools/global-tools), and
-installs the `gitsnapshotter` command. It needs the [.NET 8 runtime](https://dotnet.microsoft.com/download) or
-later.
+installs the `gitsnapshotter` command. From 0.4.0 it needs the [.NET 8 runtime](https://dotnet.microsoft.com/download)
+or later; 0.3.0 and earlier need the .NET 11 runtime or later. The latest stable version is
+![the latest version on nuget.org](https://img.shields.io/nuget/v/GitSnapshotter.Tool), and the latest release
+candidate ![the latest version on nuget.org, release candidates included](https://img.shields.io/nuget/vpre/GitSnapshotter.Tool).
 
 ### From nuget.org
 
@@ -159,8 +175,7 @@ needed. These commands install the latest stable version; add `--prerelease` for
     dotnet tool run gitsnapshotter help   # or: dotnet gitsnapshotter help
     ```
 
-    This pins the latest stable version (`0.2.0` at the time of writing). To pin a specific one, add
-    `--version 0.2.0`.
+    This pins the latest stable version. To pin a specific one, add `--version <version>`.
   </TabItem>
 </Tabs>
 
