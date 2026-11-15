@@ -10,15 +10,15 @@ Sets every SmokeTest__* variable the chosen mode needs, runs the tests, and puts
 Published (the default): tests a version on nuget.org, with every check, the release-only ones included (signatures,
 nuget.org's metadata, the symbol server, the GitHub release, the docs page).
 
-Local (-Local): builds and packs this checkout as CI does, and tests those packages from ./publish, with the
-release-only checks off. Our packages come from ./publish, everything else from nuget.org. The Source Link test
+Local (-Local): builds this checkout's release candidate as CI does, and tests it from ./release, with the
+release-only checks off. Our packages come from ./release, everything else from nuget.org. The Source Link test
 downloads the sources from GitHub at the current commit, so it passes only once that commit is pushed.
 
 Needs the .NET SDK from global.json, the .NET 8 runtime, git, and access to nuget.org and GitHub.
 
 .PARAMETER Version
 The version to test, like 0.3.0 or 0.4.0-rc.1. Published: defaults to the newest version on nuget.org. Local: taken
-from the packages in ./publish.
+from the packages in ./release.
 
 .PARAMETER WithReleaseAssets
 Also downloads the GitHub release's files and checks the packages, PDBs and console app zip against them.
@@ -27,7 +27,7 @@ Also downloads the GitHub release's files and checks the packages, PDBs and cons
 Tests the packages this checkout builds instead of a published version.
 
 .PARAMETER NoBuild
-With -Local: tests the packages already in ./publish instead of building them again.
+With -Local: tests the release candidate already in ./release instead of building it again.
 
 .PARAMETER WaitMinutes
 How long to keep retrying while the feed doesn't list the packages, their metadata or symbols yet. nuget.org takes a
@@ -51,11 +51,11 @@ Tests 0.3.0, and compares it with the files of the v0.3.0 GitHub release.
 
 .EXAMPLE
 ./smoke-test.ps1 -Local
-Builds and packs this checkout, then tests those packages.
+Builds this checkout's release candidate, then tests it.
 
 .EXAMPLE
 ./smoke-test.ps1 -Local -NoBuild --treenode-filter "/*/*/ToolTests/*"
-Tests the packages already in ./publish, running only the tool's tests.
+Tests the release candidate already in ./release, running only the tool's tests.
 #>
 [CmdletBinding(DefaultParameterSetName = 'Published')]
 param(
@@ -81,7 +81,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $root = $PSScriptRoot
-$publish = Join-Path $root 'publish'
+$candidate = Join-Path $root 'release'
 $smokeTests = Join-Path $root 'pipeline' 'GitSnapshotter.SmokeTests'
 
 function Invoke-Native {
@@ -121,12 +121,12 @@ if ($Local) {
     }
 
     # The library's package, not the tool's: GitSnapshotter.<version>.nupkg.
-    $package = Get-ChildItem -Path $publish -Filter 'GitSnapshotter.*.nupkg' -ErrorAction SilentlyContinue |
+    $package = Get-ChildItem -Path $candidate -Filter 'GitSnapshotter.*.nupkg' -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -notlike 'GitSnapshotter.Tool.*' } |
         Sort-Object LastWriteTime |
         Select-Object -Last 1
     if (-not $package) {
-        throw "No GitSnapshotter package in $publish. Run without -NoBuild to build one."
+        throw "No GitSnapshotter package in $candidate. Run without -NoBuild to build one."
     }
     $Version = $package.Name -replace '^GitSnapshotter\.(.+)\.nupkg$', '$1'
 
@@ -135,7 +135,8 @@ if ($Local) {
         Write-Warning "$commit is not pushed: the Source Link test downloads the sources from GitHub at that commit, so it will fail."
     }
 
-    $settings.Source = $publish
+    $settings.Source = $candidate
+    $settings.ReleaseDirectory = $candidate
     $settings.Commit = $commit
     # As on a CI build: only a release is signed, indexed by nuget.org, on GitHub and in the docs.
     $settings.VerifySignatures = 'false'

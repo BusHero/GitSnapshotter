@@ -108,8 +108,8 @@ public sealed class PackageTests(PublishedRelease release)
             foreach (var versions in new[] { release.ToolVersions, release.LibraryVersions })
             {
                 await Assert.That(ReleasedAtOrAbove(versions, release.Version)).IsNull().Because(
-                    $"{release.Version} must sort above every release, or updates and --prerelease never pick it: raise "
-                    + "<VersionPrefix> in Source/Directory.Build.props above the last release");
+                    $"{release.Version} must sort above every release, or it could never be released: the build takes the "
+                    + "next release after the tagged ones, so check that it was built with every tag (fetch-depth: 0)");
             }
         }
     }

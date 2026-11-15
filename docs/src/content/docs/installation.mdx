@@ -73,73 +73,53 @@ put its version in the project file. Every release is also on the
 [GitHub releases page](https://github.com/BusHero/GitSnapshotter/releases), with its `.nupkg` attached and its
 changes listed.
 
-### Builds from trunk (GitHub Packages)
+### Release candidates from trunk
 
-Every push to `trunk` publishes a build to **GitHub Packages**, so you can try changes before they are released.
-GitHub Packages requires authentication even for public packages, so you need a GitHub personal access token
-(classic) with the `read:packages` scope.
+Every build of `trunk` is a release candidate: the very packages a release would publish to nuget.org, at the version
+it would be released as, with the build's run number after a `+`. `0.4.1+57` is run 57, a candidate for 0.4.1. To
+try one before it is released:
 
 <Steps>
 
-1. Add a `nuget.config` next to your solution that adds the feed and reads the credentials from environment
-   variables, so no secret is committed. nuget.org stays available alongside it for your other packages:
+1. Pick a run of the [Build and release workflow on `trunk`](https://github.com/BusHero/GitSnapshotter/actions/workflows/build.yml?query=branch%3Atrunk)
+   whose jobs all passed; its summary names the candidate. Download its `release-candidate` artifact (you need to be
+   signed in to GitHub), and unzip it into a directory next to your solution. Or, with the GitHub CLI:
+
+   ```sh
+   gh run download <run-id> --repo BusHero/GitSnapshotter --name release-candidate --dir gitsnapshotter-candidate
+   ```
+
+2. Add a `nuget.config` next to your solution that adds the directory as a package source. nuget.org stays
+   available alongside it for your other packages:
    ```xml title="nuget.config"
    <?xml version="1.0" encoding="utf-8"?>
    <configuration>
      <packageSources>
-       <add key="BusHero" value="https://nuget.pkg.github.com/BusHero/index.json" />
+       <add key="gitsnapshotter-candidate" value="gitsnapshotter-candidate" />
      </packageSources>
-     <packageSourceCredentials>
-       <BusHero>
-         <add key="Username" value="%GITHUB_USERNAME%" />
-         <add key="ClearTextPassword" value="%GITHUB_TOKEN%" />
-       </BusHero>
-     </packageSourceCredentials>
    </configuration>
    ```
 
-2. Set the two variables in your shell:
-
-   <Tabs syncKey="shell">
-     <TabItem label="bash / zsh">
-       ```sh
-       export GITHUB_USERNAME=<your-github-user>
-       export GITHUB_TOKEN=<token-with-read:packages>
-       ```
-     </TabItem>
-     <TabItem label="PowerShell">
-       ```powershell
-       $env:GITHUB_USERNAME = "<your-github-user>"
-       $env:GITHUB_TOKEN = "<token-with-read:packages>"
-       ```
-     </TabItem>
-   </Tabs>
-
-3. Find the build you want on the
-   [package's page on GitHub](https://github.com/BusHero/GitSnapshotter/pkgs/nuget/GitSnapshotter). Builds are
-   versioned `<next version>-<branch>-<timestamp>`, such as `0.4.0-trunk-20261115060000`. Add that exact version:
+3. Add the candidate's version, without the `+` and the run number:
 
    ```sh
-   dotnet add package GitSnapshotter --version 0.4.0-trunk-20261115060000
+   dotnet add package GitSnapshotter --version 0.4.1
    ```
 
-   Give the version explicitly rather than using `--prerelease`, which picks the highest version from either feed.
-   A trunk build sorts below the release it leads up to, so once that release is on nuget.org, `--prerelease`
-   picks the release instead.
-
-   To go back to releases, set the version in your project file to one from nuget.org.
+   To go back to releases, set the version in your project file to one from nuget.org, and remove the source.
 
 </Steps>
 
-<Aside type="tip" title="In GitHub Actions">
-  Set `GITHUB_USERNAME` to `${{ github.actor }}` and `GITHUB_TOKEN` to `${{ secrets.GITHUB_TOKEN }}`, and give the
-  job `packages: read` permission. If the workflow is in a different repository, the package's settings on GitHub
-  must also grant that repository access.
+<Aside type="caution" title="NuGet caches by version">
+  NuGet ignores what follows the `+`, so to NuGet every candidate for 0.4.1, and the 0.4.1 release itself, are the
+  same package. Once one is in your global packages folder (`~/.nuget/packages`), restores keep using it. Before you
+  switch to another candidate, or to the release of the same version, clear it:
+  `dotnet nuget locals global-packages --clear`.
 </Aside>
 
 <Aside type="note" title="Package source mapping">
   If your `nuget.config` uses `<packageSourceMapping>`, add a `<package pattern="GitSnapshotter" />` entry under
-  both `nuget.org` and `BusHero`, so releases can come from one and trunk builds from the other.
+  `gitsnapshotter-candidate`.
 </Aside>
 
 ## The command-line tool
@@ -182,23 +162,23 @@ needed. These commands install the latest stable version; add `--prerelease` for
 Each [GitHub release](https://github.com/BusHero/GitSnapshotter/releases) also has the tool's `.nupkg`, and the
 app itself as a zip (`GitSnapshotter.Console_<version>.zip`) that runs with `dotnet GitSnapshotter.Console.dll`.
 
-### Builds of the tool from trunk (GitHub Packages)
+### Release candidates of the tool from trunk
 
-Every push to `trunk` publishes a build of the tool to GitHub Packages, next to the library. Set up the `BusHero`
-feed and its credentials as in [Builds from trunk](#builds-from-trunk-github-packages) (steps 1 and 2). Pick the
-exact version from the [tool's page on GitHub](https://github.com/BusHero/GitSnapshotter/pkgs/nuget/GitSnapshotter.Tool),
-for the same reason as for the library, and run these from the directory with that `nuget.config` (or pass
-`--configfile <path>`):
+Every build of `trunk` is a release candidate of the tool too, in the same `release-candidate` artifact as the
+library. Download it and add the `nuget.config` as in [Release candidates from trunk](#release-candidates-from-trunk)
+(steps 1 and 2), and mind the [cache](#release-candidates-from-trunk): a candidate and its release are the same
+version to NuGet. Run these from the directory with that `nuget.config` (or pass `--configfile <path>`), with the
+candidate's version without the `+` and the run number:
 
 <Tabs syncKey="tool-scope">
   <TabItem label="Global">
     ```sh
-    dotnet tool install --global GitSnapshotter.Tool --version <version>
-    gitsnapshotter help
+    dotnet tool install --global GitSnapshotter.Tool --version 0.4.1
+    gitsnapshotter --version   # 0.4.1+57.<commit>: the candidate's run and commit
     ```
 
     The command goes in `~/.dotnet/tools` (`%USERPROFILE%\.dotnet\tools` on Windows), which the .NET SDK
-    installer puts on your `PATH`. Move to another build with
+    installer puts on your `PATH`. Move to another candidate with
     `dotnet tool update --global GitSnapshotter.Tool --version <version>`.
   </TabItem>
   <TabItem label="Local (per repository)">
@@ -207,7 +187,7 @@ for the same reason as for the library, and run these from the directory with th
 
     ```sh
     dotnet new tool-manifest   # once, if the repository has no manifest yet
-    dotnet tool install GitSnapshotter.Tool --version <version>
+    dotnet tool install GitSnapshotter.Tool --version 0.4.1
     dotnet tool run gitsnapshotter help   # or: dotnet gitsnapshotter help
     ```
   </TabItem>
@@ -220,13 +200,14 @@ for the same reason as for the library, and run these from the directory with th
     dotnet run --project Source/GitSnapshotter.Console -- help
     ```
 
-    `./build.sh` (or `build.cmd` on Windows) also packs the tool into `./publish`. Install that build with the
+    `./build.sh` (or `build.cmd` on Windows) also builds a release candidate into `./release`. Install it with the
     version from its file name, `GitSnapshotter.Tool.<version>.nupkg`:
-    `dotnet tool install --global GitSnapshotter.Tool --version <version> --add-source ./publish`.
+    `dotnet tool install --global GitSnapshotter.Tool --version <version> --add-source ./release`.
   </TabItem>
 </Tabs>
 
 <Aside type="tip" title="In GitHub Actions">
-  Install the tool in a step before you use it, with `GITHUB_USERNAME` and `GITHUB_TOKEN` set and `packages: read`
-  permission as for the library. `actions/setup-dotnet` puts `~/.dotnet/tools` on the `PATH`, so a global tool runs as `gitsnapshotter`.
+  `actions/setup-dotnet` puts `~/.dotnet/tools` on the `PATH`, so a global tool runs as `gitsnapshotter`. To test
+  against a release candidate, download it in a step before with `actions/download-artifact`, giving its
+  `repository`, `run-id` and a `github-token` that can read this repository's actions.
 </Aside>

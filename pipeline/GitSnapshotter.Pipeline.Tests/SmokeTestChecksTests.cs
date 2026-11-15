@@ -809,14 +809,6 @@ public sealed class SmokeTestChecksTests : IDisposable
         }
     }
 
-    [Test]
-    [Arguments(new[] { "GitSnapshotter.0.4.0-trunk-20261114.nupkg", "GitSnapshotter.Tool.0.4.0-trunk-20261114.nupkg", "GitSnapshotter.0.3.0-old.nupkg" }, "trunk-20261114", "0.4.0-trunk-20261114")]
-    [Arguments(new[] { "GitSnapshotter.Tool.0.4.0-x.nupkg" }, "x", null)]
-    public async Task PackedVersionIsTheLibrarysWithTheSuffix(string[] files, string suffix, string? expected)
-    {
-        await Assert.That(PackageVersion.Packed(files, suffix)).IsEqualTo(expected);
-    }
-
     // ---- Breaking changes and size ----------------------------------------------------------------------------------
 
     [Test]

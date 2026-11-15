@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Checks formatting before every push, because the build fails on format
 # violations (.editorconfig). Also runs the test suite before anything is
-# pushed to trunk, because every push to trunk publishes a prerelease NuGet package.
+# pushed to trunk, because every push to trunk builds a release candidate.
 #
 # Enable once per clone:   git config core.hooksPath .githooks
 # Skip in an emergency:    git push --no-verify

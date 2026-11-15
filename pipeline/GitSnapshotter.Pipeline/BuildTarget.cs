@@ -7,20 +7,21 @@ namespace GitSnapshotter.Pipeline;
 public enum BuildTarget
 {
     /// <summary>
-    /// The whole build: format check, compile, tests, third-party notices, the console app, the packages, the push
-    /// to <see cref="BuildSettings.NuGetSource"/> and, on a release, the release assets.
+    /// The commit stage: the version, format check, compile, tests, third-party notices, the console app, the packages
+    /// and the release candidate (<see cref="BuildSettings.ReleaseDirectory"/>), which a release later publishes as is.
     /// </summary>
     All,
 
     /// <summary>
-    /// Checks that <see cref="BuildSettings.Version"/> may be released and writes the release description from
-    /// CHANGELOG.md. Needs a GitHub token (<c>GITHUB_TOKEN</c>) that can read the repository's environments.
+    /// Checks that the release candidate <see cref="BuildSettings.Version"/>, built from
+    /// <see cref="BuildSettings.Commit"/>, may be released, and writes the release description from CHANGELOG.md.
+    /// Builds nothing. Needs a GitHub token (<c>GITHUB_TOKEN</c>) that can read the repository's environments.
     /// </summary>
     VerifyRelease,
 
     /// <summary>
-    /// Runs the smoke tests (pipeline/GitSnapshotter.SmokeTests) on <see cref="BuildSettings.Version"/>: they download
-    /// the published packages and use them as a user would. Their settings are <c>SmokeTest__*</c> environment
+    /// Runs the smoke tests (pipeline/GitSnapshotter.SmokeTests) on <see cref="BuildSettings.Version"/>: they install
+    /// the packages from a feed (a release candidate's directory, or nuget.org) and use them as a user would. Their settings are <c>SmokeTest__*</c> environment
     /// variables. Builds nothing of the product.
     /// </summary>
     SmokeTest,

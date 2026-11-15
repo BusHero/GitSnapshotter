@@ -24,6 +24,7 @@ internal static class BuildTargets
         {
             case BuildTarget.All:
                 modules
+                    .Add<BuildVersionModule>()
                     .Add<VerifyFormattingModule>()
                     .Add<CompileModule>()
                     .Add<ConfigureGitIdentityModule>()
@@ -31,7 +32,6 @@ internal static class BuildTargets
                     .Add<ThirdPartyNoticesModule>()
                     .Add<PackModule>()
                     .Add<PublishConsoleModule>()
-                    .Add<PushPackageModule>()
                     .Add<ReleaseAssetsModule>();
                 break;
 
@@ -48,13 +48,16 @@ internal static class BuildTargets
 
             case BuildTarget.Test:
                 modules
+                    .Add<BuildVersionModule>()
                     .Add<CompileModule>()
                     .Add<ConfigureGitIdentityModule>()
                     .Add<RunUnitTestsModule>();
                 break;
 
             case BuildTarget.Compile:
-                modules.Add<CompileModule>();
+                modules
+                    .Add<BuildVersionModule>()
+                    .Add<CompileModule>();
                 break;
 
             case BuildTarget.Restore:

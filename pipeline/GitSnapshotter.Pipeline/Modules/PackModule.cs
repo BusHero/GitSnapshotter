@@ -10,12 +10,12 @@ using ModularPipelines.Modules;
 namespace GitSnapshotter.Pipeline.Modules;
 
 /// <summary>
-/// Packs the library and the console app's .NET tool package, each with its third-party notices: as the release
-/// version on a release build, otherwise as prereleases named after the branch and the build time. Both get the same
-/// version, which goes to the step's <c>package-version</c> output on GitHub Actions. The only module that packs, so
-/// no two packs write to the publish directory at once.
+/// Packs the library and the console app's .NET tool package, each with its third-party notices, at the build's
+/// version (<see cref="BuildVersionModule"/>). The only module that packs, so no two packs write to the publish
+/// directory at once.
 /// </summary>
 [DependsOn<CompileModule>]
+[DependsOn<BuildVersionModule>]
 [DependsOn<ThirdPartyNoticesModule>]
 // Packing the tool publishes the console app internally; keep that apart from PublishConsoleModule's publish.
 [DependsOn<PublishConsoleModule>]
@@ -25,19 +25,13 @@ public sealed class PackModule(IOptions<BuildSettings> settings) : Module<string
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        var suffix = PackageVersion.Suffix(context, settings.Value);
+        var version = (await context.GetModule<BuildVersionModule>()).ValueOrDefault!;
         var output = Paths.PublishDirectory(context, settings.Value);
         var notices = await context.GetModule<ThirdPartyNoticesModule>();
 
         // The library's notices cover the packages compiled into it; the tool's cover every package it ships.
         await Pack(Paths.Library(context), notices.ValueOrDefault!.Library);
         await Pack(Paths.Console(context), notices.ValueOrDefault!.Console);
-
-        // For the jobs that test the packages: the version they were packed at.
-        var version = settings.Value.Version
-            ?? PackageVersion.Packed(Directory.EnumerateFiles(output, "*.nupkg").Select(file => Path.GetFileName(file)), suffix)
-            ?? throw new InvalidOperationException($"No GitSnapshotter package ending in {suffix} in {output}.");
-        await GitHubActions.SetOutputAsync("package-version", version, cancellationToken);
 
         return output;
 
@@ -49,13 +43,12 @@ public sealed class PackModule(IOptions<BuildSettings> settings) : Module<string
                     Configuration = settings.Value.Configuration,
                     NoBuild = true,
                     NoRestore = true,
-                    VersionSuffix = suffix,
                     Output = output,
                     Nologo = true,
                     Properties =
                     [
                         new KeyValue("ThirdPartyNoticesFile", thirdPartyNotices),
-                        .. settings.Value.VersionProperties,
+                        CompileModule.VersionProperty(version),
                     ],
                 },
                 cancellationToken: cancellationToken);

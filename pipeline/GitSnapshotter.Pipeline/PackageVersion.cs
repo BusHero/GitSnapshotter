@@ -1,81 +1,94 @@
-using System.Globalization;
-
-using ModularPipelines.Context;
-using ModularPipelines.Git.Extensions;
+using System.Text.RegularExpressions;
+using System.Xml.Linq;
 
 namespace GitSnapshotter.Pipeline;
 
-/// <summary>The versions one pipeline run gives the packages (the library and the .NET tool) and the console app.</summary>
-internal static class PackageVersion
+/// <summary>The version a build stamps on everything it builds: the assemblies, both packages and the console app.</summary>
+/// <param name="Release">The version the build can be released as, like <c>0.4.1</c>.</param>
+/// <param name="Build">Which build it is: the CI run number, or <see cref="PackageVersion.LocalBuild"/>.</param>
+public sealed record BuildVersion(ReleaseVersion Release, string Build)
 {
-    // Taken once, so both packages of a prerelease build share the same timestamp.
-    private static readonly DateTime BuildTime = DateTime.UtcNow;
+    /// <summary>The version NuGet knows the packages by, like <c>0.4.1</c>: NuGet ignores build metadata.</summary>
+    public string Version => Release.Version;
+
+    /// <summary>The version with its build metadata, like <c>0.4.1+57</c>: what the assemblies and the nuspec say.</summary>
+    public string Full => $"{Release.Version}+{Build}";
+}
+
+/// <summary>
+/// Works out a build's version. Every build is a release candidate, versioned as it would be released, plus the build
+/// it came from as SemVer build metadata: <c>0.4.1+57</c>. Releasing a candidate publishes those very packages.
+/// </summary>
+internal static partial class PackageVersion
+{
+    /// <summary>The build metadata of a build that isn't a CI run.</summary>
+    public const string LocalBuild = "local";
 
     /// <summary>
-    /// The prerelease suffix for <c>VersionPrefix</c>: none on a release build (the version comes from
-    /// <see cref="BuildSettings.VersionProperties"/>), otherwise the branch and the build time.
+    /// The build metadata for <paramref name="buildNumber"/>: the CI run number, or <see cref="LocalBuild"/> without one.
     /// </summary>
-    public static string? Suffix(IPipelineContext context, BuildSettings settings) =>
-        Suffix(settings, context.Git().Information.BranchName, BuildTime);
-
-    /// <inheritdoc cref="Suffix(IPipelineContext, BuildSettings)"/>
-    /// <param name="settings">The pipeline settings.</param>
-    /// <param name="branch">The branch being built; none on a detached HEAD.</param>
-    /// <param name="buildTime">When the build started, in UTC.</param>
-    public static string? Suffix(BuildSettings settings, string? branch, DateTime buildTime)
+    /// <exception cref="ArgumentException">The build number isn't valid SemVer build metadata.</exception>
+    public static string Build(string? buildNumber)
     {
-        ArgumentNullException.ThrowIfNull(settings);
-
-        if (settings.IsRelease)
+        if (string.IsNullOrWhiteSpace(buildNumber))
         {
-            return null;
+            return LocalBuild;
         }
 
-        // A suffix is a single prerelease label part: "feature/x" would not be a valid version.
-        branch = string.IsNullOrEmpty(branch) ? "local" : branch.Replace('/', '-');
-        return string.Create(CultureInfo.InvariantCulture, $"{branch}-{buildTime:yyyyMMddHHmmss}");
+        var build = buildNumber.Trim();
+        return BuildMetadata().IsMatch(build)
+            ? build
+            : throw new ArgumentException(
+                $"'{buildNumber}' is not SemVer build metadata (dot-separated [0-9A-Za-z-] identifiers)", nameof(buildNumber));
     }
 
     /// <summary>
-    /// The console app's version: the release version on a release build, otherwise <c>yyyyMMddHHmmss+trunk</c>, or
-    /// <c>+merge</c> off the default branch.
+    /// The version the next release will have: <paramref name="prefix"/>, the <c>VersionPrefix</c> in
+    /// Source/Directory.Build.props, unless a stable release at or above it is already tagged; then the patch after
+    /// the newest such release. So nobody has to raise the prefix after each release, only to start a new minor or
+    /// major version, or a prerelease.
     /// </summary>
-    /// <param name="settings">The pipeline settings.</param>
-    /// <param name="branch">The branch being built; none on a detached HEAD.</param>
-    /// <param name="defaultBranch">The repository's default branch, when <see cref="BuildSettings.DefaultBranch"/> isn't set.</param>
-    /// <param name="buildTime">When the build started, in UTC.</param>
-    public static string Console(BuildSettings settings, string? branch, string? defaultBranch, DateTime buildTime)
+    /// <param name="prefix">The version being worked towards.</param>
+    /// <param name="tags">The repository's tags; those that aren't <c>v</c> and a version are ignored.</param>
+    /// <exception cref="InvalidOperationException">
+    /// <paramref name="prefix"/> is a prerelease that is released already, or sorts below a release: only a person
+    /// can pick the next prerelease label, so the prefix has to be raised.
+    /// </exception>
+    public static ReleaseVersion Next(ReleaseVersion prefix, IEnumerable<string> tags)
     {
-        ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(prefix);
+        ArgumentNullException.ThrowIfNull(tags);
 
-        if (settings.IsRelease)
+        var released = tags
+            .Where(tag => tag.StartsWith('v', StringComparison.Ordinal))
+            .Select(ReleaseVersion.TryParse)
+            .OfType<ReleaseVersion>()
+            .ToList();
+
+        if (prefix.IsPrerelease)
         {
-            return settings.Version!;
+            var above = released.Where(version => version >= prefix).Max();
+            return above is null
+                ? prefix
+                : throw new InvalidOperationException(
+                    $"<VersionPrefix> {prefix.Version} is not above the release {above.Version}; raise it in "
+                    + "Source/Directory.Build.props");
         }
 
-        var onDefaultBranch = branch == (settings.DefaultBranch ?? defaultBranch);
-        return string.Create(
-            CultureInfo.InvariantCulture, $"{buildTime:yyyyMMddHHmmss}+{(onDefaultBranch ? "trunk" : "merge")}");
+        var newestStable = released.Where(version => !version.IsPrerelease).Max();
+        return newestStable is not null && newestStable >= prefix ? newestStable.NextPatch() : prefix;
     }
 
-    /// <inheritdoc cref="Console(BuildSettings, string, string, DateTime)"/>
-    public static string Console(IPipelineContext context, BuildSettings settings)
+    /// <summary>The <c>VersionPrefix</c> a props file (Source/Directory.Build.props) sets.</summary>
+    /// <exception cref="InvalidOperationException">The file sets no <c>VersionPrefix</c>.</exception>
+    public static ReleaseVersion ReadPrefix(string propsFile)
     {
-        var git = context.Git().Information;
-        return Console(settings, git.BranchName, git.DefaultBranchName, DateTime.UtcNow);
+        var prefix = XDocument.Load(propsFile).Descendants("VersionPrefix").FirstOrDefault()?.Value.Trim();
+        return string.IsNullOrEmpty(prefix)
+            ? throw new InvalidOperationException($"{propsFile} sets no <VersionPrefix>.")
+            : ReleaseVersion.Parse(prefix);
     }
 
-    /// <summary>
-    /// The version the library was packed at, from the package file names in the publish directory: the one ending
-    /// in <paramref name="suffix"/> on a CI build, the release version otherwise.
-    /// </summary>
-    public static string? Packed(IEnumerable<string> fileNames, string? suffix) =>
-        fileNames
-            .Where(name => name.StartsWith("GitSnapshotter.", StringComparison.Ordinal)
-                && !name.StartsWith("GitSnapshotter.Tool.", StringComparison.Ordinal)
-                && name.EndsWith(".nupkg", StringComparison.Ordinal))
-            .Select(name => name["GitSnapshotter.".Length..^".nupkg".Length])
-            .Where(version => suffix is null || version.EndsWith("-" + suffix, StringComparison.Ordinal))
-            .Order(StringComparer.Ordinal)
-            .LastOrDefault();
+    [GeneratedRegex(@"\A[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*\z")]
+    private static partial Regex BuildMetadata();
 }

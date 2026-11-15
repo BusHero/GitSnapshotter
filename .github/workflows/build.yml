@@ -1,33 +1,41 @@
 name: Build and release
-# Releases are named after their version. Otherwise the name is empty, so GitHub uses its default: the first line of
-# the commit message on a push. (head_commit.message would be the whole message, body and all, on one line.)
-run-name: ${{ inputs.version && format('release {0}', inputs.version) || '' }}
+# Releases are named after the candidate they release. Otherwise the name is empty, so GitHub uses its default: the
+# first line of the commit message on a push. (head_commit.message would be the whole message, body and all.)
+run-name: ${{ inputs.candidate && format('release {0}', inputs.candidate) || '' }}
 
-# One workflow for CI builds and releases. The work is done by the build pipeline (pipeline/GitSnapshotter.Pipeline);
-# each job sets up the machine, runs one pipeline target (Build__Target) and hands files to the next job.
+# A deployment pipeline: every commit is a release candidate, built once and tested as it would be released, and a
+# release publishes a candidate that passed, without building anything. The work is done by the build pipeline
+# (pipeline/GitSnapshotter.Pipeline); each job sets up the machine, runs one pipeline target (Build__Target) and hands
+# files to the next job.
 #
-# CI build: every push to a branch that touches the code, or Run workflow with no version. Tests on Windows, runs the
-# pipeline on Linux, uploads the console app and the packages as artifacts, pushes prerelease packages to GitHub
-# Packages, and smoke tests them from there on every platform.
+# Build: every push to a branch that touches the code, or Run workflow with no candidate.
+#   build       (Commit stage) works out the version, the next release plus this run's number as build metadata
+#               (0.4.1+57), checks formatting, compiles, runs the tests, packs both packages at that version and
+#               uploads the release candidate: the packages, their symbols, the console app zip and SHA256SUMS.txt.
+#   test        (Test on Windows) runs the tests on .NET Framework, .NET 8 and .NET 11, next to the commit stage.
+#   smoke-test  (Acceptance stage) on Linux (x64, ARM64, Alpine), Windows and macOS, installs the candidate's packages
+#               from its files, as a user would install them from a feed, and uses them: the tool (globally, as a local
+#               tool, with dnx; each framework's build; a snapshot and restore of a repository and its working tree,
+#               also from a snapshot the previous release took; an upgrade from the previous release) and the library
+#               (on each framework it supports). Checks the packages' notices, contents, known vulnerabilities, API
+#               compatibility and size against the previous release, deterministic builds and Source Link, the console
+#               app zip and the checksums. A run whose jobs all pass is a candidate that may be released.
 #
-# Release: Actions > Build and release > Run workflow, on the default branch, with the version to release (1.2.0, or 1.2.0-rc.1
-# for a prerelease). The same jobs build with that version, then:
-#   verify   (Check release) checks first that the version is valid and not released yet, the run is on the default branch, and the
-#            'nuget' environment requires a reviewer (the workflow fails closed if anyone removes that protection),
-#            and takes the release description from CHANGELOG.md (VerifyRelease target)
-#   publish  (Publish release) waits for a reviewer to approve the 'nuget' environment, then creates the GitHub release (and its
-#            v<version> tag) with every artifact and pushes the packages to nuget.org; the only job that can write
-#            to the repository or get a nuget.org key. It stays in this file: it never checks out or runs the
-#            repository's code, so nothing built from the repository can reach its credentials.
-#   smoke-test  (Smoke test) on Linux (x64, ARM64, Alpine), Windows and macOS, uses the published packages from nuget.org as a user
-#            would: installs the tool (globally, as a local tool, with dnx), snapshots and restores a repository and
-#            its working tree with it, also from a snapshot the previous release took, upgrades it from the previous
-#            release; uses the library as a test would on each framework it supports. Checks the packages' notices,
-#            contents, signatures, known vulnerabilities, API compatibility and size against the previous release,
-#            what nuget.org shows about them, their symbols, deterministic builds and Source Link, the GitHub release,
-#            the published installation page, and that the packages, symbols and console app zip are the release's,
-#            built from the released commit (SmokeTest target). Read-only: it gets no credentials beyond reading the
-#            repository. CI builds run it too, on the prerelease packages in GitHub Packages.
+# Release: Actions > Build and release > Run workflow, on the default branch, with the candidate to release: its
+# version from a passed build on the default branch, like 0.4.1+57 (the run's number follows the +).
+#   verify      (Check release) finds that build, checks it passed and was of the default branch, downloads its
+#               candidate and checks it is that version built from that commit; then checks the version has no tag
+#               yet and the 'nuget' environment requires a reviewer (the workflow fails closed if anyone removes that
+#               protection), and takes the release description from CHANGELOG.md at the candidate's commit
+#               (VerifyRelease target).
+#   publish     (Publish release) waits for a reviewer to approve the 'nuget' environment, then creates the GitHub
+#               release (and its v<version> tag, on the candidate's commit) with the candidate's files and pushes its
+#               packages to nuget.org; the only job that can write to the repository or get a nuget.org key. It stays
+#               in this file, which nuget.org's trusted publishing policy names, and it never checks out or runs the
+#               repository's code, so nothing built from the repository can reach its credentials.
+#   smoke-test  (Smoke test) once published, the same tests on the packages from nuget.org, plus what only a release
+#               has: signatures, what nuget.org shows, the symbol server, the GitHub release and the published
+#               installation page. Read-only: it gets no credentials beyond reading the repository.
 on:
   push:
     branches: ['**']
@@ -43,8 +51,8 @@ on:
       - 'build.cmd'
   workflow_dispatch:
     inputs:
-      version:
-        description: 'Version to release, like 1.2.0 or 1.2.0-rc.1. Leave empty for a CI build.'
+      candidate:
+        description: 'Release candidate to release, like 0.4.1+57: the version of a passed build of the default branch. Leave empty for a build.'
         required: false
         type: string
 
@@ -52,73 +60,222 @@ on:
 permissions:
   contents: read
 
-# One release at a time, never cancelled half way through; CI builds are not limited.
+# One release at a time, never cancelled half way through; builds are not limited.
 concurrency:
-  group: ${{ inputs.version && 'release' || format('build-{0}', github.run_id) }}
+  group: ${{ inputs.candidate && 'release' || format('build-{0}', github.run_id) }}
   cancel-in-progress: false
 
 jobs:
-  # Decides whether this run is a release; on a release, checks it may go ahead before anything is built.
+  # Decides whether this run is a release; on a release, finds the candidate and checks it may be released.
   verify:
     name: Check release
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      # Reads the release environment's protection rules.
+      # Reads the candidate's build and its artifacts, and the release environment's protection rules.
       actions: read
     outputs:
-      release: ${{ inputs.version != '' }}
+      release: ${{ inputs.candidate != '' }}
       version: ${{ steps.pipeline.outputs.version }}
       tag: ${{ steps.pipeline.outputs.tag }}
       prerelease: ${{ steps.pipeline.outputs.prerelease }}
+      commit: ${{ steps.candidate.outputs.commit }}
     steps:
-      - name: 'CI build'
-        if: inputs.version == ''
-        run: echo "No version given, so this is a CI build and nothing is released."
+      - name: 'Build'
+        if: inputs.candidate == ''
+        run: echo "No candidate given, so this run builds and tests one; nothing is released."
 
-      - name: 'Checkout: repository'
-        uses: actions/checkout@v7
-        if: inputs.version != ''
+      - name: 'Find the candidate''s build'
+        id: candidate
+        if: inputs.candidate != ''
+        env:
+          # Through the environment, never interpolated into a script: the input is free text.
+          CANDIDATE: ${{ inputs.candidate }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          WORKFLOW: ${{ github.workflow_ref }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if [[ ! "$CANDIDATE" =~ ^v?([0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?)\+([0-9]+)$ ]]; then
+            echo "::error::'$CANDIDATE' is not a candidate's version, like 0.4.1+57: <version>+<run number>"
+            exit 1
+          fi
+          version="${BASH_REMATCH[1]}"
+          number="${BASH_REMATCH[3]}"
+
+          # This workflow's file, from owner/repo/.github/workflows/build.yml@refs/heads/trunk.
+          workflow="$(basename "${WORKFLOW%@*}")"
+          run="$(gh run list --workflow "$workflow" --branch "$DEFAULT_BRANCH" --limit 1000 \
+            --json number,databaseId,headSha,status,conclusion \
+            --jq ".[] | select(.number == $number)")"
+          if [[ -z "$run" ]]; then
+            echo "::error::No run $number of $workflow on $DEFAULT_BRANCH: a candidate must be built from $DEFAULT_BRANCH."
+            exit 1
+          fi
+          conclusion="$(jq -r .conclusion <<< "$run")"
+          if [[ "$(jq -r .status <<< "$run")" != completed || "$conclusion" != success ]]; then
+            echo "::error::Run $number did not pass (status $(jq -r .status <<< "$run"), conclusion $conclusion): only a candidate whose every stage passed may be released."
+            exit 1
+          fi
+
+          {
+            echo "version=$version"
+            echo "run-id=$(jq -r .databaseId <<< "$run")"
+            echo "commit=$(jq -r .headSha <<< "$run")"
+          } >> "$GITHUB_OUTPUT"
+          echo "Releasing $CANDIDATE: run $number ($(jq -r .databaseId <<< "$run")) of $(jq -r .headSha <<< "$run")"
+
+      - name: 'Download: release candidate'
+        if: inputs.candidate != ''
+        uses: actions/download-artifact@v8
         with:
+          name: release-candidate
+          path: release
+          run-id: ${{ steps.candidate.outputs.run-id }}
+          github-token: ${{ github.token }}
+
+      # The files must be the candidate's: intact, at its version with its build number, and built from its commit.
+      - name: 'Verify the candidate'
+        if: inputs.candidate != ''
+        working-directory: release
+        env:
+          CANDIDATE: ${{ inputs.candidate }}
+          VERSION: ${{ steps.candidate.outputs.version }}
+          COMMIT: ${{ steps.candidate.outputs.commit }}
+        run: |
+          sha256sum --check SHA256SUMS.txt
+          for id in GitSnapshotter GitSnapshotter.Tool; do
+            nuspec="$(unzip -p "$id.$VERSION.nupkg" "$id.nuspec")"
+            packed="$(grep -oP '(?<=<version>)[^<]+' <<< "$nuspec")"
+            built="$(grep -oP '<repository [^>]*\bcommit="\K[0-9a-f]+' <<< "$nuspec")"
+            if [[ "$packed" != "${CANDIDATE#v}" || "$built" != "$COMMIT" ]]; then
+              echo "::error::$id.$VERSION.nupkg is $packed from $built, not ${CANDIDATE#v} from $COMMIT."
+              exit 1
+            fi
+            echo "$id.$VERSION.nupkg is $packed, built from $built"
+          done
+
+      # The candidate's commit: its CHANGELOG.md describes the release.
+      - name: 'Checkout: candidate'
+        if: inputs.candidate != ''
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.candidate.outputs.commit }}
+          path: source
           persist-credentials: false
 
       - name: 'Setup: .NET SDK from global.json'
-        if: inputs.version != ''
+        if: inputs.candidate != ''
         uses: actions/setup-dotnet@v6
         with:
-          global-json-file: global.json
+          global-json-file: source/global.json
 
       - name: 'Cache: ~/.nuget/packages'
-        if: inputs.version != ''
+        if: inputs.candidate != ''
         uses: actions/cache@v6
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-${{ hashFiles('**/global.json', '**/packages.lock.json') }}
+          key: ${{ runner.os }}-${{ hashFiles('source/**/global.json', 'source/**/packages.lock.json') }}
 
       # Sets the version, tag and prerelease outputs, and writes release-notes/release-notes.md.
       - name: 'Run: pipeline (VerifyRelease)'
-        if: inputs.version != ''
+        if: inputs.candidate != ''
         id: pipeline
+        working-directory: source
         env:
           Build__Target: VerifyRelease
-          # Through the environment, never interpolated into a script: the input is free text.
-          Build__Version: ${{ inputs.version }}
+          Build__Version: ${{ steps.candidate.outputs.version }}
+          Build__Commit: ${{ steps.candidate.outputs.commit }}
           Build__DefaultBranch: ${{ github.event.repository.default_branch }}
+          Build__ReleaseNotesDirectory: ${{ github.workspace }}/release-notes
           GITHUB_TOKEN: ${{ github.token }}
         run: dotnet run --project pipeline/GitSnapshotter.Pipeline --configuration Release
 
-      - name: 'Upload: release notes'
+      - name: 'Upload: release assets'
+        if: inputs.candidate != ''
         uses: actions/upload-artifact@v7
-        if: inputs.version != ''
+        with:
+          name: GitSnapshotter_${{ steps.pipeline.outputs.version }}
+          path: release
+          if-no-files-found: error
+
+      - name: 'Upload: release notes'
+        if: inputs.candidate != ''
+        uses: actions/upload-artifact@v7
         with:
           name: release-notes
           path: release-notes
           if-no-files-found: error
 
-  # .NET Framework tests only run on Windows; this job runs every test framework there.
+  # The commit stage: builds the release candidate once. Everything later tests or publishes these very files.
+  build:
+    name: Build and package
+    if: inputs.candidate == ''
+    runs-on: ubuntu-latest
+    outputs:
+      # The version NuGet knows the packages by (0.4.1), and with its build metadata (0.4.1+57).
+      version: ${{ steps.pipeline.outputs.version }}
+      build-version: ${{ steps.pipeline.outputs.build-version }}
+    steps:
+      # No token left in .git/config: the code being built cannot reach the job's credentials. Every tag, for the
+      # version: the next release after the tagged ones.
+      - name: 'Checkout: repository'
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: 'Setup: .NET SDK from global.json'
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          # The tests also run on .NET 8, the oldest runtime the library supports.
+          dotnet-version: '8.0.x'
+
+      - name: 'Cache: ~/.nuget/packages'
+        uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-${{ hashFiles('**/global.json', '**/packages.lock.json') }}
+
+      # Puts the release candidate in release/: the packages, the console app zip and SHA256SUMS.txt.
+      - name: 'Run: pipeline'
+        id: pipeline
+        env:
+          Build__BuildNumber: ${{ github.run_number }}
+        run: dotnet run --project pipeline/GitSnapshotter.Pipeline --configuration Release
+
+      - name: 'Summary: release candidate'
+        env:
+          CANDIDATE: ${{ steps.pipeline.outputs.build-version }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          {
+            echo "### Release candidate \`$CANDIDATE\`"
+            echo
+            echo "Once every job of this run has passed, a build of the default branch can be released with:"
+            echo
+            echo '```sh'
+            echo "gh workflow run build.yml --ref $BRANCH -f candidate=$CANDIDATE"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # A release downloads it from this run, so it must outlive the time from build to release (90 days by default).
+      # Overwritten when this job is re-run: the run's later stages then test the new one.
+      - name: 'Upload: release candidate'
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-candidate
+          path: release
+          if-no-files-found: error
+          overwrite: true
+          # The packages and the zip are zip archives already.
+          compression-level: 0
+
+  # .NET Framework tests only run on Windows; this job runs every test framework there, next to the commit stage.
   test:
     name: Test on Windows
-    needs: verify
+    if: inputs.candidate == ''
     runs-on: windows-latest
     steps:
       - name: 'Checkout: repository'
@@ -151,99 +308,26 @@ jobs:
           Build__Target: Test
         run: dotnet run --project pipeline/GitSnapshotter.Pipeline --configuration Release
 
-  build:
-    name: Build and package
-    needs: [verify, test]
-    runs-on: ubuntu-latest
-    outputs:
-      # The version the packages were packed at; CI builds smoke test it from GitHub Packages.
-      package-version: ${{ steps.pipeline.outputs.package-version }}
-    permissions:
-      contents: read
-      # CI builds push prerelease packages to GitHub Packages with GITHUB_TOKEN. Release builds get no token.
-      packages: write
-    steps:
-      # No token left in .git/config: the code being built cannot reach the job's credentials.
-      - name: 'Checkout: repository'
-        uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-
-      - name: 'Setup: .NET SDK from global.json'
-        uses: actions/setup-dotnet@v6
-        with:
-          global-json-file: global.json
-          # The tests also run on .NET 8, the oldest runtime the library supports.
-          dotnet-version: '8.0.x'
-
-      - name: 'Cache: ~/.nuget/packages'
-        uses: actions/cache@v6
-        with:
-          path: ~/.nuget/packages
-          key: ${{ runner.os }}-${{ hashFiles('**/global.json', '**/packages.lock.json') }}
-
-      # CI build: a branch prerelease, pushed to GitHub Packages. Release: the release version, not pushed here;
-      # the pipeline puts the release assets (packages, console app zip, SHA256SUMS.txt) in release/, and the
-      # publish job pushes them to nuget.org after approval.
-      - name: 'Run: pipeline'
-        id: pipeline
-        env:
-          Build__DefaultBranch: ${{ github.event.repository.default_branch }}
-          Build__Version: ${{ needs.verify.outputs.version }}
-          Build__NuGetApiKey: ${{ needs.verify.outputs.release != 'true' && secrets.GITHUB_TOKEN || '' }}
-        run: dotnet run --project pipeline/GitSnapshotter.Pipeline --configuration Release
-
-      # PackModule and PublishConsoleModule share the publish directory; the packages (library and tool) and their
-      # symbol packages get their own artifact.
-      - name: 'Upload: console app'
-        uses: actions/upload-artifact@v7
-        with:
-          name: GitSnapshotter.Console_${{ steps.pipeline.outputs.version }}
-          path: |
-            publish
-            !publish/*.nupkg
-            !publish/*.snupkg
-
-      - name: 'Upload: NuGet packages'
-        uses: actions/upload-artifact@v7
-        with:
-          name: GitSnapshotter.NuGet_${{ steps.pipeline.outputs.version }}
-          path: |
-            publish/*.nupkg
-            publish/*.snupkg
-          if-no-files-found: error
-          # A .nupkg (and .snupkg) is already a zip archive.
-          compression-level: 0
-
-      - name: 'Upload: release assets'
-        uses: actions/upload-artifact@v7
-        if: needs.verify.outputs.release == 'true'
-        with:
-          name: GitSnapshotter_${{ needs.verify.outputs.version }}
-          path: release
-          if-no-files-found: error
-
   publish:
     name: Publish release
-    needs: [verify, build]
+    needs: verify
     if: needs.verify.outputs.release == 'true'
     runs-on: ubuntu-latest
-    # Release runs only. Waits for a required reviewer (enforced by the verify job). If the nuget.org trusted
-    # publishing policy names an environment, it must be this one.
+    # Requires a reviewer's approval. The verify job checks that the protection is still there.
     environment:
       name: nuget
       url: https://www.nuget.org/packages/GitSnapshotter/${{ needs.verify.outputs.version }}
     permissions:
-      # Creates the GitHub release and uploads its assets.
+      # Creates the GitHub release and its tag.
       contents: write
-      # Trusted publishing: NuGet/login exchanges the workflow's OIDC token for a short-lived nuget.org API key.
+      # Trusted publishing: exchanges the OIDC token for a short-lived nuget.org key.
       id-token: write
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
       TAG: ${{ needs.verify.outputs.tag }}
       PRERELEASE: ${{ needs.verify.outputs.prerelease }}
-    # No checkout: this job only publishes the files the build job produced.
+      COMMIT: ${{ needs.verify.outputs.commit }}
     steps:
       - name: 'Download: release assets'
         uses: actions/download-artifact@v8
@@ -251,7 +335,6 @@ jobs:
           name: GitSnapshotter_${{ needs.verify.outputs.version }}
           path: release
 
-      # Kept out of release/: everything there is attached to the release.
       - name: 'Download: release notes'
         uses: actions/download-artifact@v8
         with:
@@ -262,58 +345,52 @@ jobs:
         working-directory: release
         run: sha256sum --check SHA256SUMS.txt
 
-      # A draft first: if the NuGet push fails, nothing is public yet and the run can be retried. A draft has no git
-      # tag yet; GitHub creates the tag on the released commit when the release is published. The description is
-      # the version's CHANGELOG.md section, from the verify job.
+      # A draft first: nothing is visible, and no tag exists, until the push to nuget.org succeeds. A re-run finds the
+      # draft and refreshes it. The tag goes on the candidate's commit, not the one this run started on.
       - name: 'Create draft GitHub release'
         run: |
           if gh release view "$TAG" > /dev/null 2>&1; then
-            # A draft left behind by a failed run (verify rejects a published one): point it at this commit and
-            # refresh its description and assets.
-            gh release edit "$TAG" --target "$GITHUB_SHA" --notes-file release-notes/release-notes.md
+            gh release edit "$TAG" --target "$COMMIT" --notes-file release-notes/release-notes.md
             gh release upload "$TAG" release/* --clobber
           else
-            flags=(--draft --target "$GITHUB_SHA" --notes-file release-notes/release-notes.md --title "$TAG")
+            flags=(--draft --target "$COMMIT" --notes-file release-notes/release-notes.md --title "$TAG")
             if [[ "$PRERELEASE" == true ]]; then flags+=(--prerelease); fi
             gh release create "$TAG" "${flags[@]}" release/*
           fi
 
-      # Right before the push: the key it returns is short-lived. Needs a trusted publishing policy on nuget.org
-      # for this repository and workflow file (build.yml), owned by this user.
       - name: 'Log in to nuget.org (trusted publishing)'
         id: nuget-login
         uses: NuGet/login@v1
         with:
           user: bus1hero
 
-      # dotnet nuget push also pushes each package's .snupkg from the same folder to nuget.org's symbol server.
+      # --skip-duplicate: a re-run after a partial push doesn't fail on the packages that are already there.
       - name: 'Push packages to nuget.org'
         env:
           NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
         run: dotnet nuget push "release/*.nupkg" --source https://api.nuget.org/v3/index.json --api-key "$NUGET_API_KEY" --skip-duplicate
 
+      # Publishing creates the tag. A prerelease never becomes the latest release.
       - name: 'Publish GitHub release'
         run: |
           latest=true
           if [[ "$PRERELEASE" == true ]]; then latest=false; fi
           gh release edit "$TAG" --draft=false --latest="$latest"
 
-  # After publish: is the release usable from nuget.org, on every OS? Waits for nuget.org to list the packages, their
-  # metadata and their symbols (it validates and indexes them for a few minutes after the push), then checks them
-  # against the GitHub release's assets and the released commit.
-  # On a release, once published: the packages from nuget.org. On a CI build: the prerelease packages the build pushed
-  # to GitHub Packages, without the checks only a release can pass (signatures, nuget.org's metadata and symbols, the
-  # GitHub release, the published docs); everything else comes from nuget.org as for a release. So the smoke test
-  # itself, on every platform, is tested before a release depends on it.
+  # The acceptance stage, on every OS. On a build: the candidate, installed from its files, without the checks only a
+  # release can pass (signatures, nuget.org's metadata and symbols, the GitHub release, the published docs); everything
+  # else comes from nuget.org as for a release. On a release, once published: the packages from nuget.org, waiting for
+  # nuget.org to list them, their metadata and their symbols (it validates and indexes them for a few minutes after the
+  # push), checked against the GitHub release's assets and the candidate's commit.
   smoke-test:
     name: Smoke test on ${{ matrix.name }}
-    needs: [verify, build, publish]
-    # publish is skipped on a CI build.
+    needs: [verify, build, test, publish]
+    # build and test are skipped on a release, publish on a build.
     if: >-
-      !cancelled() && needs.build.result == 'success'
-      && (needs.verify.outputs.release != 'true' || needs.publish.result == 'success')
+      !cancelled()
+      && (needs.verify.outputs.release == 'true' && needs.publish.result == 'success'
+        || needs.verify.outputs.release != 'true' && needs.build.result == 'success' && needs.test.result == 'success')
     strategy:
-      # Every platform reports, even when one fails.
       fail-fast: false
       matrix:
         include:
@@ -321,7 +398,7 @@ jobs:
           - { name: Linux ARM64, os: ubuntu-24.04-arm }
           - { name: Windows, os: windows-latest }
           - { name: macOS, os: macos-latest }
-          # musl: the tool's linux-musl libgit2, in the .NET SDK's Alpine image.
+          # musl instead of glibc: the image has the SDK and the tools, like a user's Alpine container.
           - { name: Alpine Linux, os: ubuntu-latest, container: 'mcr.microsoft.com/dotnet/sdk:11.0-alpine' }
     runs-on: ${{ matrix.os }}
     container: ${{ matrix.container }}
@@ -329,19 +406,21 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: read
-      # A CI build's packages are on GitHub Packages, which needs a token even for public packages.
-      packages: read
     environment:
       name: smoke tests
+    env:
+      RELEASE: ${{ needs.verify.outputs.release }}
     steps:
       # Before the checkout, so it clones with git: the pipeline and the tool read the repository.
       - name: 'Setup: Alpine packages'
         if: matrix.container
         run: apk add --no-cache bash curl git github-cli
 
+      # The candidate's commit: the smoke tests and the CHANGELOG.md they check the API against are the candidate's.
       - name: 'Checkout: repository'
         uses: actions/checkout@v7
         with:
+          ref: ${{ needs.verify.outputs.commit || github.sha }}
           persist-credentials: false
 
       # The image comes with the SDK; the .NET 8 runtime is added next to it.
@@ -361,8 +440,16 @@ jobs:
           # The library runs on .NET 8, the oldest runtime it supports, too.
           dotnet-version: '8.0.x'
 
-      # From the published release, not this run's artifacts: what users download is what gets compared. The
-      # pipeline checks them against SHA256SUMS.txt.
+      # A build: the candidate this run built, a folder the tests install from as from a feed.
+      - name: 'Download: release candidate'
+        if: needs.verify.outputs.release != 'true'
+        uses: actions/download-artifact@v8
+        with:
+          name: release-candidate
+          path: ${{ runner.temp }}/release
+
+      # A release: from the published release, not this run's artifacts: what users download is what gets compared.
+      # The pipeline checks them against SHA256SUMS.txt.
       - name: 'Download GitHub release assets'
         if: needs.verify.outputs.release == 'true'
         shell: bash
@@ -376,14 +463,12 @@ jobs:
         shell: bash
         env:
           Build__Target: SmokeTest
-          Build__Version: ${{ needs.verify.outputs.release == 'true' && needs.verify.outputs.version || needs.build.outputs.package-version }}
-          SmokeTest__Commit: ${{ github.sha }}
+          Build__Version: ${{ needs.verify.outputs.release == 'true' && needs.verify.outputs.version || needs.build.outputs.version }}
+          SmokeTest__Commit: ${{ needs.verify.outputs.commit || github.sha }}
           SmokeTest__Source: >-
             ${{ needs.verify.outputs.release == 'true' && 'https://api.nuget.org/v3/index.json'
-            || format('https://nuget.pkg.github.com/{0}/index.json', github.repository_owner) }}
-          SmokeTest__SourceUsername: ${{ needs.verify.outputs.release != 'true' && github.actor || '' }}
-          SmokeTest__SourcePassword: ${{ needs.verify.outputs.release != 'true' && github.token || '' }}
-          SmokeTest__ReleaseDirectory: ${{ needs.verify.outputs.release == 'true' && format('{0}/release', runner.temp) || '' }}
+            || format('{0}/release', runner.temp) }}
+          SmokeTest__ReleaseDirectory: ${{ runner.temp }}/release
           # Only a release is signed, shown and indexed by nuget.org, has a GitHub release and matches the published docs.
           # true/false, never empty: on Windows an empty variable is no variable, and the default would apply.
           SmokeTest__VerifySignatures: ${{ needs.verify.outputs.release == 'true' }}
@@ -391,7 +476,9 @@ jobs:
           SmokeTest__GitHubRelease: ${{ needs.verify.outputs.release == 'true' }}
           SmokeTest__Symbols: ${{ needs.verify.outputs.release == 'true' }}
           SmokeTest__Docs: ${{ needs.verify.outputs.release == 'true' }}
-          # A CI build must sort above every release (VersionPrefix raised after each one).
+          # Only a release waits for the feed: a candidate's files are all there.
+          SmokeTest__WaitMinutes: ${{ needs.verify.outputs.release == 'true' && '30' || '0' }}
+          # A candidate is the next release, so it must sort above every release.
           SmokeTest__AboveReleases: ${{ needs.verify.outputs.release != 'true' }}
           # Reads the GitHub release.
           GITHUB_TOKEN: ${{ github.token }}
@@ -400,7 +487,7 @@ jobs:
   # Uploads the resolved package graph to GitHub's dependency graph (Dependabot alerts, Insights > Dependency graph).
   dependency-submission:
     name: Submit dependency graph
-    # CI builds only; a release builds a commit that was already built on push.
+    # Builds only; a release publishes a commit that was already built on push.
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:

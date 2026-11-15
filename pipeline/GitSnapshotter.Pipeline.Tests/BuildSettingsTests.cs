@@ -24,8 +24,8 @@ public sealed class BuildSettingsTests
             await Assert.That(settings.Configuration).IsEqualTo("Release");
             await Assert.That(settings.Version).IsNull();
             await Assert.That(settings.IsRelease).IsFalse();
-            await Assert.That(settings.VersionProperties).IsEmpty();
-            await Assert.That(settings.NuGetApiKey).IsNull();
+            await Assert.That(settings.BuildNumber).IsNull();
+            await Assert.That(settings.Commit).IsNull();
             await Assert.That(settings.ReleaseEnvironment).IsEqualTo("nuget");
         }
     }
@@ -58,21 +58,6 @@ public sealed class BuildSettingsTests
         {
             await Assert.That(settings.Version).IsNull();
             await Assert.That(settings.IsRelease).IsFalse();
-            await Assert.That(settings.VersionProperties).IsEmpty();
-        }
-    }
-
-    [Test]
-    public async Task ReleaseStampsTheVersionProperty()
-    {
-        var settings = new BuildSettings { Version = "v1.2.0" };
-
-        var property = await Assert.That(settings.VersionProperties).HasSingleItem();
-
-        using (Assert.Multiple())
-        {
-            await Assert.That(property!.Key).IsEqualTo("Version");
-            await Assert.That(property.Value).IsEqualTo("1.2.0");
         }
     }
 
@@ -85,6 +70,8 @@ public sealed class BuildSettingsTests
             ("Build:PublishDirectory", "out"),
             ("Build:Version", "v2.0.0"),
             ("Build:DefaultBranch", "main"),
+            ("Build:BuildNumber", "57"),
+            ("Build:Commit", "3d509f869118150a7f0cc1d2c727ecc123da5cc4"),
             ("Other:Version", "9.9.9"));
 
         using (Assert.Multiple())
@@ -94,6 +81,8 @@ public sealed class BuildSettingsTests
             await Assert.That(settings.PublishDirectory).IsEqualTo("out");
             await Assert.That(settings.Version).IsEqualTo("2.0.0");
             await Assert.That(settings.DefaultBranch).IsEqualTo("main");
+            await Assert.That(settings.BuildNumber).IsEqualTo("57");
+            await Assert.That(settings.Commit).IsEqualTo("3d509f869118150a7f0cc1d2c727ecc123da5cc4");
         }
     }
 

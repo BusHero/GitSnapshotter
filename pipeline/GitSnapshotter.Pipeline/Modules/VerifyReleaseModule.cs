@@ -18,9 +18,11 @@ using Octokit;
 namespace GitSnapshotter.Pipeline.Modules;
 
 /// <summary>
-/// Checks that the release may go ahead, before anything is built: the run is on the default branch, the version is
-/// not released yet, and the release environment still requires a reviewer (the workflow fails closed if anyone
-/// removes that protection). Needs a GitHub token (<c>GITHUB_TOKEN</c>) that can read the repository's environments.
+/// Checks that the release may go ahead, before anything is published: the run is on the default branch, the version
+/// is not released yet (or only by an earlier attempt at releasing the same commit), and the release environment still
+/// requires a reviewer (the workflow fails closed if anyone removes that protection). The commit is the release
+/// candidate's (<see cref="BuildSettings.Commit"/>). Needs a GitHub token (<c>GITHUB_TOKEN</c>) that can read the
+/// repository's environments.
 /// </summary>
 [DependsOn<ReleaseVersionModule>]
 public sealed class VerifyReleaseModule(IOptions<BuildSettings> settings) : Module<bool>
@@ -41,9 +43,11 @@ public sealed class VerifyReleaseModule(IOptions<BuildSettings> settings) : Modu
         var owner = github.RepositoryInfo.Owner
             ?? throw new InvalidOperationException("The repository has no GitHub remote to release from.");
         var repository = github.RepositoryInfo.RepositoryName!;
-        var commit = Environment.GetEnvironmentVariable("GITHUB_SHA") is { Length: > 0 } sha
-            ? sha
-            : context.Git().Information.LastCommitSha!;
+        var commit = settings.Value.Commit is { Length: > 0 } candidate
+            ? candidate
+            : Environment.GetEnvironmentVariable("GITHUB_SHA") is { Length: > 0 } sha
+                ? sha
+                : context.Git().Information.LastCommitSha!;
 
         await context.SubModule("Run is on the default branch", () => VerifyBranch(context));
         await context.SubModule(

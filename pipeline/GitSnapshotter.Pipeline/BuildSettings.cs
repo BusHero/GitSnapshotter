@@ -1,6 +1,3 @@
-using ModularPipelines.Attributes;
-using ModularPipelines.Models;
-
 namespace GitSnapshotter.Pipeline;
 
 /// <summary>
@@ -21,7 +18,7 @@ public sealed class BuildSettings
     public string PublishDirectory { get; set; } = "publish";
 
     /// <summary>
-    /// Where a release build puts the files attached to the GitHub release, relative to the repository root.
+    /// Where the build puts the release candidate, the files a release publishes, relative to the repository root.
     /// </summary>
     public string ReleaseDirectory { get; set; } = "release";
 
@@ -39,17 +36,17 @@ public sealed class BuildSettings
     /// <summary>The repository's default branch. Detected from git when not set.</summary>
     public string? DefaultBranch { get; set; }
 
-    /// <summary>The feed the package is pushed to.</summary>
-    public string NuGetSource { get; set; } = "https://nuget.pkg.github.com/BusHero/index.json";
-
-    /// <summary>The API key for <see cref="NuGetSource"/>. When empty, the package is not pushed.</summary>
-    [SecretValue]
-    public string? NuGetApiKey { get; set; }
+    /// <summary>
+    /// Which build this is, the build metadata of its version (<c>0.4.1+57</c>): the CI run number. Builds without one
+    /// are <c>+local</c>.
+    /// </summary>
+    public string? BuildNumber { get; set; }
 
     /// <summary>
-    /// The release version, like <c>1.2.0</c> or <c>1.2.0-rc.1</c>. When set, the assemblies, the package and the
-    /// console app get exactly this version; otherwise the package is a prerelease named after the branch. A leading
-    /// <c>v</c>, as in a tag name, is dropped.
+    /// The version to release (<see cref="BuildTarget.VerifyRelease"/>) or smoke test (<see cref="BuildTarget.SmokeTest"/>),
+    /// like <c>1.2.0</c> or <c>1.2.0-rc.1</c>: the version NuGet knows the packages by, without build metadata. A
+    /// leading <c>v</c>, as in a tag name, is dropped. Builds don't use it: they work out their own version
+    /// (<see cref="Modules.BuildVersionModule"/>).
     /// </summary>
     public string? Version
     {
@@ -57,9 +54,12 @@ public sealed class BuildSettings
         set => field = string.IsNullOrWhiteSpace(value) ? null : ReleaseVersion.Normalize(value.Trim());
     }
 
-    /// <summary>Whether this is a release build (<see cref="Version"/> is set).</summary>
-    internal bool IsRelease => !string.IsNullOrEmpty(Version);
+    /// <summary>
+    /// The commit being released, for <see cref="BuildTarget.VerifyRelease"/>: the release candidate's, which is
+    /// older than the commit the release workflow runs on. Defaults to <c>GITHUB_SHA</c>, then to HEAD.
+    /// </summary>
+    public string? Commit { get; set; }
 
-    /// <summary>The MSBuild properties that stamp <see cref="Version"/> on a release build; none otherwise.</summary>
-    internal KeyValue[] VersionProperties => IsRelease ? [new KeyValue("Version", Version!)] : [];
+    /// <summary>Whether a version to release or smoke test is given (<see cref="Version"/> is set).</summary>
+    internal bool IsRelease => !string.IsNullOrEmpty(Version);
 }

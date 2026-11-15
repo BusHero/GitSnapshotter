@@ -3,9 +3,10 @@
 
   <!-- Shared by the packages built from Source: the GitSnapshotter library and the GitSnapshotter.Tool .NET tool. -->
   <PropertyGroup>
-    <!-- The version being worked towards: builds from branches are <VersionPrefix>-<branch>-<time>, and release
-         builds override it with the release version (Build:Version in the pipeline). Raise it after each stable
-         release, so branch builds sort above what is already released. -->
+    <!-- The version being worked towards. Builds take the next release after the tagged ones: this, unless a stable
+         release at or above it is tagged, then the patch after the newest release; plus the run number as build
+         metadata (0.4.1+57, see pipeline/GitSnapshotter.Pipeline/PackageVersion.cs). Raise it only to start a new
+         minor or major version, or a prerelease (0.5.0-rc.1), which has to be raised again once released. -->
     <VersionPrefix>0.4.0</VersionPrefix>
     <Authors>BusHero</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
