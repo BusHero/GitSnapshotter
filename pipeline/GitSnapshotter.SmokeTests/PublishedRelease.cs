@@ -21,6 +21,8 @@ public sealed class PublishedRelease : IAsyncInitializer, IAsyncDisposable
 
     private readonly Stopwatch _started = Stopwatch.StartNew();
 
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, Lazy<Task<string>>> _downloads = new(StringComparer.OrdinalIgnoreCase);
+
     private readonly HttpClientHandler _handler = new()
     {
         // The registration API serves gzip.
@@ -96,6 +98,9 @@ public sealed class PublishedRelease : IAsyncInitializer, IAsyncDisposable
     public async Task InitializeAsync()
     {
         Work = Directory.CreateTempSubdirectory("gitsnapshotter-smoke-").FullName;
+
+        // Empty: git ignores the machine's and the user's configuration. Made here, before the tests run in parallel.
+        await File.WriteAllTextAsync(Path.Combine(Work, "gitconfig"), "");
         Console.WriteLine($"Smoke testing {Version} from {Settings.Source} in {Work}");
 
         await WriteAsync(NuGetConfig, SmokeTestChecks.NuGetConfig(
@@ -212,12 +217,6 @@ public sealed class PublishedRelease : IAsyncInitializer, IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(arguments);
 
-        var config = Path.Combine(Work, "gitconfig");
-        if (!File.Exists(config))
-        {
-            await File.WriteAllTextAsync(config, "");
-        }
-
         return await Command.RunAsync(
             "git",
             arguments,
@@ -225,7 +224,7 @@ public sealed class PublishedRelease : IAsyncInitializer, IAsyncDisposable
             new Dictionary<string, string>
             {
                 ["GIT_CONFIG_NOSYSTEM"] = "1",
-                ["GIT_CONFIG_GLOBAL"] = config,
+                ["GIT_CONFIG_GLOBAL"] = Path.Combine(Work, "gitconfig"),
                 ["GIT_AUTHOR_NAME"] = "Smoke Test",
                 ["GIT_AUTHOR_EMAIL"] = "smoke-test@example.invalid",
                 ["GIT_COMMITTER_NAME"] = "Smoke Test",
@@ -261,20 +260,28 @@ public sealed class PublishedRelease : IAsyncInitializer, IAsyncDisposable
         return ToolIn(toolPath);
     }
 
-    /// <summary>Downloads a previous release's package from the previous releases' feed.</summary>
-    public async Task<string> DownloadPreviousAsync(string id, string version)
+    /// <summary>
+    /// Downloads a previous release's package from the previous releases' feed, once: tests running in parallel that
+    /// ask for the same package share the download, and none sees a half-written file.
+    /// </summary>
+    public Task<string> DownloadPreviousAsync(string id, string version)
     {
         ArgumentNullException.ThrowIfNull(id);
         ArgumentNullException.ThrowIfNull(version);
 
-        var path = Path.Combine(Work, "previous", $"{id}.{version}.nupkg");
-        if (!File.Exists(path))
-        {
-            var url = $"{PreviousFeed}/{Lower(id)}/{Lower(version)}/{Lower(id)}.{Lower(version)}.nupkg";
-            await File.WriteAllBytesAsync(path, await Http.GetByteArrayAsync(new Uri(url)));
-        }
+        return _downloads.GetOrAdd($"{id}.{version}", _ => new Lazy<Task<string>>(() => DownloadAsync(id, version))).Value;
 
-        return path;
+        async Task<string> DownloadAsync(string id, string version)
+        {
+            var path = Path.Combine(Work, "previous", $"{id}.{version}.nupkg");
+            var url = $"{PreviousFeed}/{Lower(id)}/{Lower(version)}/{Lower(id)}.{Lower(version)}.nupkg";
+
+            // Written under another name, then moved: the package's name only ever holds the whole package.
+            var partial = path + ".part";
+            await File.WriteAllBytesAsync(partial, await Http.GetByteArrayAsync(new Uri(url)));
+            File.Move(partial, path, overwrite: true);
+            return path;
+        }
     }
 
     /// <summary>
