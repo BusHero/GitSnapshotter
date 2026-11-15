@@ -1,4 +1,6 @@
 using System.IO.Compression;
+using System.Net.Security;
+using System.Security.Cryptography.X509Certificates;
 using System.Xml.Linq;
 
 using GitSnapshotter.Pipeline.Modules;
@@ -960,5 +962,32 @@ public sealed class SmokeTestChecksTests : IDisposable
     public async Task ChecksumsFileIsTheOneTheReleaseAssetsHave()
     {
         await Assert.That(SmokeTestChecks.ChecksumsFile).IsEqualTo(ReleaseAssetsModule.ChecksumsFile);
+    }
+
+    [Test]
+    public async Task NetFrameworkAppRunsAs64Bit()
+    {
+        var project = XDocument.Parse(SmokeTestChecks.LibraryProject("1.2.0", ["net11.0", "net472"])).Root!;
+        var conditional = project.Elements("PropertyGroup").Where(group => group.Attribute("Condition") is not null).ToList();
+
+        using (Assert.Multiple())
+        {
+            await Assert.That(conditional.Select(group => group.Attribute("Condition")!.Value)).IsEquivalentTo(["'$(TargetFramework)' == 'net472'"]);
+            await Assert.That(conditional.Single().Element("RuntimeIdentifier")!.Value).IsEqualTo("win-x64");
+        }
+    }
+
+    [Test]
+    [Arguments(SslPolicyErrors.None, new X509ChainStatusFlags[] { }, true)]
+    [Arguments(SslPolicyErrors.RemoteCertificateChainErrors, new[] { X509ChainStatusFlags.RevocationStatusUnknown }, true)]
+    [Arguments(SslPolicyErrors.RemoteCertificateChainErrors, new[] { X509ChainStatusFlags.RevocationStatusUnknown | X509ChainStatusFlags.OfflineRevocation }, true)]
+    [Arguments(SslPolicyErrors.RemoteCertificateChainErrors, new[] { X509ChainStatusFlags.Revoked }, false)]
+    [Arguments(SslPolicyErrors.RemoteCertificateChainErrors, new[] { X509ChainStatusFlags.RevocationStatusUnknown, X509ChainStatusFlags.UntrustedRoot }, false)]
+    [Arguments(SslPolicyErrors.RemoteCertificateChainErrors, new X509ChainStatusFlags[] { }, false)]
+    [Arguments(SslPolicyErrors.RemoteCertificateNameMismatch, new[] { X509ChainStatusFlags.RevocationStatusUnknown }, false)]
+    public async Task OnlyAnUncheckableRevocationIsForgiven(
+        SslPolicyErrors errors, X509ChainStatusFlags[] chain, bool accepted)
+    {
+        await Assert.That(SmokeTestChecks.AcceptCertificate(errors, chain)).IsEqualTo(accepted);
     }
 }

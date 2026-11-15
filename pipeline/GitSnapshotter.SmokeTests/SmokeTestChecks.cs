@@ -139,6 +139,12 @@ internal static class SmokeTestChecks
                     new XElement("TargetFrameworks", string.Join(';', targetFrameworks)),
                     new XElement("LangVersion", "latest"),
                     new XElement("Nullable", "enable")),
+                // The SDK gives a .NET Framework app win-x86, and libgit2's native library then fails to load
+                // (BadImageFormatException); as for the unit tests, x64 explicitly.
+                targetFrameworks.Where(IsNetFramework).Select(framework => new XElement(
+                    "PropertyGroup",
+                    new XAttribute("Condition", $"'$(TargetFramework)' == '{framework}'"),
+                    new XElement("RuntimeIdentifier", "win-x64"))),
                 references))
             .ToString();
     }
@@ -216,6 +222,31 @@ internal static class SmokeTestChecks
         && framework.StartsWith("net", StringComparison.OrdinalIgnoreCase)
         && char.IsAsciiDigit(framework[3])
         && !framework.Contains('.', StringComparison.Ordinal);
+
+    /// <summary>
+    /// Whether to trust a server's certificate: when it has no errors, or when its chain's only problem is that its
+    /// revocation couldn't be checked. Online revocation checks often can't reach the certificate authority (macOS
+    /// runners, proxies); a certificate reported revoked, or any other error, is still refused.
+    /// </summary>
+    public static bool AcceptCertificate(System.Net.Security.SslPolicyErrors errors, IEnumerable<System.Security.Cryptography.X509Certificates.X509ChainStatusFlags> chainStatus)
+    {
+        ArgumentNullException.ThrowIfNull(chainStatus);
+
+        const System.Security.Cryptography.X509Certificates.X509ChainStatusFlags Unknown =
+            System.Security.Cryptography.X509Certificates.X509ChainStatusFlags.RevocationStatusUnknown
+            | System.Security.Cryptography.X509Certificates.X509ChainStatusFlags.OfflineRevocation;
+
+        if (errors == System.Net.Security.SslPolicyErrors.None)
+        {
+            return true;
+        }
+
+        // A chain reported bad with nothing to say why is refused too.
+        var statuses = chainStatus.Where(status => status != 0).ToList();
+        return errors == System.Net.Security.SslPolicyErrors.RemoteCertificateChainErrors
+            && statuses.Count > 0
+            && statuses.All(status => (status & ~Unknown) == 0);
+    }
 
     /// <summary>Checks that <c>--version</c> printed <paramref name="version"/>, with or without build metadata.</summary>
     /// <exception cref="InvalidOperationException">The app reported another version.</exception>

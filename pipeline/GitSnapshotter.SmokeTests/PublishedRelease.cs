@@ -26,6 +26,10 @@ public sealed class PublishedRelease : IAsyncInitializer, IAsyncDisposable
         // The registration API serves gzip.
         AutomaticDecompression = DecompressionMethods.All,
         CheckCertificateRevocationList = true,
+
+        // A revocation status that couldn't be checked fails no test; a revoked certificate still does.
+        ServerCertificateCustomValidationCallback = (_, _, chain, errors) =>
+            AcceptCertificate(errors, chain?.ChainStatus.Select(status => status.Status) ?? []),
     };
 
     public PublishedRelease()
