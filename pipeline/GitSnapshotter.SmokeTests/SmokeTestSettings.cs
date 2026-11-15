@@ -11,14 +11,17 @@ public sealed class SmokeTestSettings
 {
     private const string Prefix = "SmokeTest__";
 
-    /// <summary>The version to test, like <c>1.2.0</c> or <c>1.2.0-rc.1</c>.</summary>
+    /// <summary>
+    /// The version to test, like <c>1.2.0</c> or <c>1.2.0-rc.1</c>: what NuGet calls the packages. A release
+    /// candidate's build metadata (<c>+57</c>) is not part of it.
+    /// </summary>
     public string Version { get; } = Get("Version")?.TrimStart('v')
         ?? throw new InvalidOperationException($"Set the version to smoke test ({Prefix}Version).");
 
     /// <summary>The repository root: its CHANGELOG.md, the library's project file, a repository to snapshot.</summary>
     public string Root { get; } = Get("Root") ?? FindRoot();
 
-    /// <summary>The feed our packages are tested from.</summary>
+    /// <summary>The feed our packages are tested from: a feed's URL, or a directory like a release candidate's.</summary>
     public string Source { get; } = Get("Source") ?? SmokeTestChecks.NuGetOrg;
 
     /// <summary>
@@ -77,9 +80,8 @@ public sealed class SmokeTestSettings
     public int MaxGrowthPercent { get; } = Number("MaxGrowthPercent", 25);
 
     /// <summary>
-    /// Whether the version must sort above every stable release: on for CI builds, versioned after the
-    /// <c>VersionPrefix</c> in Source/Directory.Build.props, which must be raised after each stable release. Off for
-    /// releases, as a fix for an older line (a 0.3.1 after 0.4.0) may sort below.
+    /// Whether the version must sort above every stable release: on for release candidates, which are the next
+    /// release. Off for releases, as a fix for an older line (a 0.3.1 after 0.4.0) may sort below.
     /// </summary>
     public bool AboveReleases { get; } = Flag("AboveReleases", false);
 

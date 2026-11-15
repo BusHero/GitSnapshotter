@@ -2,45 +2,116 @@ using TUnit.Core;
 
 namespace GitSnapshotter.Pipeline.Tests;
 
-public sealed class PackageVersionTests
+public sealed class PackageVersionTests : IDisposable
 {
-    private static readonly DateTime BuildTime = new(2026, 11, 14, 9, 5, 7, DateTimeKind.Utc);
+    private readonly string _props = Path.Combine(Path.GetTempPath(), $"Directory.Build.{Guid.NewGuid():N}.props");
+
+    public void Dispose() => File.Delete(_props);
+
+    private static ReleaseVersion Next(string prefix, params string[] tags) =>
+        PackageVersion.Next(ReleaseVersion.Parse(prefix), tags);
 
     [Test]
-    [Arguments("trunk", "trunk-20261114090507")]
-    [Arguments("claude/fix-it", "claude-fix-it-20261114090507")]
-    [Arguments("a/b/c", "a-b-c-20261114090507")]
-    [Arguments(null, "local-20261114090507")]
-    [Arguments("", "local-20261114090507")]
-    public async Task SuffixIsTheBranchAndTheBuildTime(string? branch, string expected)
+    [Arguments("57", "57")]
+    [Arguments(" 57\n", "57")]
+    [Arguments(null, "local")]
+    [Arguments("", "local")]
+    [Arguments("   ", "local")]
+    [Arguments("57.2", "57.2")]
+    public async Task BuildIsTheRunNumberOrLocal(string? buildNumber, string expected)
     {
-        await Assert.That(PackageVersion.Suffix(new BuildSettings(), branch, BuildTime)).IsEqualTo(expected);
+        await Assert.That(PackageVersion.Build(buildNumber)).IsEqualTo(expected);
     }
 
     [Test]
-    public async Task ReleaseHasNoSuffix()
+    [Arguments("57+1")]
+    [Arguments("a/b")]
+    [Arguments("57.")]
+    [Arguments("..")]
+    public async Task BuildMustBeValidBuildMetadata(string buildNumber)
     {
-        await Assert.That(PackageVersion.Suffix(new BuildSettings { Version = "1.2.0" }, "trunk", BuildTime)).IsNull();
+        await Assert.That(() => PackageVersion.Build(buildNumber)).Throws<ArgumentException>();
     }
 
     [Test]
-    [Arguments("trunk", "trunk", null, "20261114090507+trunk")]
-    [Arguments("feature", "trunk", null, "20261114090507+merge")]
-    [Arguments("main", "trunk", "main", "20261114090507+trunk")]
-    [Arguments("trunk", "trunk", "main", "20261114090507+merge")]
-    public async Task ConsoleVersionSaysWhetherTheDefaultBranchWasBuilt(
-        string branch, string detectedDefault, string? configuredDefault, string expected)
+    public async Task FullVersionAddsTheBuildAsMetadata()
     {
-        var settings = new BuildSettings { DefaultBranch = configuredDefault };
+        var version = new BuildVersion(ReleaseVersion.Parse("0.4.1"), "57");
 
-        await Assert.That(PackageVersion.Console(settings, branch, detectedDefault, BuildTime)).IsEqualTo(expected);
+        using (Assert.Multiple())
+        {
+            await Assert.That(version.Version).IsEqualTo("0.4.1");
+            await Assert.That(version.Full).IsEqualTo("0.4.1+57");
+        }
     }
 
     [Test]
-    public async Task ReleaseConsoleVersionIsTheReleaseVersion()
+    // Nothing released at or above the prefix: the prefix.
+    [Arguments("0.4.0", new string[0], "0.4.0")]
+    [Arguments("0.4.0", new[] { "v0.1.0", "v0.3.0" }, "0.4.0")]
+    // Its prereleases don't count: 0.4.0 comes after 0.4.0-rc.1.
+    [Arguments("0.4.0", new[] { "v0.3.0", "v0.4.0-rc.1" }, "0.4.0")]
+    // Released: the patch after the newest release, so nobody has to raise the prefix after each one.
+    [Arguments("0.4.0", new[] { "v0.3.0", "v0.4.0" }, "0.4.1")]
+    [Arguments("0.4.0", new[] { "v0.4.0", "v0.4.1", "v0.4.2" }, "0.4.3")]
+    [Arguments("0.4.0", new[] { "v0.4.2", "v0.4.10", "v0.4.9" }, "0.4.11")]
+    // A raised prefix starts a new minor or major version.
+    [Arguments("0.5.0", new[] { "v0.4.0", "v0.4.1" }, "0.5.0")]
+    [Arguments("1.0.0", new[] { "v0.4.1" }, "1.0.0")]
+    // A prefix left below a newer release still builds above it.
+    [Arguments("0.4.0", new[] { "v0.5.0" }, "0.5.1")]
+    // A prerelease prefix that isn't released yet.
+    [Arguments("0.5.0-rc.1", new[] { "v0.4.1" }, "0.5.0-rc.1")]
+    [Arguments("0.5.0-rc.2", new[] { "v0.4.1", "v0.5.0-rc.1" }, "0.5.0-rc.2")]
+    // Tags that aren't releases are ignored.
+    [Arguments("0.4.0", new[] { "0.4.0", "v0.4.0-", "vnext", "release-0.4.0", "v0.4" }, "0.4.0")]
+    public async Task NextReleaseIsThePrefixOrThePatchAfterTheNewestRelease(string prefix, string[] tags, string expected)
     {
-        var settings = new BuildSettings { Version = "v1.2.0-rc.1" };
+        await Assert.That(Next(prefix, tags).Version).IsEqualTo(expected);
+    }
 
-        await Assert.That(PackageVersion.Console(settings, "trunk", "trunk", BuildTime)).IsEqualTo("1.2.0-rc.1");
+    [Test]
+    [Arguments("0.5.0-rc.1", new[] { "v0.5.0-rc.1" }, "v0.5.0-rc.1")]
+    [Arguments("0.5.0-rc.1", new[] { "v0.5.0-rc.2" }, "v0.5.0-rc.2")]
+    [Arguments("0.5.0-rc.1", new[] { "v0.5.0" }, "v0.5.0")]
+    public async Task ReleasedPrereleasePrefixMustBeRaised(string prefix, string[] tags, string release)
+    {
+        // Only a person can pick the next label (rc.2, or the release).
+        await Assert.That(() => Next(prefix, tags))
+            .Throws<InvalidOperationException>()
+            .WithMessageContaining(release[1..], StringComparison.Ordinal);
+    }
+
+    [Test]
+    public async Task PrefixIsReadFromTheProps()
+    {
+        await File.WriteAllTextAsync(_props, """
+            <Project>
+              <PropertyGroup>
+                <VersionPrefix> 0.4.0 </VersionPrefix>
+                <Authors>BusHero</Authors>
+              </PropertyGroup>
+            </Project>
+            """);
+
+        await Assert.That(PackageVersion.ReadPrefix(_props).Version).IsEqualTo("0.4.0");
+    }
+
+    [Test]
+    public async Task PropsWithoutAPrefixFail()
+    {
+        await File.WriteAllTextAsync(_props, "<Project><PropertyGroup /></Project>");
+
+        await Assert.That(() => PackageVersion.ReadPrefix(_props))
+            .Throws<InvalidOperationException>()
+            .WithMessageContaining("VersionPrefix", StringComparison.Ordinal);
+    }
+
+    [Test]
+    public async Task TheRepositorysPrefixIsAVersion()
+    {
+        var props = Path.Combine(Repository.Root, "Source", "Directory.Build.props");
+
+        await Assert.That(() => PackageVersion.ReadPrefix(props)).ThrowsNothing();
     }
 }

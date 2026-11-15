@@ -39,29 +39,39 @@ the `Build` configuration section, as environment variables (`Build__PublishDire
 | `Target` | `All` | Which modules run, see below |
 | `Configuration` | `Release` | Build configuration |
 | `PublishDirectory` | `publish` | Where the packages and the console app go |
-| `DefaultBranch` | from git | Decides the `+trunk` / `+merge` version suffix |
-| `NuGetApiKey` | none | Pushes the packages (library and tool) when set; otherwise the push is skipped |
-| `NuGetSource` | GitHub Packages | Feed to push to |
-| `Version` | none | Release version (`1.2.0`, `1.2.0-rc.1`); without it the packages are branch prereleases |
-| `ReleaseDirectory` | `release` | Where a release build puts the GitHub release assets |
+| `BuildNumber` | none (`local`) | The build metadata of the version (`0.4.1+57`); CI passes the run number |
+| `ReleaseDirectory` | `release` | Where the build puts the release candidate (packages, symbols, console app zip, `SHA256SUMS.txt`) |
+| `Version` | none | The version `VerifyRelease` checks and `SmokeTest` tests (`1.2.0`, `1.2.0-rc.1`); builds ignore it |
+| `Commit` | `GITHUB_SHA`, then HEAD | The release candidate's commit, for `VerifyRelease` |
+| `DefaultBranch` | from git | The branch `VerifyRelease` requires the run to be on |
 | `ReleaseNotesDirectory` | `release-notes` | Where `VerifyRelease` writes the release description |
 | `ReleaseEnvironment` | `nuget` | The GitHub environment `VerifyRelease` requires a reviewer on |
+
+Every build is a release candidate, versioned as the release it would be, with the build as SemVer build metadata:
+`0.4.1+57` is run 57 of the next release, 0.4.1. The version is the `VersionPrefix` in `Source/Directory.Build.props`,
+unless a stable release at or above it is already tagged: then it is the patch after the newest release, so nobody
+raises the prefix after each release. Raise it by hand only to start a new minor or major version (`0.5.0`) or a
+prerelease (`0.5.0-rc.1`; once released, a prerelease prefix has to be raised before the next build). NuGet ignores
+build metadata, so the packages are named `0.4.1`, while the nuspec says `0.4.1+57` and the assemblies'
+informational version `0.4.1+57.<commit>`. That is also why candidates go to no feed: to NuGet, every candidate of
+0.4.1 is the same package. A build needs the tags (`git fetch --tags`; CI checks out with `fetch-depth: 0`), and warns
+when it finds none.
 
 The CI workflows run the pipeline too, one target per job, so a job only sets up the machine and hands files to
 the next. Each target runs on a developer machine as well (`./build.sh --Build:Target=Test`):
 
 | Target | Modules | Used by |
 |---|---|---|
-| `All` | Format check, compile, tests, third-party notices, console app, packages, push; on a release, the release assets (packages, console app zip, `SHA256SUMS.txt`) | Build and release > Build and package |
-| `VerifyRelease` | Checks the release may go ahead and writes its description from `CHANGELOG.md`; needs `GITHUB_TOKEN` | Build and release > Check release |
-| `SmokeTest` | Runs the smoke tests (`pipeline/GitSnapshotter.SmokeTests`) on `Version`, building nothing of the product; see below | Build and release > Smoke test (Linux x64, ARM64 and Alpine, Windows, macOS), after every release and on every CI build (from GitHub Packages, without the release-only checks) |
+| `All` | The commit stage: version, format check, compile, tests, third-party notices, console app, packages, and the release candidate in `release/` (packages, symbols, console app zip, `SHA256SUMS.txt`) | Build and release > Build and package |
+| `VerifyRelease` | Checks the candidate may be released and writes its description from `CHANGELOG.md`; builds nothing; needs `GITHUB_TOKEN` | Build and release > Check release |
+| `SmokeTest` | Runs the smoke tests (`pipeline/GitSnapshotter.SmokeTests`) on `Version`, building nothing of the product; see below | Build and release > Smoke test (Linux x64, ARM64 and Alpine, Windows, macOS): the acceptance stage of every build, on its candidate without the release-only checks, and after every release |
 | `Test` | Compile and tests | Build and release > Test on Windows |
 | `Compile` | Compile | CodeQL |
 | `Restore` | Restore the solution | Build and release > Submit dependency graph |
 | `Docs` | `npm ci` and `npm run build` in `docs` | Docs |
 
 The smoke tests are a TUnit app in `pipeline/GitSnapshotter.SmokeTests`, one test per check, so a failed run names
-what broke. They download the published packages into an empty directory and use them as a user would: the tool
+what broke. They install the packages from a feed or a candidate's files into an empty directory and use them as a user would: the tool
 (installed globally, as a local tool from a manifest, with `dotnet tool exec`; each framework's build; a snapshot and
 restore of a repository and its working tree, also from a snapshot the previous release took; an upgrade from the
 previous release) and the library (snapshot, `Preserve`, JSON and `Restore`, on each framework it is built for).
@@ -69,8 +79,8 @@ They check both packages' third-party notices and contents (an assembly must be 
 library may depend only on packages its project passes on), signatures, known vulnerabilities, API compatibility (a
 break must be under a "Breaking" heading in the version's `CHANGELOG.md` section) and size against the previous
 release, what the feed shows, the symbols, deterministic builds and Source Link, the GitHub release, and the published
-installation page. Releases run them on nuget.org's packages, CI builds on GitHub Packages' prereleases with the
-release-only checks off.
+installation page. Every build runs them on its release candidate, from its files, with the release-only checks off;
+every release runs them again on nuget.org's packages.
 
 `dotnet test` on the solution leaves them out, as they need a published version. To run them locally, use
 `smoke-test.ps1` (PowerShell 7), which sets the variables below for you:
@@ -78,8 +88,8 @@ release-only checks off.
 ```powershell
 ./smoke-test.ps1                                   # the newest version on nuget.org, every check
 ./smoke-test.ps1 -Version 0.3.0 -WithReleaseAssets # also compare with the v0.3.0 GitHub release's files
-./smoke-test.ps1 -Local                            # build and pack this checkout as CI does, test those packages
-./smoke-test.ps1 -Local -NoBuild --treenode-filter "/*/*/ToolTests/*"  # reuse ./publish, run one class
+./smoke-test.ps1 -Local                            # build this checkout's release candidate as CI does, test it
+./smoke-test.ps1 -Local -NoBuild --treenode-filter "/*/*/ToolTests/*"  # reuse ./release, run one class
 ```
 
 `Get-Help ./smoke-test.ps1 -Full` lists its options. CI runs them with the `SmokeTest` target
@@ -90,19 +100,19 @@ environment variables (`pipeline/GitSnapshotter.SmokeTests/SmokeTestSettings.cs`
 | Setting | Default | Purpose |
 |---|---|---|
 | `Version` | the target's `Version` | The version to test |
-| `Source` | nuget.org | Feed our packages are tested from |
-| `SourceUsername`, `SourcePassword` | none | Credentials for `Source` (GitHub Packages) |
+| `Source` | nuget.org | Feed our packages are tested from, or a directory such as a release candidate's |
+| `SourceUsername`, `SourcePassword` | none | Credentials for `Source`, if it needs them |
 | `PreviousSource` | nuget.org | Where the previous releases and our packages' dependencies come from |
 | `WaitMinutes` | `30` | How long to retry while the feed doesn't list the packages, their metadata or symbols yet |
 | `ReleaseDirectory` | none | The GitHub release's assets: checked against `SHA256SUMS.txt`, and compared with the feed's packages, the PDBs and the console app zip |
 | `Commit` | the library package's | The commit the packages, Source Link and the release tag must point at |
-| `VerifySignatures` | `true` | Verify the packages' signatures; off for a feed that doesn't sign, like GitHub Packages |
+| `VerifySignatures` | `true` | Verify the packages' signatures; off for a release candidate, which nuget.org hasn't signed yet |
 | `FeedMetadata` | `true` | Check what the feed shows (nuget.org's registration API) |
 | `Symbols`, `SymbolServer` | `true`, nuget.org's | Download our PDBs from the symbol server |
 | `GitHubRelease`, `GitHubRepository` | `true`, this one | Check the GitHub release (with `GITHUB_TOKEN`, when set) |
 | `Docs`, `DocsPage` | `true`, the installation page | Check the published page against the release |
 | `MaxGrowthPercent` | `25` | How much each framework's part of a package may grow over the previous release |
-| `AboveReleases` | `false` | Fail when the version sorts below a release (CI builds: raise `VersionPrefix` after each release) |
+| `AboveReleases` | `false` | Fail when the version sorts below a release; on for release candidates |
 
 On a build server the pipeline also gives git a user name and email for the tests; on a developer machine it leaves
 the git configuration alone.
@@ -117,7 +127,7 @@ Package versions live in `Directory.Packages.props`, and each project's resolved
 `packages.lock.json`. A normal restore updates the lock files; commit them with the version change. CI (and the
 pre-push hook) restore in locked mode and fail if a lock file is out of date.
 
-Every push to `trunk` publishes prerelease packages, so enable the pre-push hook once per clone. It runs the
+Every push to `trunk` builds a release candidate, so enable the pre-push hook once per clone. It runs the
 test suite on the commit being pushed to `trunk` and stops the push if anything fails:
 
 ```sh
@@ -136,35 +146,41 @@ git config core.hooksPath .githooks
 
 ### Releasing
 
-Releases come from the same **Build and release** workflow as CI builds. Start it by hand: **Actions > Build and release > Run workflow**, on
-`trunk`, with the version to release (`1.2.0`, or `1.2.0-rc.1` for a prerelease). With no version, the run is an
-ordinary CI build. A release builds the latest commit on `trunk` and creates the `v1.2.0` tag when the release is
-published. From a terminal:
+A release publishes a release candidate that a build of `trunk` made and tested; nothing is built again. Pick a
+build of `trunk` whose every job passed, and release its version: the **Build and package** job's summary and the
+pipeline's log give it, like `0.4.1+57` (the run's number follows the `+`). Start **Actions > Build and release >
+Run workflow** on `trunk` with that candidate, or from a terminal:
 
 ```sh
-gh workflow run build.yml --ref trunk -f version=1.2.0
+gh workflow run build.yml --ref trunk -f candidate=0.4.1+57
 ```
 
-The release description comes from [`CHANGELOG.md`](CHANGELOG.md). Record each change under **Unreleased** as it is
-made. Before a stable release, rename **Unreleased** to the version (`## [1.2.0] - 2026-12-01`) and start a new,
-empty **Unreleased** above it; the release fails if the version has no section. A prerelease uses its own section if
-there is one, otherwise **Unreleased**.
+The run releases `0.4.1` and creates the `v0.4.1` tag on the candidate's commit. A candidate can be released as long
+as its build's artifacts are kept (90 days by default), and only once: after `0.4.1` is released, the next build of
+`trunk` is `0.4.2+<run>`.
+
+The release description comes from [`CHANGELOG.md`](CHANGELOG.md) at the candidate's commit. Record each change
+under **Unreleased** as it is made. Before a stable release, rename **Unreleased** to the version
+(`## [1.2.0] - 2026-12-01`) and start a new, empty **Unreleased** above it, then release the build of that commit; the
+release fails if the version has no section. A prerelease uses its own section if there is one, otherwise
+**Unreleased**.
 
 The workflow (`.github/workflows/build.yml`) never publishes without approval:
 
-1. **Check release** checks that the version is valid and has no tag yet, that the run is on the default branch, that
-   `CHANGELOG.md` describes it, and that the `nuget` environment requires a reviewer. If anyone removes that protection, releases fail instead of
-   publishing unattended.
-2. **Test on Windows** runs the tests on Windows.
-3. **Build and package** runs the pipeline with `Build:Version` set to the version. On a release it gets no token, so the
-   code being built cannot publish anything.
-4. **Publish release** waits for a reviewer to approve the `nuget` environment. It then creates a draft GitHub release with
-   both NuGet packages (the `GitSnapshotter` library and the `GitSnapshotter.Tool` .NET tool), the zipped console
-   app and `SHA256SUMS.txt`, pushes the packages to nuget.org, and publishes the release, which creates the tag. It
-   is the only job that can write to the repository or get a nuget.org key.
+1. **Check release** finds the candidate's build, checks that it passed and built `trunk`, downloads its candidate,
+   and checks the files against their checksums and that both packages are that version, built from that commit.
+   Then it checks that the version has no tag yet, that the run is on the default branch, that `CHANGELOG.md`
+   describes it, and that the `nuget` environment requires a reviewer. If anyone removes that protection, releases
+   fail instead of publishing unattended.
+2. **Publish release** waits for a reviewer to approve the `nuget` environment. It then creates a draft GitHub release with
+   the candidate's files (the `GitSnapshotter` library and the `GitSnapshotter.Tool` .NET tool packages with their
+   symbols, the zipped console app and `SHA256SUMS.txt`), pushes the packages to nuget.org, and publishes the release,
+   which creates the tag. It is the only job that can write to the repository or get a nuget.org key.
+3. **Smoke test** runs the smoke tests on the packages from nuget.org, with every check.
 
-A version with a prerelease label (`1.2.0-rc.1`) makes a GitHub prerelease and a NuGet prerelease. The release stays
-a draft until the push to nuget.org succeeds, so a failed run can be re-run.
+A version with a prerelease label (`1.2.0-rc.1`, from a `VersionPrefix` of `1.2.0-rc.1`) makes a GitHub prerelease
+and a NuGet prerelease. The release stays a draft until the push to nuget.org succeeds, so a failed run can be
+re-run.
 
 Setup, once:
 

@@ -6,9 +6,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 Add each change under **Unreleased** as it is made. A release takes its GitHub release description from the section
 for its version: before releasing, rename **Unreleased** to the version (`## [1.2.0] - 2026-12-01`) and start a new,
-empty **Unreleased** section above it. A prerelease with no section of its own uses **Unreleased**.
+empty **Unreleased** section above it, then release the build of that commit. A prerelease with no section of its
+own uses **Unreleased**.
 
 ## [Unreleased]
+
+### Changed
+
+- Builds of `trunk` are no longer published to GitHub Packages. Every build is a release candidate at the version it
+  would be released as, with the build's run number as build metadata (`0.4.1+57`, which `gitsnapshotter --version`
+  prints), and a release publishes such a candidate to nuget.org unchanged. To try one before it is released,
+  download its `release-candidate` artifact; see the installation page.
 
 ## [0.4.0-rc.1] - 2026-11-14
 

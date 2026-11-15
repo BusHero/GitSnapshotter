@@ -38,10 +38,11 @@ public sealed class BuildTargetsTests
     public static IEnumerable<BuildTarget> Targets() => Enum.GetValues<BuildTarget>();
 
     [Test]
-    public async Task AllBuildsTestsPacksAndReleases()
+    public async Task AllBuildsTestsAndPacksTheReleaseCandidate()
     {
         await Assert.That(ModulesOf(BuildTarget.All)).IsEquivalentTo(
         [
+            typeof(BuildVersionModule),
             typeof(VerifyFormattingModule),
             typeof(CompileModule),
             typeof(ConfigureGitIdentityModule),
@@ -49,7 +50,6 @@ public sealed class BuildTargetsTests
             typeof(ThirdPartyNoticesModule),
             typeof(PackModule),
             typeof(PublishConsoleModule),
-            typeof(PushPackageModule),
             typeof(ReleaseAssetsModule),
         ]);
     }
@@ -66,11 +66,16 @@ public sealed class BuildTargetsTests
     public async Task TestCompilesAndRunsTheTestsOnly()
     {
         await Assert.That(ModulesOf(BuildTarget.Test)).IsEquivalentTo(
-            [typeof(CompileModule), typeof(ConfigureGitIdentityModule), typeof(RunUnitTestsModule)]);
+            [typeof(BuildVersionModule), typeof(CompileModule), typeof(ConfigureGitIdentityModule), typeof(RunUnitTestsModule)]);
     }
 
     [Test]
-    [Arguments(BuildTarget.Compile, typeof(CompileModule))]
+    public async Task CompileOnlyCompiles()
+    {
+        await Assert.That(ModulesOf(BuildTarget.Compile)).IsEquivalentTo([typeof(BuildVersionModule), typeof(CompileModule)]);
+    }
+
+    [Test]
     [Arguments(BuildTarget.Restore, typeof(RestoreModule))]
     [Arguments(BuildTarget.Docs, typeof(BuildDocsModule))]
     [Arguments(BuildTarget.SmokeTest, typeof(SmokeTestModule))]
@@ -120,8 +125,19 @@ public sealed class BuildTargetsTests
     [Test]
     public async Task SmokeTestBuildsNothing()
     {
-        // It tests what was published, so it must not compile, pack or push anything of its own.
+        // It tests a release candidate or a release, so it must not compile or pack anything of its own.
         await Assert.That(DependenciesOf(typeof(SmokeTestModule))).IsEmpty();
+    }
+
+    [Test]
+    [Arguments(typeof(CompileModule))]
+    [Arguments(typeof(PackModule))]
+    [Arguments(typeof(PublishConsoleModule))]
+    [Arguments(typeof(ReleaseAssetsModule))]
+    public async Task EverythingBuiltWaitsForTheVersion(Type module)
+    {
+        // Each stamps or checks the build's version, so none may start before it is known.
+        await Assert.That(DependenciesOf(module).Select(d => d.Type)).Contains(typeof(BuildVersionModule));
     }
 
     [Test]
@@ -135,11 +151,7 @@ public sealed class BuildTargetsTests
     [Test]
     public async Task ReleaseAssetsWaitForTheTests()
     {
-        // Nothing is handed to the publish job, or pushed, unless the tests passed.
-        using (Assert.Multiple())
-        {
-            await Assert.That(DependenciesOf(typeof(ReleaseAssetsModule)).Select(d => d.Type)).Contains(typeof(RunUnitTestsModule));
-            await Assert.That(DependenciesOf(typeof(PushPackageModule)).Select(d => d.Type)).Contains(typeof(RunUnitTestsModule));
-        }
+        // No release candidate is made unless the tests passed.
+        await Assert.That(DependenciesOf(typeof(ReleaseAssetsModule)).Select(d => d.Type)).Contains(typeof(RunUnitTestsModule));
     }
 }

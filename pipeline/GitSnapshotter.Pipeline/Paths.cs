@@ -10,6 +10,10 @@ internal static class Paths
     public static string Solution(IPipelineContext context) =>
         Path.Combine(Root(context), "Source", "GitSnapshotter.slnx");
 
+    /// <summary>The props file that sets the <c>VersionPrefix</c> of both packages.</summary>
+    public static string VersionProps(IPipelineContext context) =>
+        Path.Combine(Root(context), "Source", "Directory.Build.props");
+
     public static string Library(IPipelineContext context) =>
         Path.Combine(Root(context), "Source", "GitSnapshotter", "GitSnapshotter.csproj");
 

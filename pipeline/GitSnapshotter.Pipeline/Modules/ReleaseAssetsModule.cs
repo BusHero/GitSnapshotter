@@ -6,7 +6,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 using ModularPipelines.Attributes;
-using ModularPipelines.Configuration;
 using ModularPipelines.Context;
 using ModularPipelines.Models;
 using ModularPipelines.Modules;
@@ -14,11 +13,13 @@ using ModularPipelines.Modules;
 namespace GitSnapshotter.Pipeline.Modules;
 
 /// <summary>
-/// On a release build, puts everything the GitHub release gets into <see cref="BuildSettings.ReleaseDirectory"/>: the
-/// packages and their symbol packages, the console app as a zip, and SHA256SUMS.txt over all of them. Fails unless
-/// exactly the expected packages were built at the release version, and our assemblies in them and in the console app
-/// carry that version too (<see cref="ReleaseAssemblies"/>): pushing to nuget.org can't be undone.
+/// Puts the release candidate into <see cref="BuildSettings.ReleaseDirectory"/>: everything a release publishes, the
+/// packages and their symbol packages, the console app as a zip, and SHA256SUMS.txt over all of them. Every build
+/// makes one; releasing it pushes these very files, built and tested once. Fails unless exactly the expected packages
+/// were built at the build's version, and our assemblies in them and in the console app carry that version too
+/// (<see cref="ReleaseAssemblies"/>): pushing to nuget.org can't be undone.
 /// </summary>
+[DependsOn<BuildVersionModule>]
 [DependsOn<PackModule>]
 [DependsOn<PublishConsoleModule>]
 [DependsOn<RunUnitTestsModule>]
@@ -28,13 +29,6 @@ public sealed class ReleaseAssetsModule(IOptions<BuildSettings> settings) : Modu
 
     private static readonly string[] PackageIds = ["GitSnapshotter", "GitSnapshotter.Tool"];
 
-    protected override ModuleConfiguration Configure() =>
-        ModuleConfiguration.Create()
-            .WithSkipWhen(() => settings.Value.IsRelease
-                ? SkipDecision.DoNotSkip
-                : SkipDecision.Skip("Not a release"))
-            .Build();
-
     protected override async Task<string?> ExecuteAsync(IModuleContext context, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -42,7 +36,7 @@ public sealed class ReleaseAssetsModule(IOptions<BuildSettings> settings) : Modu
         var files = await CreateAsync(
             (await context.GetModule<PackModule>()).ValueOrDefault!,
             Paths.ReleaseDirectory(context, settings.Value),
-            settings.Value.Version!,
+            (await context.GetModule<BuildVersionModule>()).ValueOrDefault!.Version,
             cancellationToken);
 
         foreach (var file in files)
