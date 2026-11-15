@@ -72,8 +72,18 @@ release, what the feed shows, the symbols, deterministic builds and Source Link,
 installation page. Releases run them on nuget.org's packages, CI builds on GitHub Packages' prereleases with the
 release-only checks off.
 
-`dotnet test` on the solution leaves them out, as they need a published version. Run them with the `SmokeTest` target
-(`./build.sh --Build:Target=SmokeTest --Build:Version=0.3.0`), or directly with
+`dotnet test` on the solution leaves them out, as they need a published version. To run them locally, use
+`smoke-test.ps1` (PowerShell 7), which sets the variables below for you:
+
+```powershell
+./smoke-test.ps1                                   # the newest version on nuget.org, every check
+./smoke-test.ps1 -Version 0.3.0 -WithReleaseAssets # also compare with the v0.3.0 GitHub release's files
+./smoke-test.ps1 -Local                            # build and pack this checkout as CI does, test those packages
+./smoke-test.ps1 -Local -NoBuild --treenode-filter "/*/*/ToolTests/*"  # reuse ./publish, run one class
+```
+
+`Get-Help ./smoke-test.ps1 -Full` lists its options. CI runs them with the `SmokeTest` target
+(`./build.sh --Build:Target=SmokeTest --Build:Version=0.3.0`), and they also run directly with
 `dotnet run --project pipeline/GitSnapshotter.SmokeTests` and `SmokeTest__Version`. Their settings are `SmokeTest__*`
 environment variables (`pipeline/GitSnapshotter.SmokeTests/SmokeTestSettings.cs`); booleans are `true` or `false`:
 

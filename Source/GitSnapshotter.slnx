@@ -13,6 +13,7 @@
     <File Path="../global.json" />
     <File Path="../LICENSE" />
     <File Path="../README.md" />
+    <File Path="../smoke-test.ps1" />
   </Folder>
   <Project Path="../pipeline/GitSnapshotter.Pipeline.Tests/GitSnapshotter.Pipeline.Tests.csproj" />
   <Project Path="../pipeline/GitSnapshotter.SmokeTests/GitSnapshotter.SmokeTests.csproj" />
